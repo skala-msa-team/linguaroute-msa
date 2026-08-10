@@ -119,21 +119,31 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
-      - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=user-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=lb://user-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/users/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_1_URI=lb://recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/api/courses/recommendations,/api/courses/recommendations/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=course-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://course-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/courses/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/enrollments/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=payment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://payment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/payments/**
+      # [설계 이유 - 내부 API의 외부 노출 차단]
+      # 일반 서비스 라우트(/api/courses/** 등)는 internal 하위 경로까지 포함한다.
+      # 가장 높은 우선순위의 차단 라우트를 먼저 매칭해 외부에는 내부 API 존재와
+      # 인증 방식이 드러나지 않도록 404를 반환한다. 서비스 간 호출은 Gateway를
+      # 거치지 않고 Docker 네트워크에서 직접 수행하며 별도의 내부 키도 검증한다.
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=block-internal-api
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=no://op
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_FILTERS_0=SetStatus=404
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_ORDER=-100
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_URI=lb://user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/api/users/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/courses/recommendations,/api/courses/recommendations/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments/**
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -160,7 +170,7 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
-      - INTERNAL_API_KEY=local-internal-api-key
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -186,6 +196,7 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -268,7 +279,7 @@ services:
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
       - USER_SERVICE_URL=http://user-service:8081
-      - INTERNAL_API_KEY=local-internal-api-key
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.6-luna}
       - OPENAI_TIMEOUT_SECONDS=${OPENAI_TIMEOUT_SECONDS:-15}
