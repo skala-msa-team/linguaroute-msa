@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # OpenAI 키가 없는 개발 환경에서는 로컬 제공자를 유지한다. 키의 존재 여부만으로
     # 제공자를 선택하면 별도 feature flag 없이도 로컬 테스트와 운영 설정을 분리할 수 있다.
     openai_api_key: str | None = None
-    openai_model: str = "gpt-5.6-sol"
+    openai_model: str = "gpt-5.6-luna"
     openai_timeout_seconds: float = 15.0
     openai_max_retries: int = 1
     openai_max_output_tokens: int = 600
