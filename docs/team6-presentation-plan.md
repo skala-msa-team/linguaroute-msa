@@ -173,10 +173,10 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start` | 직원 | 수강·차시 ID | 학습 시작 시각과 상태 |
 | 차시 완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/complete` | 직원 | 수강·차시 ID | 서버 계산 진도율 |
-| AI 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 추천 강의·이유·생성 방식 |
+| AI 추천 (개발 중) | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 목표 계약. 발표 라이브 시연 제외 |
 | 강의 등록 | `POST` | `/api/admin/courses` | 플랫폼 관리자 | 강의 정보 | 생성 강의 |
 | 강의 수정 | `PATCH` | `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 변경 정보 | 수정 강의 |
-| 운영 조회 | `GET` | `/api/admin/users`, `/companies`, `/payments`, `/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 영역별 운영 목록 |
+| 운영 조회 (설계·목업) | `GET` | `/api/admin/users`, `/companies`, `/payments`, `/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 목표 계약. 발표 라이브 시연 제외 |
 
 ### 예시 1. 이메일·비밀번호 로그인
 
@@ -281,7 +281,9 @@ Content-Type: application/json
 
 서버는 직원 역할, 기업의 활성 구독, 강의의 `ACTIVE` 상태와 중복 신청 여부를 모두 확인합니다.
 
-### 예시 5. AI 강의 추천
+### 예시 5. AI 강의 추천 목표 계약
+
+> 이 요청·응답은 추천 기능 구현 중인 목표 계약입니다. 발표 라이브 시연에서는 사용하지 않고, 구현·curl 검증 후 실제 결과로 교체합니다.
 
 ```http
 POST /api/courses/recommendations
@@ -398,13 +400,11 @@ Content-Type: application/json
 ```text
 기업 관리자: 요금제 선택 → 모의 결제 → 구독 ACTIVE·좌석 활성화
 → 기업 관리자: 초대코드 생성
-→ 직원: 초대 가입 → AI 추천 조건 입력 → 추천 강의 확인
-→ 직원: 강의 상세 → 수강신청 → 차시 완료 → 진도율 증가
+→ 직원: 초대 가입 → 강의 상세 → 수강신청 → 차시 완료 → 진도율 증가
 → 기업 관리자: 직원별 진도 확인
-→ 플랫폼 관리자: 기업·결제·수강 운영 상태 확인
 ```
 
-발표에서는 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화를 같은 순서로 설명합니다.
+AI 추천과 플랫폼 운영 화면은 현재 UI 프로토타입 또는 목표 구조 설명용으로만 사용합니다. 라이브 시연에는 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화가 확인된 구현 기능만 포함합니다.
 
 ## 팀 담당 영역
 

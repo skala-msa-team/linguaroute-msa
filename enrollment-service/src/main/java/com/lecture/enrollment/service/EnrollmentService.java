@@ -65,14 +65,6 @@ public class EnrollmentService {
                 courseId
         );
 
-        enrollmentKafkaProducer.publishEnrollmentCompleted(
-                KafkaEvent.EnrollmentCompletedEvent.builder()
-                        .enrollmentId(enrollment.getId())
-                        .userId(userId)
-                        .courseId(courseId)
-                        .build()
-        );
-
         log.info("[EnrollmentService] 수강신청 완료 - enrollmentId: {}", enrollment.getId());
         return EnrollmentDto.EnrollResponse.from(enrollment);
     }
@@ -104,9 +96,22 @@ public class EnrollmentService {
     @Transactional
     public EnrollmentDto.LessonActionResponse completeLesson(Long userId, Long enrollmentId, Long lessonId) {
         Enrollment enrollment = findActiveEmployeeEnrollment(userId, enrollmentId);
+        boolean wasCompleted = enrollment.getStatus() == Enrollment.Status.COMPLETED;
         LessonProgress progress = findOrCreateLessonProgress(enrollment, lessonId);
         progress.complete(java.time.LocalDateTime.now());
         updateProgress(enrollment);
+        if (!wasCompleted && enrollment.getStatus() == Enrollment.Status.COMPLETED) {
+            enrollmentKafkaProducer.publishEnrollmentCompleted(
+                    KafkaEvent.EnrollmentCompletedEvent.builder()
+                            .eventId(java.util.UUID.randomUUID().toString())
+                            .eventType("EnrollmentCompleted")
+                            .occurredAt(java.time.LocalDateTime.now())
+                            .enrollmentId(enrollment.getId())
+                            .userId(enrollment.getUserId())
+                            .courseId(enrollment.getCourseId())
+                            .build()
+            );
+        }
         return EnrollmentDto.LessonActionResponse.from(enrollment, progress);
     }
 

@@ -10,9 +10,9 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | 수강·학습 API는 2026-08-11 Gateway curl 검증 반영, 나머지는 MVP 설계 초안 |
+| 문서 상태 | 인증·구독·직원·강의·수강 API는 구현·검증 기록 반영, AI 추천·플랫폼 운영 API는 설계·미구현 |
 
-수강·학습 API(`COURSE-03`, `ADMIN-LESSON-01`, `ENROLL-*`, `LEARNING-*`, `COMPANY-ENROLL-*`)는 실제 Gateway 호출 결과를 반영했습니다. 나머지 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
+인증·구독·직원·강의·수강 API의 구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. AI 추천과 플랫폼 운영 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
@@ -1032,7 +1032,9 @@ Authorization: Bearer {accessToken}
 
 ---
 
-## 9. AI 강의 추천 API
+## 9. AI 강의 추천 API (설계·미구현)
+
+> 이 절의 경로와 요청·응답은 확정 MVP 목표 계약이다. 현재 `recommend-service`의 외부 경로와 내부 호출이 이 계약에 맞지 않아 Gateway 통합 API로 사용할 수 없다. 구현·curl 검증 전에는 완료 API로 공유하지 않는다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -1150,7 +1152,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 ---
 
-## 11. 플랫폼 운영 API
+## 11. 플랫폼 운영 API (설계·미구현)
+
+> 아래 운영 조회 API는 화면·클라이언트에서 호출하지 않는다. 현재 각 소유 서비스에 플랫폼 관리자용 집계 API가 구현되어 있지 않으므로, 구현 및 Gateway 검증 전에는 설계 계약으로만 관리한다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
