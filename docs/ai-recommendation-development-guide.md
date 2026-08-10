@@ -98,7 +98,7 @@ Authorization: Bearer {accessToken}
 - 추천 제공자 장애 시 규칙 기반 폴백
 - 직원 권한과 Gateway 인증 헤더
 
-API Gateway에서는 `/api/courses/recommendations`가 일반 강의 경로보다 먼저 `recommend-service`로 전달되도록 구성했습니다.
+API Gateway에서는 `/api/courses/recommendations`가 일반 강의 경로보다 먼저 `recommend-service`로 전달되도록 Compose 환경 설정을 추가했습니다. 다만 제공된 Gateway 이미지에서 실제 라우팅과 인증 헤더 전달이 동작하는지는 아직 검증하지 않았습니다.
 
 ---
 
@@ -231,6 +231,45 @@ GET /api/courses?language=ENGLISH&status=ACTIVE
 - 서비스 간 요청에 사용자 토큰 또는 내부 인증이 필요한지
 
 현재 `CourseServiceClient`는 최신 명세의 `data.content` 페이징 구조에 맞춘 보완이 필요할 수 있습니다.
+
+### 5.3 API Gateway 담당 범위
+
+API Gateway 연동과 서비스 통합 테스트는 김지민 담당입니다. 단순히 추천 API URL을 추가하는 것뿐 아니라 인증과 라우팅 경계를 실제 실행 환경에서 확인해야 합니다.
+
+#### 추천 경로 우선 라우팅
+
+추천 API는 외부 계약상 `/api/courses` 하위 경로지만 `course-service`가 아니라 `recommend-service`가 처리합니다. 따라서 구체적인 추천 경로가 일반 강의 경로보다 먼저 평가돼야 합니다.
+
+```text
+/api/courses/recommendations/**
+→ recommend-service
+
+/api/courses/**
+→ course-service
+```
+
+현재 `docker-compose.yml`에 이 우선순위를 설정했지만 실제 Gateway 이미지에서 환경변수로 기존 라우트가 정상 재정의되는지 확인해야 합니다.
+
+#### 인증과 클레임 전달
+
+Gateway는 외부 요청의 Bearer Token을 검증하고, 인증되지 않은 요청은 `401 Unauthorized`로 차단해야 합니다. 추천 API는 직원 전용이므로 `EMPLOYEE`가 아닌 사용자는 `403 Forbidden`으로 거부해야 합니다.
+
+팀에서 다음 두 방식 중 하나를 확정합니다.
+
+1. Gateway가 토큰을 검증한 뒤 `X-User-Id`, `X-Company-Id`, `X-User-Role`을 신뢰할 수 있는 내부 헤더로 만들어 전달
+2. Gateway가 토큰 유효성만 검증하고 `recommend-service`가 같은 토큰에서 필요한 클레임을 추출
+
+Gateway 헤더 방식을 사용할 때는 클라이언트가 임의로 보낸 `X-User-*` 헤더를 제거하고, 검증한 토큰 값으로 덮어써야 합니다. 실제 제공 이미지가 `companyId`까지 전달하지 못하면 Gateway 소스 또는 설정을 수정할 수 있는지 확인해야 합니다.
+
+#### Gateway 통합 검증
+
+- 직원 토큰으로 추천 요청 시 `200 OK`
+- 기업 관리자 또는 플랫폼 관리자 토큰으로 요청 시 `403 Forbidden`
+- 토큰이 없거나 잘못된 경우 `401 Unauthorized`
+- 추천 경로가 `recommend-service`로 전달되는지 확인
+- 일반 강의 경로가 계속 `course-service`로 전달되는지 확인
+- OpenAI 장애 시 Gateway를 통해 규칙 기반 폴백 응답이 반환되는지 확인
+- Gateway 외부 응답이 API 명세의 `{ data, timestamp }` 형식과 일치하는지 확인
 
 ---
 
@@ -367,7 +406,15 @@ LLM이 존재하지 않는 강의를 만들지 않도록 `course-service`에서 
 
 ### 우선순위 3: 테스트
 
-자동 테스트에서는 실제 유료 API를 호출하지 않고 OpenAI 클라이언트를 가짜 응답으로 대체합니다.
+실제 서비스 실행에서는 OpenAI API를 호출합니다. 반복 실행되는 단위·자동 테스트에서는 비용과 외부 네트워크 의존성을 줄이고 결과를 재현할 수 있도록 OpenAI 클라이언트를 가짜 응답으로 대체합니다. 실제 API 키를 사용하는 연결 검증은 별도의 수동 스모크 테스트와 전체 통합 테스트에서 최소 횟수로 수행합니다.
+
+```text
+실제 서비스 및 수동 통합 테스트
+→ 실제 OpenAI API 호출
+
+pytest 단위·자동 테스트
+→ 가짜 OpenAI 응답 사용
+```
 
 추가할 테스트:
 
@@ -382,7 +429,7 @@ LLM이 존재하지 않는 강의를 만들지 않도록 `course-service`에서 
 - 폴백 결과 저장
 - `AI`와 `RULE_BASED_FALLBACK` source 구분
 
-실제 API 호출은 팀 API 키를 준비한 뒤 수동 스모크 테스트로 최소 1회 실행합니다.
+실제 API 호출은 팀 API 키와 API 플랫폼 결제를 준비한 뒤 수동 스모크 테스트로 최소 1회 실행합니다. 이후 Gateway부터 OpenAI API와 DB 저장까지 이어지는 전체 흐름에서도 실제 호출을 확인합니다.
 
 ### 우선순위 4: 전체 MSA 통합
 
@@ -407,6 +454,7 @@ LLM이 존재하지 않는 강의를 만들지 않도록 `course-service`에서 
 - OpenAI 장애 시 폴백 응답
 - AI와 폴백 결과 DB 저장
 - Gateway 외부 경로와 응답 형식 일치
+- 일반 강의 API와 추천 API의 라우팅 충돌 없음
 
 ### 우선순위 5: 문서와 체크리스트
 
