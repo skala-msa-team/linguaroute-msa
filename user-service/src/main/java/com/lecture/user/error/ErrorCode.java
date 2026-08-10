@@ -12,6 +12,8 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "인증 토큰의 사용자 정보가 올바르지 않습니다"),
     INVALID_INTERNAL_API_KEY(HttpStatus.FORBIDDEN, "내부 API 키가 올바르지 않습니다"),
     INVALID_EMAIL_VERIFICATION(HttpStatus.UNPROCESSABLE_ENTITY, "이메일 인증 토큰이 유효하지 않습니다"),
+    INVALID_VERIFICATION_CODE(HttpStatus.UNPROCESSABLE_ENTITY, "이메일 인증 코드가 올바르지 않거나 만료되었습니다"),
+    EMAIL_VERIFICATION_REQUEST_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증 요청 횟수를 초과했습니다"),
     COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "기업을 찾을 수 없습니다"),
     COMPANY_ENTITLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "기업 구독 권한 정보를 찾을 수 없습니다"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),

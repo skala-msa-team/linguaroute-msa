@@ -84,14 +84,14 @@
 | AUTH-01 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
 | AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
 | AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
-| AUTH-05 | `POST` | `/api/auth/email-verifications` | 공개 | 이메일 인증 요청 | 필수 |
-| AUTH-06 | `POST` | `/api/auth/email-verifications/confirm` | 공개 | 이메일 인증 확인 | 필수 |
+| AUTH-05 | `POST` | `/api/users/register?action=request-email-verification` | 공개 | 이메일 인증 요청 | 필수 |
+| AUTH-06 | `POST` | `/api/users/register?action=confirm-email-verification` | 공개 | 이메일 인증 확인 | 필수 |
 | AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
 | AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
 
-Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 각 `/api/auth/**` 요청을 소유 서비스로 전달합니다. 서버를 새로 추가하지 않습니다.
+Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로, 구현된 `AUTH-05`, `AUTH-06`은 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다. 서버를 새로 추가하지 않습니다.
 
-이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
+이메일 인증은 SMTP로 6자리 코드를 보내며 로컬 개발에서는 MailHog를 사용합니다. SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 가입용 토큰은 해시로 저장하고 각각 15분 동안 한 번만 사용할 수 있습니다. 이메일 인증 요청은 이메일별 1분에 1회, 1시간에 5회로 제한합니다. 아이디 찾기와 비밀번호 재설정 메일은 후속 구현 대상입니다.
 
 ### AUTH-01 로그인
 
@@ -151,6 +151,11 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 
 ### AUTH-05 이메일 인증 요청
 
+```http
+POST /api/users/register?action=request-email-verification
+Content-Type: application/json
+```
+
 ```json
 {
   "email": "admin@company.com",
@@ -158,7 +163,25 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
+응답 `202 Accepted`:
+
+```json
+{
+  "data": {
+    "accepted": true
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+서버는 이메일을 소문자로 정규화하고 6자리 인증 코드를 SMTP로 발송합니다. 코드 원문은 저장하지 않습니다.
+
 ### AUTH-06 이메일 인증 확인
+
+```http
+POST /api/users/register?action=confirm-email-verification
+Content-Type: application/json
+```
 
 ```json
 {
@@ -167,7 +190,7 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
-성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 만료시간을 적용하고 재사용을 금지합니다.
+성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 15분 만료시간을 적용하고 재사용을 금지합니다. 가입 요청은 `action` 없이 기존 `POST /api/users/register` 본문을 사용합니다.
 
 응답 `200 OK`:
 
@@ -995,9 +1018,8 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | 오류 코드 | HTTP | 설명 |
 | --- | --- | --- |
 | `INVALID_CREDENTIALS` | `401` | 이메일 또는 비밀번호 불일치 |
-| `EMAIL_NOT_VERIFIED` | `422` | 이메일 인증 미완료 |
-| `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치 |
-| `VERIFICATION_CODE_EXPIRED` | `422` | 이메일 인증 코드 만료 |
+| `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치·만료·재사용 |
+| `EMAIL_VERIFICATION_REQUEST_LIMIT` | `429` | 이메일별 인증 요청 1분 1회 또는 1시간 5회 초과 |
 | `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
 | `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
 | `INVALID_INTERNAL_API_KEY` | `401` 또는 `403` | 서비스 간 내부 API 키 누락·불일치. 신규 내부 API는 `401`을 우선 사용하며, 기존 user-service 내부 API는 현재 구현상 `403`을 반환 |

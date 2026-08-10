@@ -292,9 +292,30 @@ Course Service     http://localhost:8082
 Enrollment Service http://localhost:8083
 Payment Service    http://localhost:8084
 Recommend Service  http://localhost:8085
+MailHog UI         http://localhost:8025
 MariaDB            localhost:3379
 Kafka              localhost:9092
 ```
+
+### 이메일 인증 로컬 확인
+
+이메일 인증 요청은 Gateway 공개 가입 경로를 사용합니다. 제공 Gateway 이미지가 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로, 기업 가입 경로에 `action` 쿼리 파라미터를 사용합니다.
+
+```bash
+curl -X POST 'http://localhost:8080/api/users/register?action=request-email-verification' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","purpose":"SIGNUP"}'
+```
+
+MailHog UI `http://localhost:8025`에서 수신된 6자리 코드를 확인한 뒤 다음 요청을 보냅니다.
+
+```bash
+curl -X POST 'http://localhost:8080/api/users/register?action=confirm-email-verification' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","verificationCode":"123456"}'
+```
+
+응답의 `emailVerificationToken`은 일반 `POST /api/users/register` 기업 가입 요청에 한 번만 사용할 수 있습니다.
 
 Eureka 화면(<http://localhost:8761/>)에서 각 서비스가 등록되었는지도 확인합니다.
 

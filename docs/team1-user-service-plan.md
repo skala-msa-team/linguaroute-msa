@@ -44,7 +44,7 @@
 - [x] `POST /api/users/me/agreements`
 - [x] 내부 사용자 권한 조회와 API 키 검증
 - [x] 공통 성공·오류 응답 및 주요 예외 상태 코드
-- [ ] 이메일 인증 요청·6자리 코드 확인·SMTP 발송
+- [x] 이메일 인증 요청·6자리 코드 확인·SMTP 발송
 - [ ] Gateway를 통한 OAuth2 로그인 후 보호 API 호출
 - [ ] 회원 탈퇴와 비밀번호 변경·재설정
 
@@ -169,7 +169,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 ### PR 1 — 기업 계정 기반 마무리
 
-1. 이메일 인증 요청·확인 API와 MailHog SMTP 연동
+1. 이메일 인증 요청·확인 API와 MailHog SMTP 연동: 완료. 제공 Gateway의 공개 경로 제약에 맞춰 `POST /api/users/register?action=request-email-verification`, `POST /api/users/register?action=confirm-email-verification`을 사용한다.
 2. Gateway 보호 라우팅과 기업 관리자 실제 로그인 토큰 기반 보호 API 검증
 3. 기존 Auth Server의 Refresh Token 반환과 MVP 문서 차이 팀 합의
 4. 관련 API·ERD·MVP 체크리스트 갱신
