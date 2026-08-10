@@ -1,220 +1,55 @@
 <template>
-  <div class="login-page">
-    <div class="login-layout">
-      <!-- 좌측 브랜딩 -->
-      <div class="login-left">
-        <div class="brand">
-          <img src="@/assets/images/logo/main_logo.png" alt="LearnNexus" class="brand-logo" />
-          <span class="brand-name">LearnNexus</span>
-        </div>
-        <div class="brand-content">
-          <h2>다시 만나서<br>반갑습니다</h2>
-          <p>로그인하고 나만의 학습 여정을 이어가세요.</p>
-          <ul class="feature-list">
-            <li v-for="f in features" :key="f">
-              <span class="dot"></span>{{ f }}
-            </li>
-          </ul>
-        </div>
+  <div class="auth-page">
+    <section class="auth-aside">
+      <BrandLogo />
+      <div class="aside-copy"><p class="eyebrow">Welcome back</p><h1>배움의 다음 경로가<br>기다리고 있어요.</h1><p>오늘도 작은 한 걸음으로 글로벌 역량을 이어가세요.</p></div>
+      <div class="mini-route"><span class="route-node done"><Check :size="15" /></span><div><strong>나의 목표 설정</strong><small>글로벌 고객 미팅 준비</small></div><span class="route-line"></span><span class="route-node"><BookOpen :size="15" /></span><div><strong>오늘의 학습</strong><small>3차시 · 제품 가치 설명</small></div></div>
+      <p class="quote">“개인의 목표와 회사의 성장이<br>같은 방향으로 이어지는 경험”</p>
+    </section>
+    <main class="auth-main">
+      <router-link to="/" class="back"><ArrowLeft :size="16" /> 홈으로</router-link>
+      <div class="auth-card animate-in">
+        <div><p class="eyebrow">Sign in</p><h2>LinguaRoute 로그인</h2><p class="muted">회사에서 사용하는 이메일로 로그인하세요.</p></div>
+        <div v-if="reasonMessage" class="login-notice"><TriangleAlert :size="17" />{{ reasonMessage }}</div>
+        <form class="form-stack" @submit.prevent="login">
+          <div class="field"><label for="email">이메일</label><div class="input-with-icon"><Mail :size="17" /><input id="email" v-model.trim="email" class="input" type="email" autocomplete="username" required /></div></div>
+          <div class="field"><div class="label-row"><label for="password">비밀번호</label><router-link to="/account/recovery">비밀번호를 잊으셨나요?</router-link></div><div class="input-with-icon"><LockKeyhole :size="17" /><input id="password" v-model="password" class="input" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" aria-label="비밀번호 표시" @click="showPassword=!showPassword"><Eye :size="17" /></button></div></div>
+          <label class="check-row"><input type="checkbox" checked /> 로그인 상태 유지</label>
+          <div v-if="loginError" class="login-notice"><TriangleAlert :size="17" />{{ loginError }}</div>
+          <button class="button primary" type="submit" :disabled="isSubmitting">{{ isSubmitting ? '로그인 중...' : '로그인' }} <ArrowRight :size="17" /></button>
+        </form>
+        <div class="auth-divider"><span>처음이신가요?</span></div>
+        <div class="signup-links"><router-link to="/signup/company"><Building2 :size="18" /><span><strong>기업 관리자 가입</strong><small>새로운 기업 학습 공간 만들기</small></span><ChevronRight :size="17" /></router-link><router-link to="/signup/employee"><TicketCheck :size="18" /><span><strong>직원 가입</strong><small>초대코드로 학습 공간 참여하기</small></span><ChevronRight :size="17" /></router-link></div>
+        <router-link class="find-id" to="/account/recovery?tab=id">아이디 찾기</router-link>
       </div>
-
-      <!-- 우측 -->
-      <div class="login-right">
-        <div class="login-box fade-in-up">
-          <router-link to="/" class="back-link">← 홈으로</router-link>
-
-          <!-- 로그인 영역 -->
-          <div v-if="!showRegister" class="section">
-            <h3 class="section-title">로그인</h3>
-            <p class="section-desc">LearnNexus 계정으로 로그인합니다.</p>
-            <button class="btn btn-primary btn-full" @click="handleOAuth">로그인</button>
-            <div class="switch-link">
-              계정이 없으신가요?
-              <button class="text-btn" @click="showRegister = true">회원가입</button>
-            </div>
-          </div>
-
-          <!-- 회원가입 영역 -->
-          <div v-else class="section">
-            <h3 class="section-title">회원가입</h3>
-            <form @submit.prevent="handleRegister" class="form">
-              <div class="form-group">
-                <label class="form-label">이름</label>
-                <input v-model="registerForm.name" type="text" class="form-input" placeholder="홍길동" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">이메일</label>
-                <input v-model="registerForm.email" type="email" class="form-input" placeholder="user@example.com" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">비밀번호</label>
-                <input v-model="registerForm.password" type="password" class="form-input" placeholder="8자 이상" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">역할</label>
-                <select v-model="registerForm.role" class="form-input">
-                  <option value="STUDENT">학생</option>
-                  <option value="INSTRUCTOR">강사</option>
-                </select>
-              </div>
-              <div v-if="error" class="error-msg">{{ error }}</div>
-              <div v-if="success" class="success-msg">{{ success }}</div>
-              <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
-                <span v-if="loading">가입 중...</span>
-                <span v-else>회원가입</span>
-              </button>
-            </form>
-            <div class="switch-link">
-              이미 계정이 있으신가요?
-              <button class="text-btn" @click="showRegister = false">로그인</button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
+    </main>
   </div>
 </template>
-
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth.js'
-import { authApi } from '@/api/auth.js'
-
-const auth = useAuthStore()
-
-const showRegister = ref(false)
-const loading = ref(false)
-const error = ref('')
-const success = ref('')
-
-const registerForm = ref({ name: '', email: '', password: '', role: 'STUDENT' })
-
-const features = ['수강 중인 강의 이어보기', '맞춤 강의 추천', '수료증 관리']
-
-function handleOAuth() {
-  auth.redirectToLogin()
-}
-
-async function handleRegister() {
-  error.value = ''
-  success.value = ''
-  loading.value = true
-  try {
-    await authApi.register(registerForm.value)
-    success.value = '회원가입 완료! 로그인 페이지로 이동합니다.'
-    registerForm.value = { name: '', email: '', password: '', role: 'STUDENT' }
-    setTimeout(() => {
-      showRegister.value = false
-      success.value = ''
-    }, 2000)
-  } catch (e) {
-    error.value = e.response?.data?.message || '회원가입에 실패했습니다.'
-  } finally {
-    loading.value = false
-  }
+import { Check, BookOpen, ArrowLeft, Mail, LockKeyhole, Eye, ArrowRight, Building2, TicketCheck, ChevronRight, TriangleAlert } from '@lucide/vue'
+import BrandLogo from '@/components/BrandLogo.vue'
+const showPassword=ref(false)
+const email=ref('employee@scalatech.co.kr'),password=ref('Password123!'),loginError=ref(''),isSubmitting=ref(false)
+const route=useRoute(),router=useRouter(),auth=useAuthStore(); const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
+const reasonMessage=computed(()=>route.query.reason==='session-expired'?'Access Token이 만료되었습니다. 다시 로그인해 주세요.':route.query.reason==='user-inactive'?'비활성 또는 탈퇴 계정은 서비스를 이용할 수 없습니다.':'')
+const homeByRole={PLATFORM_ADMIN:'/admin',COMPANY_ADMIN:'/company',EMPLOYEE:'/app'}
+async function login(){
+  loginError.value=''
+  if(!useLiveApi){router.push('/app');return}
+  isSubmitting.value=true
+  try{
+    const user=await auth.login(email.value,password.value)
+    await router.push(homeByRole[user?.businessRole]||'/app')
+  }catch(error){
+    loginError.value=error.response?.data?.message||'이메일 또는 비밀번호를 확인해 주세요.'
+  }finally{isSubmitting.value=false}
 }
 </script>
-
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: stretch;
-}
-.login-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 100%;
-  min-height: 100vh;
-}
-.login-left {
-  background: linear-gradient(160deg, #1a4f8a 0%, #185FA5 50%, #1e7bc4 100%);
-  padding: 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 48px;
-}
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-logo { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; }
-.brand-name { font-size: 18px; font-weight: 700; color: #fff; }
-.brand-content h2 {
-  font-size: 32px; font-weight: 700; color: #fff;
-  line-height: 1.35; margin-bottom: 14px;
-}
-.brand-content p { font-size: 15px; color: rgba(255,255,255,0.75); margin-bottom: 28px; }
-.feature-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-.feature-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.85); }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.6); flex-shrink: 0; }
-
-.login-right {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  background: var(--color-bg-primary);
-}
-.login-box { width: 100%; max-width: 400px; }
-.back-link {
-  display: inline-block;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-bottom: 32px;
-  transition: var(--transition);
-}
-.back-link:hover { color: var(--color-primary); }
-
-.section { display: flex; flex-direction: column; gap: 16px; }
-.section-title { font-size: 22px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 4px; }
-.section-desc { font-size: 14px; color: var(--color-text-secondary); margin-bottom: 4px; }
-
-.form { display: flex; flex-direction: column; gap: 14px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
-.form-input {
-  padding: 10px 14px;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-family: var(--font-sans);
-  color: var(--color-text-primary);
-  background: var(--color-bg-primary);
-  transition: var(--transition);
-  outline: none;
-}
-.form-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
-.btn-full { width: 100%; padding: 12px; font-size: 15px; justify-content: center; margin-top: 4px; }
-
-.switch-link {
-  text-align: center;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-top: 4px;
-}
-.text-btn {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0 2px;
-  text-decoration: underline;
-}
-.error-msg {
-  padding: 10px 14px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  color: #dc2626;
-}
-.success-msg {
-  padding: 10px 14px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  color: #16a34a;
-}
+.auth-page{min-height:100vh;display:grid;grid-template-columns:minmax(380px,43%) 1fr;background:var(--surface)}.auth-aside{position:relative;display:flex;flex-direction:column;padding:42px 9vw 50px 5vw;overflow:hidden;color:white;background:var(--forest)}.auth-aside::after{position:absolute;right:-150px;bottom:-170px;width:430px;height:430px;content:'';border:1px solid rgba(200,243,107,.25);border-radius:50%;box-shadow:0 0 0 70px rgba(200,243,107,.05),0 0 0 140px rgba(200,243,107,.035)}.auth-aside :deep(.brand-name){color:white}.auth-aside :deep(.brand-name span){color:var(--lime)}.aside-copy{margin:auto 0 40px}.aside-copy .eyebrow{color:var(--lime)}.aside-copy h1{margin:18px 0;font-family:var(--font-display);font-size:clamp(38px,4vw,56px);line-height:1.08;letter-spacing:-.055em}.aside-copy>p:last-child{max-width:390px;color:#b7ccbf;font-size:14px}.mini-route{position:relative;z-index:1;display:grid;grid-template-columns:auto 1fr;gap:11px 14px;padding:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:17px}.mini-route strong,.mini-route small{display:block}.mini-route strong{font-size:12px}.mini-route small{color:#91ad9c;font-size:10px}.route-node{width:30px;height:30px;display:grid;place-items:center;color:var(--lime);background:rgba(200,243,107,.1);border-radius:50%}.route-node.done{color:var(--ink);background:var(--lime)}.route-line{position:absolute;top:50px;left:34px;width:1px;height:14px;background:rgba(200,243,107,.4)}.quote{position:relative;z-index:1;margin-top:28px;color:#91ad9c;font-size:11px;line-height:1.7}.auth-main{position:relative;display:grid;place-items:center;padding:70px 28px;background:var(--paper)}.back{position:absolute;top:30px;right:34px;display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.auth-card{width:min(440px,100%);display:grid;gap:25px}.auth-card h2{margin:10px 0 7px;font-family:var(--font-display);font-size:30px;letter-spacing:-.04em}.input-with-icon{position:relative}.input-with-icon>svg{position:absolute;top:15px;left:14px;z-index:1;color:var(--subtle)}.input-with-icon .input{padding-left:42px}.input-with-icon button{position:absolute;top:11px;right:10px;width:30px;height:30px;display:grid;place-items:center;color:var(--subtle);background:transparent}.label-row{display:flex;justify-content:space-between}.label-row a{color:var(--forest-2);font-size:11px;font-weight:700}.check-row{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}.auth-card .button{width:100%}.auth-divider{display:flex;align-items:center;gap:12px;color:var(--subtle);font-size:10px}.auth-divider::before,.auth-divider::after{height:1px;flex:1;content:'';background:var(--line)}.signup-links{display:grid;grid-template-columns:1fr 1fr;gap:9px}.signup-links a{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px;padding:12px;color:var(--forest-2);background:var(--surface);border:1px solid var(--line);border-radius:12px}.signup-links strong,.signup-links small{display:block}.signup-links strong{color:var(--ink);font-size:11px}.signup-links small{margin-top:2px;color:var(--muted);font-size:8px}.find-id{margin-top:-12px;color:var(--muted);font-size:11px;text-align:center;text-decoration:underline}
+.login-notice{display:flex;align-items:center;gap:8px;padding:12px;color:var(--danger);background:var(--danger-soft);border-radius:10px;font-size:10px}
+@media(max-width:820px){.auth-page{grid-template-columns:1fr}.auth-aside{display:none}.auth-main{min-height:100vh;padding:75px 24px 40px}}@media(max-width:480px){.signup-links{grid-template-columns:1fr}}
 </style>
