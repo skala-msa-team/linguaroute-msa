@@ -57,6 +57,15 @@ services:
     networks:
       - lecture-net
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: lecture-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - lecture-net
+
 
   # Service Discovery
 
@@ -170,6 +179,9 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - MAIL_FROM=${MAIL_FROM:-no-reply@linguaroute.local}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -179,6 +191,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     networks:
       - lecture-net
 

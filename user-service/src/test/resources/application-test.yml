@@ -39,3 +39,8 @@ app:
 kafka:
   topic:
     subscription-events: subscription.events
+
+management:
+  health:
+    mail:
+      enabled: false
