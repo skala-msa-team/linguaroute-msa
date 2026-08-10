@@ -36,4 +36,5 @@
 
 # Local archives and bundled infrastructure images
 *.tar
+*.tar.gz
 *.zip
