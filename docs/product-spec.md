@@ -53,7 +53,7 @@
 
 MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습니다. Access Token이 만료되면 사용자는 다시 로그인합니다.
 
-Auth Server는 로그인 ID, 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정과 Access Token 발급을 소유합니다. `user-service`는 기업·사용자 프로필, 역할, 기업 소속, 초대코드, 좌석과 약관 동의를 소유하며 비밀번호를 저장하지 않습니다. Auth Server는 로그인 시 `user-service`에서 최신 사용자 상태·역할·기업 소속을 조회하여 Access Token에 반영합니다.
+기존 Auth Server는 OAuth2 로그인과 Access Token 발급을 그대로 담당합니다. `user-service`는 공용 `users` 테이블, 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정, 기업·사용자 프로필과 비즈니스 역할을 담당합니다. Auth Server는 같은 `users` 테이블의 로그인 호환 필드를 읽습니다.
 
 아이디 찾기는 이름과 기업 사업자번호로 계정을 조회한 뒤 등록된 로그인 이메일로만 안내 메일을 발송합니다. 화면에는 이메일이나 계정 존재 여부를 표시하지 않습니다.
 
@@ -302,8 +302,10 @@ Auth Server는 로그인 ID, 비밀번호 해시, 이메일 인증, 아이디 �
 ## 11. 확정 구현 방침
 
 - 데이터베이스는 현재 Docker Compose와 동일하게 MariaDB 한 개와 `lecture_db` 한 개를 유지하며 서비스별 소유 테이블만 추가·변경합니다.
-- 제공 Auth Server JAR에는 목표 인증 REST API가 없으므로 수정 가능한 `auth-server` 소스 모듈로 교체합니다. 기존 OAuth2/JWT 호환성을 유지하고 인증 책임을 `user-service`로 옮기지 않습니다.
-- 제공 API Gateway JAR의 고정 라우트는 목표 API를 모두 지원하지 않으므로 수정 가능한 `api-gateway` 소스 모듈로 교체하고 이 문서의 모든 외부 경로를 연결합니다.
+- 서버를 추가하지 않고 현재 Docker Compose의 서비스 수와 MariaDB 한 개를 유지합니다.
+- 기존 Auth Server는 수정하지 않고 OAuth2 로그인과 Access Token 발급에 계속 사용합니다. 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
+- 기존 Auth Server 호환을 위해 `EMPLOYEE`는 `users.role=STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `users.role=INSTRUCTOR`로 저장합니다. 실제 서비스 권한은 새 `business_role` 컬럼으로 관리합니다.
+- 기존 API Gateway 서버는 유지하되 목표 API 경로와 공개 경로가 JAR에 고정되어 있으므로, 동일한 Gateway 한 대의 라우팅·보안 설정만 수정합니다. 새 Gateway 서버를 추가하지 않습니다.
 - 이메일 인증은 SMTP로 6자리 코드를 보내고 비밀번호 재설정은 SMTP 링크로 처리하며, 세부 보안 정책은 API 명세를 따릅니다.
 - 수강신청 시 `enrollment-service`가 `user-service`의 내부 구독 권한 API를 동기 호출하며, 호출 실패 시 신청을 허용하지 않습니다.
 - 실제 PG 없이 모의 결제와 구독 기간·갱신·만료를 구현합니다.
@@ -311,10 +313,11 @@ Auth Server는 로그인 ID, 비밀번호 해시, 이메일 인증, 아이디 �
 
 개발은 다음 순서로 시작합니다.
 
-1. 수정 가능한 `auth-server`와 `api-gateway` 소스 모듈을 만들고 로그인·JWT·기본 라우팅을 먼저 검증합니다.
-2. 각 서비스가 자신의 테이블과 API를 구현하고 Swagger로 계약을 확인합니다.
-3. 내부 구독 권한 조회와 Kafka 구독 이벤트를 연동합니다.
-4. 프론트엔드를 Gateway 경로에 연결하고 전체 사용자 흐름을 통합 테스트합니다.
+1. 기존 Auth Server의 OAuth2 로그인과 현재 `users` 테이블 호환성을 유지합니다.
+2. 기존 API Gateway 한 대에 목표 라우트와 공개·보호 경로를 반영합니다.
+3. `user-service`에 인증 보조 기능과 비즈니스 역할을 추가하고 각 서비스 API를 구현합니다.
+4. 내부 구독 권한 조회와 Kafka 구독 이벤트를 연동합니다.
+5. 프론트엔드를 Gateway 경로에 연결하고 전체 사용자 흐름을 통합 테스트합니다.
 
 ---
 

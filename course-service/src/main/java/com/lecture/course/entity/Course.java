@@ -6,7 +6,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,19 +29,15 @@ public class Course {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Category category;
+    private Language language;
 
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
-
-    // 강사 ID (users 테이블 참조 - 직접 JOIN 없이 ID만 보관)
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Long instructorId;
+    private Situation situation;
 
-    // 수강생 수 (추천 서비스 정렬 기준)
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @Builder.Default
-    private Integer enrollmentCount = 0;
+    private Level level;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -56,15 +51,20 @@ public class Course {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
-    public enum Category {
-        BACKEND, FRONTEND, DEVOPS, DATA_SCIENCE, MOBILE, SECURITY, DATABASE, OTHER
+    public enum Language {
+        ENGLISH, JAPANESE, CHINESE
+    }
+
+    public enum Situation {
+        CUSTOMER_MEETING, PRESENTATION, EMAIL, BUSINESS_TRIP, DAILY_CONVERSATION
+    }
+
+    public enum Level {
+        BEGINNER, ELEMENTARY, INTERMEDIATE, ADVANCED
     }
 
     public enum Status {
         ACTIVE, INACTIVE
     }
 
-    public void increaseEnrollmentCount() {
-        this.enrollmentCount++;
-    }
 }
