@@ -10,7 +10,7 @@ def test_gateway_blocks_internal_api_paths_before_public_routes():
     block_id = "SPRING_CLOUD_GATEWAY_ROUTES_0_ID=block-internal-api"
     block_paths = (
         "SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0="
-        "Path=/api/courses/internal/**,/api/enrollments/internal/**,"
+        "Path=/internal/**,/api/courses/internal/**,/api/enrollments/internal/**,"
         "/api/payments/internal/**"
     )
 
@@ -38,4 +38,9 @@ def test_internal_api_key_is_injected_into_calling_and_providing_services():
 
     assert compose.count(
         "INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}"
-    ) >= 3
+    ) >= 4
+
+    enrollment_section = compose.split("\n  enrollment-service:", 1)[1].split(
+        "\n  payment-service:", 1
+    )[0]
+    assert "INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}" in enrollment_section

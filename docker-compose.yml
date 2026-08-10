@@ -126,7 +126,9 @@ services:
       # 거치지 않고 Docker 네트워크에서 직접 수행하며 별도의 내부 키도 검증한다.
       - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=block-internal-api
       - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=no://op
-      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
+      # 새 공통 규칙인 /internal/**와 전환 기간의 레거시 경로를 모두 막는다.
+      # 서비스 간 호출은 Gateway가 아닌 Docker 내부 주소를 사용하므로 외부 라우트가 필요 없다.
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/internal/**,/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
       - SPRING_CLOUD_GATEWAY_ROUTES_0_FILTERS_0=SetStatus=404
       - SPRING_CLOUD_GATEWAY_ROUTES_0_ORDER=-100
       - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=user-service
@@ -223,6 +225,8 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      # recommend-service와 동일한 값을 주입해야 내부 수강 이력 요청을 검증할 수 있다.
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
     depends_on:
       mariadb:
         condition: service_healthy
