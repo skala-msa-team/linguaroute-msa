@@ -25,7 +25,9 @@ flowchart LR
     COURSE["Course<br/>course-service"] --> LESSON["Lesson<br/>course-service"]
     COURSE -. "논리 참조" .-> ENROLLMENT
     ENROLLMENT --> PROGRESS["Lesson Progress<br/>enrollment-service"]
-    COURSE --> RECOMMENDATION["Recommendation Item<br/>course-service"]
+    USER -. "논리 참조" .-> RECOMMENDATION["Recommendation<br/>recommend-service"]
+    COURSE -. "ACTIVE 강의 조회" .-> RECOMMENDATION
+    RECOMMENDATION --> RECOMMENDATION_ITEM["Recommendation Item<br/>recommend-service"]
 ```
 
 점선은 서로 다른 서비스 DB 사이의 논리 참조이며 실제 데이터베이스 외래키를 생성하지 않습니다.
@@ -137,8 +139,6 @@ erDiagram
 ```mermaid
 erDiagram
     COURSE ||--|{ LESSON : contains
-    RECOMMENDATION ||--|{ RECOMMENDATION_ITEM : contains
-    COURSE ||--o{ RECOMMENDATION_ITEM : selected_as
     COURSE_ADMIN_AUDIT_LOG }o--|| COURSE : targets
 
     COURSE {
@@ -165,6 +165,33 @@ erDiagram
         datetime updated_at
     }
 
+    COURSE_ADMIN_AUDIT_LOG {
+        bigint id PK
+        bigint actor_user_id
+        bigint course_id FK
+        varchar action
+        text detail
+        datetime created_at
+    }
+```
+
+### course-service 주요 제약조건
+
+| 테이블 | 제약조건 |
+| --- | --- |
+| `course` | 상태는 `ACTIVE`, `INACTIVE`만 사용 |
+| `lesson` | `(course_id, sequence)` 유일 |
+
+강의 등록·수정·활성·비활성 상태 관리는 확정 MVP입니다. 별도의 게시·비게시 상태는 두지 않고 `ACTIVE`, `INACTIVE`로 통합합니다.
+
+---
+
+## 5. recommend-service ERD
+
+```mermaid
+erDiagram
+    RECOMMENDATION ||--|{ RECOMMENDATION_ITEM : contains
+
     RECOMMENDATION {
         bigint id PK
         bigint user_id
@@ -182,36 +209,25 @@ erDiagram
     RECOMMENDATION_ITEM {
         bigint id PK
         bigint recommendation_id FK
-        bigint course_id FK
+        bigint course_id
         int rank
         text reason
         datetime created_at
     }
-
-    COURSE_ADMIN_AUDIT_LOG {
-        bigint id PK
-        bigint actor_user_id
-        bigint course_id FK
-        varchar action
-        text detail
-        datetime created_at
-    }
 ```
 
-### course-service 주요 제약조건
+### recommend-service 주요 제약조건
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `course` | 상태는 `ACTIVE`, `INACTIVE`만 사용 |
-| `lesson` | `(course_id, sequence)` 유일 |
 | `recommendation_item` | `(recommendation_id, course_id)` 유일 |
 | 추천 결과 | `ACTIVE` 강의와 요청 언어가 일치하는 강의만 저장 |
 
-`recommendation.user_id`와 `company_id`는 `user-service`에 대한 논리 참조입니다.
+`recommendation.user_id`와 `company_id`는 `user-service`, `recommendation_item.course_id`는 `course-service`에 대한 논리 참조입니다. `recommend-service`는 다른 서비스의 테이블을 직접 조회하지 않고 `course-service` API로 추천 후보와 상태를 검증합니다.
 
 ---
 
-## 5. enrollment-service ERD
+## 6. enrollment-service ERD
 
 ```mermaid
 erDiagram
@@ -271,7 +287,7 @@ erDiagram
 
 ---
 
-## 6. payment-service ERD
+## 7. payment-service ERD
 
 ```mermaid
 erDiagram
@@ -363,9 +379,9 @@ erDiagram
 
 ---
 
-## 7. 상태값
+## 8. 상태값
 
-### 7.1 사용자·초대
+### 8.1 사용자·초대
 
 | 엔티티 | 상태 |
 | --- | --- |
@@ -373,7 +389,7 @@ erDiagram
 | `User` | `ACTIVE`, `INACTIVE`, `WITHDRAWN` |
 | `Invitation` | `UNUSED`, `USED`, `EXPIRED`, `REVOKED` |
 
-### 7.2 강의·수강
+### 8.2 강의·수강
 
 | 엔티티 | 상태 |
 | --- | --- |
@@ -381,7 +397,7 @@ erDiagram
 | `Enrollment` | `ENROLLED`, `LEARNING`, `COMPLETED` |
 | `LessonProgress` | `NOT_STARTED`, `LEARNING`, `COMPLETED` |
 
-### 7.3 구독·결제
+### 8.3 구독·결제
 
 | 엔티티 | 상태 |
 | --- | --- |
@@ -389,7 +405,7 @@ erDiagram
 | `Payment` | `PENDING`, `SUCCESS`, `FAILED` |
 | `RefundRequest` | `REQUESTED`, `APPROVED`, `REJECTED`, `COMPLETED` |
 
-### 7.4 AI 추천
+### 8.4 AI 추천
 
 | 엔티티 | 상태 |
 | --- | --- |
@@ -398,7 +414,7 @@ erDiagram
 
 ---
 
-## 8. Kafka 이벤트
+## 9. Kafka 이벤트
 
 ### PaymentCompleted
 
@@ -429,7 +445,7 @@ payment-service에서 결제 성공
 
 ---
 
-## 9. 삭제 정책
+## 10. 삭제 정책
 
 | 데이터 | 정책 |
 | --- | --- |
@@ -442,7 +458,7 @@ payment-service에서 결제 성공
 
 ---
 
-## 10. 구현 전 확인사항
+## 11. 구현 전 확인사항
 
 | 확인 항목 | 이유 |
 | --- | --- |

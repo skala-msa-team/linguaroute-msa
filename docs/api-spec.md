@@ -448,6 +448,8 @@ Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 | AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수 |
 | AI-02 | `POST` | `/api/courses/recommendations/{recommendationId}/reject` | 직원 | 추천 거부 | 선택 |
 
+추천 요청과 결과 데이터는 `recommend-service`가 소유합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
+
 ### AI-01 추천 요청
 
 ```json

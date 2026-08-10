@@ -4,9 +4,9 @@
 
 ## 프로젝트 문서
 
-- [문서 목록](./docs/README.md)
 - [에이전트 작업 지침](./AGENTS.md)
 - [서비스 기획서](./docs/product-spec.md)
+- [MVP 체크리스트](./docs/mvp-checklist.md)
 - [API 명세서](./docs/api-spec.md)
 - [ERD](./docs/erd.md)
 
