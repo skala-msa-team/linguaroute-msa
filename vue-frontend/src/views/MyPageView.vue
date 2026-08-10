@@ -20,7 +20,7 @@
 
         <template v-else-if="tab === 'security'">
           <div class="section-title"><div><h2>비밀번호 변경</h2><p>현재 비밀번호를 확인한 후 새 비밀번호로 변경합니다.</p></div></div>
-          <form class="form-stack narrow" @submit.prevent="passwordSaved = true"><div class="field"><label>현재 비밀번호</label><input class="input" type="password" required /></div><div class="field"><label>새 비밀번호</label><input class="input" type="password" minlength="8" maxlength="72" required /><small>8자 이상 72자 이하</small></div><div class="field"><label>새 비밀번호 확인</label><input class="input" type="password" required /></div><p v-if="passwordSaved" class="message"><CircleCheck :size="15" />비밀번호 변경 요청이 완료되었습니다.</p><button class="button primary">비밀번호 변경</button></form>
+          <form class="form-stack narrow" @submit.prevent="savePassword"><div class="field"><label>현재 비밀번호</label><input v-model="currentPassword" class="input" type="password" required /></div><div class="field"><label>새 비밀번호</label><input v-model="newPassword" class="input" type="password" minlength="8" maxlength="72" required /><small>8자 이상 72자 이하</small></div><div class="field"><label>새 비밀번호 확인</label><input v-model="newPasswordConfirm" class="input" type="password" minlength="8" maxlength="72" required /></div><p v-if="passwordSaved" class="message"><CircleCheck :size="15" />비밀번호가 변경되었습니다.</p><button class="button primary">비밀번호 변경</button></form>
         </template>
 
         <template v-else-if="tab === 'agreements'">
@@ -30,7 +30,7 @@
         </template>
 
         <template v-else>
-          <div class="danger-zone"><span><UserRoundX :size="24" /></span><h2>회원 탈퇴</h2><p>탈퇴하면 상태가 <b>WITHDRAWN</b>으로 변경되고 기존 Access Token으로도 보호 API를 사용할 수 없습니다.</p><label class="confirm"><input v-model="withdrawConfirmed" type="checkbox" />탈퇴 후 학습 기록과 서비스 접근이 제한되는 것을 확인했습니다.</label><button class="button danger" :disabled="!withdrawConfirmed" @click="withdrawn = true">회원 탈퇴 요청</button><div v-if="withdrawn" class="withdraw-result"><TriangleAlert :size="16" />탈퇴 처리 후 저장된 Access Token을 삭제하고 로그인 화면으로 이동합니다.</div></div>
+          <div class="danger-zone"><span><UserRoundX :size="24" /></span><h2>회원 탈퇴</h2><p>탈퇴하면 상태가 <b>WITHDRAWN</b>으로 변경되고 기존 Access Token으로도 보호 API를 사용할 수 없습니다.</p><label class="confirm"><input v-model="withdrawConfirmed" type="checkbox" />탈퇴 후 학습 기록과 서비스 접근이 제한되는 것을 확인했습니다.</label><button class="button danger" :disabled="!withdrawConfirmed" @click="withdrawMe">회원 탈퇴 요청</button><div v-if="withdrawn" class="withdraw-result"><TriangleAlert :size="16" />탈퇴 처리 후 저장된 Access Token을 삭제하고 로그인 화면으로 이동합니다.</div></div>
         </template>
       </section>
     </div>
@@ -52,6 +52,9 @@ const profileMessage = ref('')
 const passwordSaved = ref(false)
 const withdrawConfirmed = ref(false)
 const withdrawn = ref(false)
+const currentPassword = ref('')
+const newPassword = ref('')
+const newPasswordConfirm = ref('')
 const user = reactive({ id: 101, email: 'employee@scalatech.co.kr', name: '박건우', role: 'STUDENT', businessRole: 'EMPLOYEE', companyId: 10, status: 'ACTIVE', createdAt: '2026-07-12T09:00:00' })
 const terms = reactive([{ id: 1, type: 'SERVICE_TERMS', title: 'LinguaRoute 이용약관', version: '1.0', required: true, effectiveAt: '2026.08.10', agreed: true }, { id: 2, type: 'PRIVACY', title: '개인정보 수집 및 이용', version: '1.0', required: true, effectiveAt: '2026.08.10', agreed: true }, { id: 3, type: 'MARKETING', title: '교육 소식 및 혜택 수신', version: '1.0', required: false, effectiveAt: '2026.08.10', agreed: false }])
 const tabs = [{ id: 'profile', label: '기본 정보', icon: UserRound }, { id: 'security', label: '비밀번호 변경', icon: LockKeyhole }, { id: 'agreements', label: '약관 및 동의', icon: FileCheck2 }, { id: 'withdraw', label: '회원 탈퇴', icon: UserRoundX }]
@@ -69,6 +72,17 @@ async function saveProfile() {
   if (useLiveApi) Object.assign(user, unwrapApiData(await authApi.updateMe(profileName.value)))
   else user.name = profileName.value
   profileMessage.value = '이름이 저장되었습니다.'
+}
+
+async function savePassword() {
+  if (newPassword.value !== newPasswordConfirm.value) return
+  if (useLiveApi) await authApi.changePassword(currentPassword.value, newPassword.value)
+  passwordSaved.value = true
+}
+
+async function withdrawMe() {
+  if (useLiveApi) await authApi.withdrawMe()
+  withdrawn.value = true
 }
 </script>
 

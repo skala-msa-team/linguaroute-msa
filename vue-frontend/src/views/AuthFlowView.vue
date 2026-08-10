@@ -40,10 +40,11 @@
         </template>
 
         <template v-else-if="mode==='reset-confirm'">
-          <form v-if="!resetDone" class="form-stack" @submit.prevent="resetDone=true">
-            <div class="notice success"><ShieldCheck :size="19" /><span><strong>유효한 재설정 링크입니다</strong>이 링크는 한 번만 사용할 수 있으며 12분 48초 후 만료됩니다.</span></div>
-            <div class="field"><label>새 비밀번호</label><input class="input" type="password" value="NewPassword123!" /><small class="helper">영문, 숫자, 특수문자를 포함한 8자 이상</small></div>
-            <div class="field"><label>새 비밀번호 확인</label><input class="input" type="password" value="NewPassword123!" /></div>
+          <form v-if="!resetDone" class="form-stack" @submit.prevent="confirmPasswordReset">
+            <div class="notice success"><ShieldCheck :size="19" /><span><strong>새 비밀번호를 설정해 주세요</strong>이 링크는 15분 동안 한 번만 사용할 수 있습니다.</span></div>
+            <div class="field"><label>새 비밀번호</label><input v-model="resetPassword" class="input" type="password" minlength="8" maxlength="72" required /><small class="helper">8자 이상 72자 이하</small></div>
+            <div class="field"><label>새 비밀번호 확인</label><input v-model="resetPasswordConfirm" class="input" type="password" minlength="8" maxlength="72" required /></div>
+            <p v-if="formError" class="form-error"><AlertTriangle :size="15" />{{ formError }}</p>
             <button class="button primary" type="submit">새 비밀번호 저장 <ArrowRight :size="16" /></button>
           </form>
           <div v-else class="completion-state"><span><CircleCheck :size="28" /></span><h2>비밀번호가 변경되었습니다</h2><p>새 비밀번호로 다시 로그인해 주세요. 기존 로그인 정보는 더 이상 사용할 수 없습니다.</p><router-link class="button primary" to="/login">로그인으로 이동 <ArrowRight :size="16" /></router-link></div>
@@ -51,7 +52,7 @@
 
         <template v-else-if="mode==='recovery'">
           <div class="recovery-tabs"><button :class="{active:recoveryTab==='password'}" @click="recoveryTab='password'">비밀번호 재설정</button><button :class="{active:recoveryTab==='id'}" @click="recoveryTab='id'">아이디 찾기</button></div>
-          <form class="form-stack" @submit.prevent="submitted=true"><div v-if="submitted" class="notice success"><MailCheck :size="20" /><span><strong>안내 메일을 발송했습니다</strong>입력한 정보와 일치하는 계정이 있다면 등록된 이메일로 안내가 전송됩니다.</span></div><template v-else-if="recoveryTab==='password'"><div class="field"><label>로그인 이메일</label><input class="input" type="email" placeholder="name@company.com" /></div><p class="helper">가입된 계정인지 여부는 보안을 위해 화면에 표시하지 않습니다.</p></template><template v-else><div class="field"><label>이름</label><input class="input" placeholder="가입 시 입력한 이름" /></div><div class="field"><label>기업 사업자등록번호</label><input class="input" placeholder="000-00-00000" /></div><p class="helper">계정 정보는 등록된 로그인 이메일로만 안내됩니다.</p></template><button class="button primary" type="submit">{{ submitted?'로그인으로 돌아가기':'안내 메일 받기' }} <ArrowRight :size="16" /></button></form>
+          <form class="form-stack" @submit.prevent="requestRecovery"><div v-if="submitted" class="notice success"><MailCheck :size="20" /><span><strong>안내 메일을 발송했습니다</strong>입력한 정보와 일치하는 계정이 있다면 등록된 이메일로 안내가 전송됩니다.</span></div><template v-else-if="recoveryTab==='password'"><div class="field"><label>로그인 이메일</label><input v-model.trim="recoveryEmail" class="input" type="email" required placeholder="name@company.com" /></div><p class="helper">가입된 계정인지 여부는 보안을 위해 화면에 표시하지 않습니다.</p></template><template v-else><div class="field"><label>이름</label><input v-model.trim="recoveryName" class="input" required placeholder="가입 시 입력한 이름" /></div><div class="field"><label>기업 사업자등록번호</label><input v-model.trim="recoveryBusinessNumber" class="input" required placeholder="000-00-00000" /></div><p class="helper">계정 정보는 등록된 로그인 이메일로만 안내됩니다.</p></template><p v-if="formError" class="form-error"><AlertTriangle :size="15" />{{ formError }}</p><button class="button primary" type="submit">{{ submitted?'로그인으로 돌아가기':'안내 메일 받기' }} <ArrowRight :size="16" /></button></form>
         </template>
       </section>
     </main>
@@ -68,6 +69,7 @@ const props=defineProps({ mode:{type:String,default:'company-signup'} })
 const route=useRoute(); const step=ref(1); const submitted=ref(false); const recoveryTab=ref(route.query.tab==='id'?'id':'password'); const invitationCode=ref('A7K9-P2QM'); const inviteStatus=ref('valid'); const verificationSent=ref(false); const resetDone=ref(false)
 const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'; const verificationCode=ref('123456'); const passwordConfirm=ref('Password123!'); const formError=ref('')
 const companyForm=reactive({company:{name:'스칼라테크',businessNumber:'123-45-67890'},admin:{email:'admin@scalatech.co.kr',password:'Password123!',name:'김관리'},emailVerificationToken:'prototype-email-verification-token',agreementIds:[1,2]})
+const recoveryEmail=ref(''); const recoveryName=ref(''); const recoveryBusinessNumber=ref(''); const resetPassword=ref(''); const resetPasswordConfirm=ref('')
 const configs={
   'company-signup':{eyebrow:'Company onboarding',title:'기업 학습 공간 만들기',description:'기업 정보와 관리자 계정을 등록하면 바로 요금제를 선택하고 직원을 초대할 수 있습니다.',steps:['기업 정보','이메일 인증','약관 동의']},
   'employee-signup':{eyebrow:'Join your team',title:'초대코드로 참여하기',description:'회사에서 받은 초대코드를 확인하고 나만의 학습 경로를 시작하세요.',steps:['초대 확인','계정 정보','가입 완료']},
@@ -82,6 +84,8 @@ const inviteErrors={expired:{title:'초대코드가 만료되었습니다',descr
 const inviteError=computed(()=>inviteErrors[inviteStatus.value]||inviteErrors.expired)
 function validateInvitation(){ const code=invitationCode.value.trim().toUpperCase(); inviteStatus.value=code==='EXPIRED'?'expired':code==='USED'?'used':code==='NO-SEAT'?'seat':code==='INACTIVE'?'inactive':'valid' }
 function handleEmployeeNext(){ if(step.value===1&&inviteStatus.value!=='valid')return; if(step.value<3)step.value+=1; else window.location.href='/app' }
+async function requestRecovery(){ formError.value=''; try{if(useLiveApi){if(recoveryTab.value==='password')await authApi.requestPasswordReset(recoveryEmail.value);else await authApi.requestIdFind(recoveryName.value,recoveryBusinessNumber.value)}submitted.value=true}catch(error){formError.value=error.response?.data?.message||'요청을 처리하지 못했습니다.'} }
+async function confirmPasswordReset(){ formError.value=''; if(resetPassword.value!==resetPasswordConfirm.value){formError.value='비밀번호가 일치하지 않습니다.';return} if(!route.query.token){formError.value='재설정 토큰이 없습니다.';return} try{if(useLiveApi)await authApi.confirmPasswordReset(route.query.token,resetPassword.value);resetDone.value=true}catch(error){formError.value=error.response?.data?.message||'비밀번호를 변경하지 못했습니다.'} }
 </script>
 
 <style scoped>

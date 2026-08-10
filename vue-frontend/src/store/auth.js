@@ -49,13 +49,38 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.removeItem('access_token')
     sessionStorage.removeItem('user')
 
-    if (redirect) {
-      window.location.href = '/login'
-    }
+    if (!redirect) return
+
+    const authServerBaseUrl = import.meta.env.VITE_AUTH_SERVER_BASE_URL || 'http://localhost:8080'
+    const form = document.createElement('form')
+    form.method = 'post'
+    form.action = `${authServerBaseUrl}/logout`
+    document.body.appendChild(form)
+    form.submit()
   }
 
-  async function login(email, password) {
-    const res = await authApi.login(email, password)
+  function startOAuthLogin() {
+    const state = crypto.randomUUID()
+    const redirectUri = import.meta.env.VITE_AUTH_REDIRECT_URI || `${window.location.origin}/callback`
+    const authServerBaseUrl = import.meta.env.VITE_AUTH_SERVER_BASE_URL || 'http://localhost:8080'
+    sessionStorage.setItem('oauth_state', state)
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: import.meta.env.VITE_AUTH_WEB_CLIENT_ID || 'web-client',
+      redirect_uri: redirectUri,
+      scope: 'openid profile read write',
+      state
+    })
+    window.location.assign(`${authServerBaseUrl}/oauth2/authorize?${params}`)
+  }
+
+  async function completeOAuthLogin(code, state) {
+    const expectedState = sessionStorage.getItem('oauth_state')
+    if (!expectedState || state !== expectedState) {
+      throw new Error('로그인 요청 상태가 올바르지 않습니다.')
+    }
+    sessionStorage.removeItem('oauth_state')
+    const res = await authApi.exchangeOAuthCode(code)
     const payload = res?.data?.data ?? res?.data
     const token = payload?.accessToken
 
@@ -80,6 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     setUser,
     fetchUser,
     logout,
-    login
+    startOAuthLogin,
+    completeOAuthLogin
   }
 })

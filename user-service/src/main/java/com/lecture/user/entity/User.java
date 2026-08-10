@@ -65,6 +65,10 @@ public class User {
         this.status = status;
     }
 
+    public void changePassword(String password) {
+        this.password = password;
+    }
+
     public enum AuthRole {
         STUDENT,
         INSTRUCTOR

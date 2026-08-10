@@ -59,7 +59,7 @@
 
 기업 대표자가 월간 또는 연간 정기권을 결제하면 구매 좌석 수에 따라 직원을 초대할 수 있습니다. 직원은 일회용 초대코드로 가입하며, 잔여 좌석이 없거나 구독이 비활성 상태이면 가입할 수 없습니다.
 
-MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습니다. Access Token이 만료되면 사용자는 다시 로그인합니다.
+MVP 인증은 자체 이메일·비밀번호 로그인 뒤 Auth Server의 OAuth2 Authorization Code 흐름으로 JWT Access Token을 발급받습니다. 소셜 로그인은 사용하지 않습니다. Auth Server가 Refresh Token을 반환할 수 있으나 MVP 프론트엔드는 저장·갱신에 사용하지 않고, Access Token 만료 시 다시 로그인합니다.
 
 인증 서버는 이메일·비밀번호를 검증하고 JWT Access Token을 발급합니다. `user-service`는 공용 `users` 테이블, 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정, 기업·사용자 프로필과 비즈니스 역할을 담당합니다. 인증 서버는 같은 `users` 테이블의 로그인 필드를 읽습니다.
 
@@ -311,7 +311,7 @@ MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습�
 
 - 데이터베이스는 현재 Docker Compose와 동일하게 MariaDB 한 개와 `lecture_db` 한 개를 유지하며 서비스별 소유 테이블만 추가·변경합니다.
 - 서버를 추가하지 않고 현재 Docker Compose의 서비스 수와 MariaDB 한 개를 유지합니다.
-- 인증 서버는 이메일·비밀번호 로그인과 JWT Access Token 발급을 담당합니다. OAuth2 Authorization Code 흐름은 사용하지 않으며, 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
+- 인증 서버는 이메일·비밀번호 로그인과 OAuth2 Authorization Code 기반 JWT Access Token 발급을 담당합니다. 소셜 로그인은 사용하지 않으며, 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
 - 기존 Auth Server 호환을 위해 `EMPLOYEE`는 `users.role=STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `users.role=INSTRUCTOR`로 저장합니다. 실제 서비스 권한은 새 `business_role` 컬럼으로 관리합니다.
 - 기존 API Gateway 서버는 유지합니다. 제공 Gateway 이미지는 수정하지 않고, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 그 경로를 외부 MVP 계약에 맞춰 사용합니다.
 - 이메일 인증은 SMTP로 6자리 코드를 보내고 비밀번호 재설정은 SMTP 링크로 처리하며, 세부 보안 정책은 API 명세를 따릅니다.
@@ -492,7 +492,7 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
-| 로그인 | `POST` | `/api/auth/login` | 공개 | `email`, `password` | JWT `accessToken`, `expiresIn` |
+| 로그인 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | Auth Server 이메일·비밀번호 세션, Authorization Code | JWT `access_token`, `expires_in` |
 | 기업 회원가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·이메일 인증·약관 | `companyId`, `userId`, `COMPANY_ADMIN` |
 | 직원 회원가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·이메일 인증·약관 | 직원 계정과 좌석 배정 결과 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정 시 이름 등 | 사용자·역할·기업 정보 |

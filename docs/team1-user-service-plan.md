@@ -10,7 +10,7 @@
 
 ## 1. 확정된 인증·데이터 경계
 
-- 기존 Auth Server는 OAuth2 로그인과 Access Token 발급을 그대로 담당한다.
+- 기존 Auth Server는 자체 이메일·비밀번호 로그인 후 OAuth2 Authorization Code 흐름으로 JWT Access Token을 발급한다. 소셜 로그인은 사용하지 않는다.
 - `user-service`는 공용 `users` 테이블과 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유한다.
 - `users.role`은 Auth Server 호환용이며 `STUDENT`, `INSTRUCTOR`만 저장한다.
 - 실제 서비스 권한은 `users.business_role`의 `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE`로 판단한다.
@@ -45,8 +45,10 @@
 - [x] 내부 사용자 권한 조회와 API 키 검증
 - [x] 공통 성공·오류 응답 및 주요 예외 상태 코드
 - [x] 이메일 인증 요청·6자리 코드 확인·SMTP 발송
-- [ ] Gateway를 통한 OAuth2 로그인 후 보호 API 호출
-- [ ] 회원 탈퇴와 비밀번호 변경·재설정
+- [x] Gateway를 통한 OAuth2 Authorization Code JWT 발급 후 보호 API 호출
+- [x] 공개 비밀번호 재설정 요청·확인과 아이디 찾기 SMTP 발송
+- [x] 보호 API 비밀번호 변경·회원 탈퇴 서버 구현 및 MockMvc 검증
+- [ ] 실제 Bearer Token Gateway 호출로 비밀번호 변경·회원 탈퇴 검증
 
 ## 3. 기업 대표계정 가입 처리
 
@@ -130,13 +132,12 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [x] 인증 토큰 `used_at`, 기업·사용자·약관 동의 저장 확인
 - [x] 잘못된 토큰 `422`, 중복 가입 `409`, 실패 요청 Rollback 확인
 - [x] 내부 API 키 성공 `200`, 누락·오류 `403`
-- [x] 기존 Auth Server로 생성 사용자의 OAuth2 로그인 확인
-- [x] Authorization Code와 Access Token 발급 확인
-- [x] 기존 Auth 토큰으로 `/api/users/me`, `/api/companies/me` `200` 확인
-- [x] 발급된 토큰이 있어도 비활성 사용자는 `403 USER_INACTIVE` 확인
+- [x] Gateway 경유 비밀번호 재설정 요청 `202`, 링크 확인 `200`, 재사용 `422` 확인
+- [x] Gateway 경유 아이디 찾기 `202` 및 MailHog 안내 메일 확인
+- [x] OAuth2 Authorization Code JWT 발급과 실제 Bearer Token으로 `/api/users/me`, `/api/companies/me` 호출
 - [x] Gateway 경유 `POST /api/users/register` `201` 확인
 
-기존 Auth Server는 현재 Access Token과 함께 Refresh Token도 반환한다. 확정 MVP 문서는 Refresh Token을 사용하지 않는다고 정의하므로 프론트엔드와 각 서비스는 Refresh Token을 저장·사용하지 않는다. 기존 Auth 이미지를 수정하지 않는 방침 때문에 응답 필드가 남아 있는 차이는 팀 공유 사항으로 유지한다.
+수업 가이드의 `POST /api/users/login` 예시는 현재 제공 이미지와 다르며 Gateway에서 `401`을 반환한다. 실제 제공 Auth Server는 `authorization_code` grant를 지원하므로, 브라우저는 `/oauth2/authorize`와 `/login`을 거쳐 Authorization Code를 받고 user-service의 서버 측 코드 교환으로 JWT를 발급받는다. 실제 토큰으로 사용자·기업 보호 API `200`, 탈퇴 사용자 `403 USER_INACTIVE`를 확인했다.
 
 ## 6. `dev` 병합 후 필수 주의사항
 
@@ -162,17 +163,16 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 ### 기존 Auth Server 제한
 
-- 기존 Auth Server는 확정 MVP 문서와 달리 Refresh Token도 반환한다.
-- 프론트엔드는 Refresh Token을 저장하거나 사용하지 않고, 정책 차이는 팀 결정사항으로 남긴다.
+- 제공 Gateway/Auth 이미지의 JSON 로그인 경로는 사용하지 않는다.
+- 등록된 브라우저 클라이언트 `web-client`의 Authorization Code 흐름을 사용하며, 클라이언트 비밀값은 `AUTH_WEB_CLIENT_SECRET` 환경변수로 user-service에만 주입한다.
 
 ## 7. 다음 개발 순서
 
 ### PR 1 — 기업 계정 기반 마무리
 
 1. 이메일 인증 요청·확인 API와 MailHog SMTP 연동: 완료. 제공 Gateway의 공개 경로 제약에 맞춰 `POST /api/users/register?action=request-email-verification`, `POST /api/users/register?action=confirm-email-verification`을 사용한다.
-2. Gateway 보호 라우팅과 기업 관리자 실제 로그인 토큰 기반 보호 API 검증
-3. 기존 Auth Server의 Refresh Token 반환과 MVP 문서 차이 팀 합의
-4. 관련 API·ERD·MVP 체크리스트 갱신
+2. `AUTH_WEB_CLIENT_SECRET`을 로컬 실행 환경에 주입하고 브라우저 OAuth 로그인 확인
+3. 관련 API·ERD·MVP 체크리스트 갱신
 
 ### PR 2 — 초대코드·직원 가입
 
@@ -194,9 +194,10 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 ### PR 4 — 회원·운영 기능
 
 - [ ] 직원 목록과 상태 변경
-- [ ] 비밀번호 변경·재설정
-- [ ] 아이디 찾기
-- [ ] 회원 탈퇴와 로그인 불가 비밀번호 교체
+- [x] 비밀번호 재설정 링크 발송·단회 확인
+- [x] 아이디 찾기 등록 이메일 안내
+- [x] 회원 탈퇴와 로그인 불가 비밀번호 교체 서버 구현
+- [ ] 실제 Bearer Token Gateway 통합 검증
 - [ ] 플랫폼 관리자용 기업·사용자 상태 조회
 
 ## 8. 커밋·PR 전 체크
