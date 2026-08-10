@@ -47,3 +47,13 @@ logging:
     root: INFO
     com.lecture.user: DEBUG
     org.springframework.web: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  security:
+    internal-api-key: ${INTERNAL_API_KEY:local-internal-api-key}

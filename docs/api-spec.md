@@ -250,6 +250,56 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 
 Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-service`가 이메일 인증 토큰과 필수 약관을 확인하고, 기업·사용자·약관 동의를 한 트랜잭션에서 생성합니다. 비밀번호는 BCrypt 해시로 `users.password`에 저장하고 원문은 저장하지 않습니다.
 
+오류 코드:
+
+| HTTP | 오류 코드 | 조건 |
+| --- | --- | --- |
+| `409` | `DUPLICATE_BUSINESS_NUMBER` | 이미 등록된 사업자번호 |
+| `409` | `DUPLICATE_EMAIL` | 이미 가입한 이메일 |
+| `400` | `INVALID_AGREEMENT` | 현재 활성 약관이 아닌 ID가 포함됨 |
+| `422` | `REQUIRED_AGREEMENT_MISSING` | 현재 필수 약관 동의 누락 |
+| `422` | `INVALID_EMAIL_VERIFICATION` | 인증 토큰이 없거나 이메일 불일치·만료·사용됨 |
+
+### COMPANY-02 기업 정보 조회
+
+검증된 Access Token의 `userId`에 해당하는 사용자가 `COMPANY_ADMIN`인지 확인하고, 해당 사용자의 소속 기업만 반환합니다.
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "id": 10,
+    "name": "스칼라테크",
+    "businessNumber": "1234567890",
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+### COMPANY-03 기업 정보 수정
+
+요청:
+
+```json
+{
+  "name": "스칼라글로벌"
+}
+```
+
+사업자번호는 이 API에서 변경하지 않습니다.
+
+### USER-02 내 정보 수정
+
+요청:
+
+```json
+{
+  "name": "김수정"
+}
+```
+
 ---
 
 ## 5. 직원 초대·좌석 API
@@ -687,6 +737,38 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 기업 관리자와 직원 회원가입 요청은 현재 필수 약관의 `agreementIds`를 포함해야 하며, 서버는 누락된 필수 약관이 있으면 가입을 거부합니다.
 
+### TERM-01 활성 약관 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "type": "SERVICE_TERMS",
+      "version": "1.0",
+      "content": "LinguaRoute 서비스 이용약관",
+      "required": true,
+      "effectiveAt": "2026-08-10T00:00:00"
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+### TERM-02 약관 동의 저장
+
+요청:
+
+```json
+{
+  "agreementIds": [3]
+}
+```
+
+이미 동의한 약관 ID는 중복 저장하지 않으며 정상 처리합니다.
+
 ---
 
 ## 11. 플랫폼 운영 API
@@ -714,6 +796,12 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
 | `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
 | `INVALID_INTERNAL_API_KEY` | `403` | 서비스 간 내부 API 키 불일치 |
+| `INVALID_EMAIL_VERIFICATION` | `422` | 이메일 인증 토큰이 유효하지 않거나 이미 사용됨 |
+| `USER_INACTIVE` | `403` | 비활성 또는 탈퇴 사용자의 보호 API 요청 |
+| `DUPLICATE_BUSINESS_NUMBER` | `409` | 이미 등록된 사업자번호 |
+| `DUPLICATE_EMAIL` | `409` | 이미 가입한 이메일 |
+| `INVALID_AGREEMENT` | `400` | 현재 활성 약관이 아닌 ID |
+| `REQUIRED_AGREEMENT_MISSING` | `422` | 필수 약관 동의 누락 |
 | `COMPANY_NOT_FOUND` | `404` | 기업 없음 |
 | `INVITATION_NOT_FOUND` | `404` | 초대코드 없음 |
 | `INVITATION_ALREADY_USED` | `409` | 사용된 초대코드 |
