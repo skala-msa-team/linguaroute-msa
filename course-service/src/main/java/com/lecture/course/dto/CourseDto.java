@@ -1,5 +1,6 @@
 package com.lecture.course.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.lecture.course.entity.Course;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,9 +9,13 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 public class CourseDto {
+    private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
+    @Getter @NoArgsConstructor @AllArgsConstructor public static class LessonRequest { @NotBlank private String title; @NotBlank private String contentUrl; @NotNull private Integer sequence; @NotNull private Boolean required; @NotNull private Integer durationSeconds; }
+    @Getter @AllArgsConstructor public static class LessonResponse { private Long lessonId; private String title; private String contentUrl; private Integer sequence; private boolean required; private Integer durationSeconds; public static LessonResponse from(com.lecture.course.entity.Lesson l){return new LessonResponse(l.getId(),l.getTitle(),l.getContentUrl(),l.getSequence(),l.isRequired(),l.getDurationSeconds());} }
 
     // 강의 등록 요청
     @Getter
@@ -143,6 +148,7 @@ public class CourseDto {
 
     // 공통 API 응답 래퍼
     @Getter
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
@@ -155,7 +161,7 @@ public class CourseDto {
         public static <T> ApiResponse<T> success(T data) {
             return ApiResponse.<T>builder()
                     .data(data)
-                    .timestamp(OffsetDateTime.now())
+                    .timestamp(OffsetDateTime.now(SERVICE_ZONE_ID))
                     .build();
         }
 
@@ -163,7 +169,7 @@ public class CourseDto {
             return ApiResponse.<T>builder()
                     .code(code)
                     .message(message)
-                    .timestamp(OffsetDateTime.now())
+                    .timestamp(OffsetDateTime.now(SERVICE_ZONE_ID))
                     .build();
         }
     }

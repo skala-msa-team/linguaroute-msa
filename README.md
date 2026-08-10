@@ -7,6 +7,7 @@
 - [에이전트 작업 지침](./AGENTS.md)
 - [서비스 기획서](./docs/product-spec.md)
 - [MVP 체크리스트](./docs/mvp-checklist.md)
+- [MVP 통합 검증 기록](./docs/mvp-verification.md)
 - [팀원 1 user-service 구현 계획](./docs/team1-user-service-plan.md)
 - [API 명세서](./docs/api-spec.md)
 - [ERD](./docs/erd.md)
@@ -412,10 +413,12 @@ sequenceDiagram
     ES-->>FE: 수강신청 결과 반환
     FE->>GW: 차시 시작·완료 요청
     GW->>ES: 학습 상태 변경
+    ES->>CS: 내부 API로 차시 소속·필수 여부 조회
+    CS-->>ES: 강의 차시 목록 반환
     ES->>DB: 차시 상태·진도율·완료 상태 저장
 ```
 
-#### 6. AI 강의 추천
+#### 6. AI 강의 추천 (설계 흐름 — 현재 구현 전)
 
 ```mermaid
 sequenceDiagram
@@ -435,6 +438,8 @@ sequenceDiagram
     RS->>DB: 추천 요청·결과 저장
     RS-->>FE: 추천 강의와 추천 이유 반환
 ```
+
+현재 `recommend-service`의 외부 계약과 내부 호출 경로는 위 설계와 아직 일치하지 않아, 추천 API는 완료 기능으로 표시하지 않습니다. 수강·학습 흐름과 달리 실제 운영 경로로 사용하기 전에 별도 정비가 필요합니다.
 
 ### 이메일 인증 로컬 확인
 

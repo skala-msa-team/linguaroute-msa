@@ -143,6 +143,19 @@ CREATE TABLE IF NOT EXISTS courses (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS lessons (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT,
+    course_id           BIGINT       NOT NULL,
+    title               VARCHAR(255) NOT NULL,
+    content_url         TEXT         NOT NULL,
+    sequence_no         INT          NOT NULL,
+    required            BOOLEAN      NOT NULL DEFAULT TRUE,
+    duration_seconds    INT          NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_lesson_course_sequence (course_id, sequence_no),
+    CONSTRAINT fk_lessons_course FOREIGN KEY (course_id) REFERENCES courses(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS enrollments (
     id                  BIGINT        NOT NULL AUTO_INCREMENT,
     company_id          BIGINT        NOT NULL COMMENT 'user-service companies.id 논리 참조',
@@ -309,6 +322,14 @@ ON DUPLICATE KEY UPDATE
     level = VALUES(level),
     status = VALUES(status),
     updated_at = VALUES(updated_at);
+
+INSERT INTO lessons (id, course_id, title, content_url, sequence_no, required, duration_seconds)
+VALUES
+    (910101, 9101, '고객 미팅 시작하기', 'https://example.com/lessons/910101', 1, TRUE, 900),
+    (910102, 9101, '제품 핵심 가치 설명하기', 'https://example.com/lessons/910102', 2, TRUE, 1200),
+    (910103, 9101, '질문과 이견에 대응하기', 'https://example.com/lessons/910103', 3, TRUE, 1100)
+ON DUPLICATE KEY UPDATE
+    title = VALUES(title), content_url = VALUES(content_url), required = VALUES(required), duration_seconds = VALUES(duration_seconds);
 
 INSERT INTO plans (id, name, description, status, created_at)
 VALUES

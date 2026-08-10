@@ -10,9 +10,9 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | MVP 설계 초안 |
+| 문서 상태 | 수강·학습 API는 2026-08-11 Gateway curl 검증 반영, 나머지는 MVP 설계 초안 |
 
-이 문서의 URL은 기능 설계를 위한 초안입니다. 구현 후에는 Swagger UI에서 실제 Method, URL, Request 및 Response를 호출하여 최종 명세와 일치시켜야 합니다.
+수강·학습 API(`COURSE-03`, `ADMIN-LESSON-01`, `ENROLL-*`, `LEARNING-*`, `COMPANY-ENROLL-*`)는 실제 Gateway 호출 결과를 반영했습니다. 나머지 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
@@ -632,6 +632,28 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 }
 ```
 
+### COURSE-03 강의 차시 목록 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "lessonId": 1201,
+      "title": "고객 미팅 시작하기",
+      "contentUrl": "https://example.com/lessons/1201",
+      "sequence": 1,
+      "required": true,
+      "durationSeconds": 900
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+직원용 강의 상세 조회와 동일하게 `ACTIVE` 강의만 조회할 수 있습니다.
+
 ### ADMIN-COURSE-01 강의 등록
 
 API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. `course-service`는 내부 사용자 권한 조회 API로 활성 상태의 `PLATFORM_ADMIN`인지 다시 확인합니다.
@@ -669,6 +691,20 @@ API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. 
 ```
 
 플랫폼 관리자 권한이 아니면 `403 PLATFORM_ADMIN_REQUIRED`, 사용자 권한 서비스에 연결할 수 없으면 `503 USER_AUTHORIZATION_UNAVAILABLE`를 반환합니다.
+
+### ADMIN-LESSON-01 강의 차시 등록
+
+```json
+{
+  "title": "고객 미팅 시작하기",
+  "contentUrl": "https://example.com/lessons/1201",
+  "sequence": 1,
+  "required": true,
+  "durationSeconds": 900
+}
+```
+
+성공 시 `201 Created`로 등록된 차시를 반환합니다. 같은 강의의 `sequence`는 중복될 수 없습니다.
 
 ### course-service 내부 API
 
@@ -717,6 +753,15 @@ X-Internal-Api-Key: {internalApiKey}
 ```
 
 `enrollable=false`이면 `enrollment-service`는 수강신청을 생성하지 않습니다. 강의가 없으면 `404 COURSE_NOT_FOUND`, 내부 API 키가 없거나 다르면 `401 INVALID_INTERNAL_API_KEY`를 반환합니다.
+
+#### 차시 목록 조회
+
+```http
+GET /internal/courses/{courseId}/lessons
+X-Internal-Api-Key: {internalApiKey}
+```
+
+`enrollment-service`가 차시 소속 검증과 필수 차시 기준 진도율 계산에 사용합니다. 외부 Gateway에는 노출하지 않습니다.
 
 ---
 
@@ -769,6 +814,35 @@ X-Internal-Api-Key: {internalApiKey}
 중복 신청은 `409 DUPLICATE_ENROLLMENT`를 반환합니다.
 
 현재 구현은 개별 강의 결제를 요청하지 않습니다. `payment-service`의 구독 결제 결과가 `user-service`의 기업 구독 권한에 반영되어 있고, 해당 권한이 `ACTIVE`인 경우에만 수강신청을 허용합니다.
+
+### ENROLL-02·03 수강 목록·상세
+
+`GET /api/enrollments/me`은 본인의 수강 목록을, `GET /api/enrollments/{enrollmentId}`은 본인 수강의 차시별 상태와 서버 계산 진도율을 반환합니다. 둘 다 활성 `EMPLOYEE` 권한과 같은 기업 소속을 서버에서 재확인합니다.
+
+### LEARNING-01·02 차시 시작·완료
+
+차시 시작과 완료는 각각 `200 OK`로 아래와 같은 응답을 반환합니다. 차시 ID가 해당 강의에 없으면 `422 LESSON_NOT_IN_COURSE`를 반환합니다.
+
+```json
+{
+  "data": {
+    "enrollmentId": 9001,
+    "lessonId": 1201,
+    "lessonStatus": "COMPLETED",
+    "progressRate": 100.0,
+    "enrollmentStatus": "COMPLETED",
+    "startedAt": "2026-08-10T10:30:00+09:00",
+    "completedAt": "2026-08-10T10:45:00+09:00"
+  },
+  "timestamp": "2026-08-10T10:45:00+09:00"
+}
+```
+
+서버는 필수 차시의 완료 수를 기준으로 진도율을 계산하고, 첫 시작 시각 및 모든 필수 차시 완료 시각을 저장합니다.
+
+### COMPANY-ENROLL-01·02 직원별 수강 상태·진도율
+
+기업 관리자는 자기 기업의 수강 레코드를 페이지 단위로 조회합니다. `page`(기본 0), `size`(기본 20, 최대 100)를 사용할 수 있습니다. 두 경로 모두 `enrollmentId`, `userId`, `courseId`, `status`, `progressRate`, 학습 시각을 반환하며, `/progress`는 진도율 조회용 별칭입니다. 사용자 이름·부서 정보는 `user-service` 소유이므로 이 API 응답에는 포함하지 않습니다.
 
 ### enrollment-service 내부 API
 

@@ -138,13 +138,13 @@ services:
       - SPRING_CLOUD_GATEWAY_ROUTES_1_ORDER=-100
       - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=user-service
       - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://user-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/users,/api/users/**,/api/companies,/api/companies/**,/api/terms,/api/terms/**,/api/auth,/api/auth/**,/api/employees,/api/employees/**,/api/admin/users,/api/admin/users/**,/api/admin/companies,/api/admin/companies/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/users,/api/users/**,/api/companies,/api/companies/me,/api/companies/me/invitations,/api/companies/me/invitations/**,/api/companies/me/employees,/api/companies/me/employees/**,/api/companies/me/seats,/api/terms,/api/terms/**,/api/auth,/api/auth/**,/api/employees,/api/employees/**,/api/admin/users,/api/admin/users/**,/api/admin/companies,/api/admin/companies/**
       - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=course-service
       - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://course-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses,/api/courses/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses,/api/courses/**,/api/admin/courses,/api/admin/courses/**
       - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=enrollment-service
       - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**,/api/companies/me/enrollments,/api/companies/me/enrollments/**
       - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=payment-service
       - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://payment-service
       - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**
