@@ -13,20 +13,18 @@ CREATE TABLE IF NOT EXISTS users (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 강사가 강의 개설 (instructor_id → users.id)
+-- 기업 외국어교육 강의
 CREATE TABLE IF NOT EXISTS courses (
-    id               BIGINT          NOT NULL AUTO_INCREMENT,
-    title            VARCHAR(255)    NOT NULL,
-    description      TEXT,
-    category         VARCHAR(50)     NOT NULL COMMENT 'BACKEND|FRONTEND|DEVOPS|DATA_SCIENCE|MOBILE|SECURITY|DATABASE|OTHER',
-    price            DECIMAL(10,2)   NOT NULL,
-    instructor_id    BIGINT          NOT NULL,
-    enrollment_count INT             NOT NULL DEFAULT 0,
-    status           VARCHAR(20)     NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE | INACTIVE',
-    created_at       DATETIME(6),
-    updated_at       DATETIME(6),
-    PRIMARY KEY (id),
-    FOREIGN KEY (instructor_id) REFERENCES users(id)
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    title       VARCHAR(255) NOT NULL,
+    description TEXT,
+    language    VARCHAR(50)  NOT NULL COMMENT 'ENGLISH | JAPANESE | CHINESE',
+    situation   VARCHAR(50)  NOT NULL COMMENT 'CUSTOMER_MEETING | PRESENTATION | EMAIL | BUSINESS_TRIP | DAILY_CONVERSATION',
+    level       VARCHAR(50)  NOT NULL COMMENT 'BEGINNER | ELEMENTARY | INTERMEDIATE | ADVANCED',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE | INACTIVE',
+    created_at  DATETIME(6),
+    updated_at  DATETIME(6),
+    PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 수강생이 수강 신청 (user_id → users.id, course_id → courses.id)
