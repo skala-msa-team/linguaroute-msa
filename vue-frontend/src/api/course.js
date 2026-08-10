@@ -10,11 +10,15 @@ export const courseApi = {
   },
 
   getByLanguage(language) {
-    return api.get(`/api/courses/language/${language}`)
+    return api.get('/api/courses', { params: { language } })
   },
 
   getById(id) {
     return api.get(`/api/courses/${id}`)
+  },
+
+  getLessons(courseId) {
+    return api.get(`/api/courses/${courseId}/lessons`)
   },
 
   create(data) {

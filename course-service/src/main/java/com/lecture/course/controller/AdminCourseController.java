@@ -43,4 +43,6 @@ public class AdminCourseController {
         userAuthorizationClient.requirePlatformAdmin(userId);
         return ResponseEntity.ok(CourseDto.ApiResponse.success(courseService.changeCourseStatus(courseId, request)));
     }
+    @PostMapping("/{courseId}/lessons")
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.LessonResponse>> addLesson(@RequestHeader("X-User-Id") Long userId,@PathVariable Long courseId,@Valid @RequestBody CourseDto.LessonRequest request){userAuthorizationClient.requirePlatformAdmin(userId);return ResponseEntity.status(HttpStatus.CREATED).body(CourseDto.ApiResponse.success(courseService.addLesson(courseId,request)));}
 }

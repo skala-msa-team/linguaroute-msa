@@ -30,7 +30,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Sparkles } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import AsyncState from '@/components/AsyncState.vue'
@@ -38,14 +38,17 @@ import CourseTile from '@/components/CourseTile.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { courses } from '@/data/mockData.js'
 import { LANGUAGE_OPTIONS, LEVEL_OPTIONS, SITUATION_OPTIONS } from '@/constants/domain.js'
+import { courseApi } from '@/api/course.js'
 
 const keyword = ref('')
 const language = ref('')
 const situation = ref('')
 const level = ref('')
 const viewState = ref('ready')
+const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
+const liveCourses = ref([])
 
-const filtered = computed(() => courses.filter((course) => {
+const filtered = computed(() => (liveCourses.value.length ? liveCourses.value : courses).filter((course) => {
   const query = keyword.value.trim().toLowerCase()
   return (!query || `${course.title} ${course.description}`.toLowerCase().includes(query))
     && (!language.value || course.languageCode === language.value)
@@ -53,12 +56,31 @@ const filtered = computed(() => courses.filter((course) => {
     && (!level.value || course.levelCode === level.value)
 }))
 
+async function loadCourses() {
+  if (!useLiveApi) return
+  viewState.value = 'loading'
+  try {
+    const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, situation: situation.value || undefined, level: level.value || undefined, page: 0, size: 20 })
+    liveCourses.value = response.data.data.content.map((course) => ({
+      ...courses[0], id: course.courseId, title: course.title, languageCode: course.language,
+      language: course.language, situationCode: course.situation, situation: course.situation,
+      levelCode: course.level, level: course.level, status: course.status, tone: 'green'
+    }))
+    viewState.value = 'ready'
+  } catch (_) {
+    viewState.value = 'error'
+  }
+}
+
+onMounted(loadCourses)
+watch([keyword, language, situation, level], loadCourses)
+
 function clearFilters() {
   keyword.value = ''
   language.value = ''
   situation.value = ''
   level.value = ''
-  viewState.value = 'ready'
+  loadCourses()
 }
 </script>
 

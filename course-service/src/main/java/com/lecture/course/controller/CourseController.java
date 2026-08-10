@@ -46,4 +46,10 @@ public class CourseController {
         );
     }
 
+    @GetMapping("/{id}/lessons")
+    public ResponseEntity<CourseDto.ApiResponse<java.util.List<CourseDto.LessonResponse>>> getLessons(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(CourseDto.ApiResponse.success(courseService.getLessons(id)));
+    }
+
 }

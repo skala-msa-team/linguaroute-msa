@@ -45,4 +45,28 @@ public class EnrollmentController {
         return ResponseEntity.ok(EnrollmentDto.ApiResponse.success(response));
     }
 
+    @GetMapping("/{enrollmentId}")
+    public ResponseEntity<EnrollmentDto.ApiResponse<EnrollmentDto.EnrollmentDetailResponse>> getEnrollment(
+            @PathVariable Long enrollmentId,
+            @RequestHeader("X-User-Id") Long userId) {
+        return ResponseEntity.ok(EnrollmentDto.ApiResponse.success(
+                enrollmentService.getEnrollmentDetail(userId, enrollmentId)));
+    }
+
+    @PostMapping("/{enrollmentId}/lessons/{lessonId}/start")
+    public ResponseEntity<EnrollmentDto.ApiResponse<EnrollmentDto.LessonActionResponse>> startLesson(
+            @PathVariable Long enrollmentId, @PathVariable Long lessonId,
+            @RequestHeader("X-User-Id") Long userId) {
+        return ResponseEntity.ok(EnrollmentDto.ApiResponse.success(
+                enrollmentService.startLesson(userId, enrollmentId, lessonId)));
+    }
+
+    @PostMapping("/{enrollmentId}/lessons/{lessonId}/complete")
+    public ResponseEntity<EnrollmentDto.ApiResponse<EnrollmentDto.LessonActionResponse>> completeLesson(
+            @PathVariable Long enrollmentId, @PathVariable Long lessonId,
+            @RequestHeader("X-User-Id") Long userId) {
+        return ResponseEntity.ok(EnrollmentDto.ApiResponse.success(
+                enrollmentService.completeLesson(userId, enrollmentId, lessonId)));
+    }
+
 }
