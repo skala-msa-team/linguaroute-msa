@@ -18,7 +18,7 @@
 
 ```mermaid
 flowchart LR
-    AUTH_SERVER["Auth Server<br/>OAuth2/JWT"] -. "users 로그인 필드 읽기" .-> USER
+    AUTH_SERVER["Auth Server<br/>Email Login/JWT"] -. "users 로그인 필드 읽기" .-> USER
     COMPANY["Company<br/>user-service"] --> USER["User<br/>user-service"]
     COMPANY --> INVITATION["Invitation<br/>user-service"]
     COMPANY -. "논리 참조" .-> SUBSCRIPTION["Subscription<br/>payment-service"]
@@ -39,7 +39,7 @@ flowchart LR
 
 ## 3. 기존 Auth Server 호환
 
-Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 OAuth2 로그인과 Access Token 발급을 수행합니다. Refresh Token은 추가하지 않습니다.
+Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 이메일·비밀번호 로그인과 JWT Access Token 발급을 수행합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 사용하지 않습니다.
 
 제공 JAR의 역할 enum이 `STUDENT`, `INSTRUCTOR`로 고정되어 있으므로 `users.role`은 로그인 호환 필드로 유지합니다. `EMPLOYEE`는 `STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `INSTRUCTOR`로 매핑합니다. LinguaRoute의 실제 권한은 `users.business_role`에 저장하고 각 보호 API가 `user-service`의 사용자 상태·기업 소속과 함께 확인합니다.
 

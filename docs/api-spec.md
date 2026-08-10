@@ -16,7 +16,7 @@
 
 기존 API Gateway 서버는 유지합니다. 다만 현재 이미지의 라우트와 공개 경로가 JAR에 고정되어 있으므로 동일한 Gateway 한 대의 라우팅·보안 설정을 수정하여 아래 외부 경로를 연결합니다. Gateway 서버를 추가하지 않습니다.
 
-OAuth2 표준 경로인 `/oauth2/**`와 `/logout`은 기본 경로 `/api`의 예외입니다.
+로그인을 포함한 모든 외부 API는 기본 경로 `/api`를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 구현하지 않습니다.
 
 ---
 
@@ -71,40 +71,48 @@ OAuth2 표준 경로인 `/oauth2/**`와 `/logout`은 기본 경로 `/api`의 예
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | `GET` | `/oauth2/authorize` | 공개 | OAuth2 로그인 시작 | 필수 |
-| AUTH-02 | `POST` | `/logout` | 로그인 | OAuth2 세션 로그아웃 | 필수 |
+| AUTH-01 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
 | AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
 | AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
 | AUTH-05 | `POST` | `/api/auth/email-verifications` | 공개 | 이메일 인증 요청 | 필수 |
 | AUTH-06 | `POST` | `/api/auth/email-verifications/confirm` | 공개 | 이메일 인증 확인 | 필수 |
 | AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
 | AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
-| AUTH-09 | `POST` | `/oauth2/token` | OAuth2 클라이언트 | 인증 코드로 Access Token 발급 | 필수 |
 
-기존 Auth Server는 `AUTH-01`, `AUTH-02`, `AUTH-09`와 Access Token 발급만 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 `/api/auth/**` 요청을 `user-service`로 전달합니다. 서버를 새로 추가하지 않습니다.
+Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 각 `/api/auth/**` 요청을 소유 서비스로 전달합니다. 서버를 새로 추가하지 않습니다.
 
 이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
 
 ### AUTH-01 로그인
 
-현재 프론트엔드의 OAuth2 Authorization Code 흐름을 유지합니다.
+프론트엔드는 이메일과 비밀번호를 API Gateway의 로그인 API로 전송합니다.
 
 ```http
-GET /oauth2/authorize?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=openid%20profile%20read%20write
+POST /api/auth/login
+Content-Type: application/json
 ```
-
-로그인 완료 후 전달받은 인증 코드는 기존 `/oauth2/token`에서 Access Token으로 교환합니다. 토큰 응답은 기존 Auth Server의 OAuth2 형식을 유지합니다.
 
 ```json
 {
-  "access_token": "access-token",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "scope": "openid profile read write"
+  "email": "employee@company.com",
+  "password": "Password123!"
 }
 ```
 
-MVP에서는 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃 시에는 클라이언트가 저장한 Access Token을 삭제합니다.
+인증 서버가 이메일과 BCrypt 비밀번호 해시를 검증하고 JWT Access Token을 직접 반환합니다.
+
+```json
+{
+  "data": {
+    "accessToken": "jwt-access-token",
+    "tokenType": "Bearer",
+    "expiresIn": 3600
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+MVP에서는 OAuth2 Authorization Code와 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 별도 서버 세션 없이 클라이언트가 저장한 Access Token을 삭제합니다.
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
 
