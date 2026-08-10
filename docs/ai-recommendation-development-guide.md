@@ -208,6 +208,7 @@ Gateway Bearer Token 검증 및 userId 전달
 
 ```http
 GET /api/courses/internal/recommend?language=ENGLISH
+X-Internal-Api-Key: {internalApiKey}
 ```
 
 필요한 최소 응답 필드:
@@ -243,6 +244,24 @@ API Gateway 연동과 서비스 통합 테스트는 김지민 담당입니다. �
 
 현재 `docker-compose.yml`에 이 우선순위를 설정했지만 실제 Gateway 이미지에서 환경변수로 기존 라우트가 정상 재정의되는지 확인해야 합니다.
 
+#### 내부 API 외부 차단
+
+일반 서비스 라우트는 `/api/courses/**`처럼 하위 경로 전체를 포함하므로 그대로 두면
+`/api/courses/internal/**`도 외부에 노출됩니다. 이를 막기 위해 내부 경로 전용 차단
+라우트를 우선순위 `-100`으로 먼저 평가하고 `404 Not Found`를 반환합니다.
+
+```text
+/api/courses/internal/**
+/api/enrollments/internal/**
+/api/payments/internal/**
+→ Gateway에서 404
+```
+
+Gateway 차단만으로 내부 네트워크의 호출자를 식별할 수는 없습니다. recommend-service는
+course-service를 직접 호출할 때 `X-Internal-Api-Key`를 추가하며, course-service도 같은
+키를 검증해야 방어가 완성됩니다. 실제 키는 저장소가 아니라 `INTERNAL_API_KEY`
+환경변수로 주입합니다.
+
 #### 인증과 클레임 전달
 
 Gateway는 외부 요청의 Bearer Token을 검증하고, 인증되지 않은 요청은 `401 Unauthorized`로 차단해야 합니다. 추천 API는 직원 전용이므로 `EMPLOYEE`가 아닌 사용자는 `403 Forbidden`으로 거부해야 합니다.
@@ -256,6 +275,8 @@ Gateway는 외부 요청의 Bearer Token을 검증하고, 인증되지 않은 �
 - 토큰이 없거나 잘못된 경우 `401 Unauthorized`
 - 추천 경로가 `recommend-service`로 전달되는지 확인
 - 일반 강의 경로가 계속 `course-service`로 전달되는지 확인
+- `/api/**/internal/**` 외부 요청이 `404 Not Found`로 차단되는지 확인
+- recommend-service의 직접 Course 호출에 내부 API 키가 포함되는지 확인
 - OpenAI 장애 시 Gateway를 통해 규칙 기반 폴백 응답이 반환되는지 확인
 - Gateway 외부 응답이 API 명세의 `{ data, timestamp }` 형식과 일치하는지 확인
 
