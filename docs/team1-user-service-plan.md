@@ -27,7 +27,7 @@
 - [x] 기존 작업 복원 후 충돌 없음 확인
 - [x] 변경사항 커밋
 - [x] 원격 기능 브랜치 푸시
-- [ ] Base `dev`, Compare `feature/user-company` Pull Request 생성
+- [x] Base `dev`, Compare `feature/user-company` Pull Request 생성 및 병합
 
 ### 이번 구현 범위
 
