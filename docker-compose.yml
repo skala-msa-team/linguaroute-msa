@@ -160,6 +160,7 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - INTERNAL_API_KEY=local-internal-api-key
     depends_on:
       mariadb:
         condition: service_healthy
@@ -267,6 +268,12 @@ services:
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
       - USER_SERVICE_URL=http://user-service:8081
+      - INTERNAL_API_KEY=local-internal-api-key
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.6-sol}
+      - OPENAI_TIMEOUT_SECONDS=${OPENAI_TIMEOUT_SECONDS:-15}
+      - OPENAI_MAX_RETRIES=${OPENAI_MAX_RETRIES:-1}
+      - OPENAI_MAX_OUTPUT_TOKENS=${OPENAI_MAX_OUTPUT_TOKENS:-600}
       - DATABASE_URL=mysql+pymysql://manager:SqlDba-1@lecturedb:3306/lecture_db
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
