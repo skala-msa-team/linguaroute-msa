@@ -31,14 +31,25 @@ def test_employee_can_request_recommendations(monkeypatch):
     )
     mocked = AsyncMock(return_value=result)
     monkeypatch.setattr(recommend_router.recommend_service, "recommend", mocked)
-    company_lookup = AsyncMock(return_value=10)
-    monkeypatch.setattr(recommend_router.user_client, "get_company_id", company_lookup)
+    authorization_lookup = AsyncMock(
+        return_value={
+            "userId": 7,
+            "companyId": 10,
+            "businessRole": "EMPLOYEE",
+            "status": "ACTIVE",
+        }
+    )
+    monkeypatch.setattr(
+        recommend_router.user_client,
+        "get_authorization_context",
+        authorization_lookup,
+        raising=False,
+    )
 
     response = build_client().post(
         "/api/courses/recommendations",
         headers={
             "X-User-Id": "7",
-            "X-User-Role": "EMPLOYEE",
             "Authorization": "Bearer test-token",
         },
         json=valid_body(),
@@ -50,12 +61,52 @@ def test_employee_can_request_recommendations(monkeypatch):
     assert response.json()["timestamp"]
 
 
-def test_non_employee_is_forbidden():
+def test_non_employee_is_forbidden(monkeypatch):
+    monkeypatch.setattr(
+        recommend_router.user_client,
+        "get_authorization_context",
+        AsyncMock(
+            return_value={
+                "userId": 7,
+                "companyId": 10,
+                "businessRole": "COMPANY_ADMIN",
+                "status": "ACTIVE",
+            }
+        ),
+        raising=False,
+    )
+
     response = build_client().post(
         "/api/courses/recommendations",
         headers={
             "X-User-Id": "7",
-            "X-User-Role": "COMPANY_ADMIN",
+            "Authorization": "Bearer test-token",
+        },
+        json=valid_body(),
+    )
+
+    assert response.status_code == 403
+
+
+def test_inactive_employee_is_forbidden(monkeypatch):
+    monkeypatch.setattr(
+        recommend_router.user_client,
+        "get_authorization_context",
+        AsyncMock(
+            return_value={
+                "userId": 7,
+                "companyId": 10,
+                "businessRole": "EMPLOYEE",
+                "status": "INACTIVE",
+            }
+        ),
+        raising=False,
+    )
+
+    response = build_client().post(
+        "/api/courses/recommendations",
+        headers={
+            "X-User-Id": "7",
             "Authorization": "Bearer test-token",
         },
         json=valid_body(),
@@ -68,6 +119,22 @@ def test_gateway_identity_headers_are_required():
     response = build_client().post(
         "/api/courses/recommendations",
         json=valid_body(),
+    )
+
+    assert response.status_code == 422
+
+
+def test_unknown_course_domain_value_is_rejected_before_service_call():
+    body = valid_body()
+    body["language"] = "SPANISH"
+
+    response = build_client().post(
+        "/api/courses/recommendations",
+        headers={
+            "X-User-Id": "7",
+            "Authorization": "Bearer test-token",
+        },
+        json=body,
     )
 
     assert response.status_code == 422

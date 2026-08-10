@@ -7,6 +7,7 @@ from app.model.schemas import (
     RecommendationRequest,
     RecommendationSource,
 )
+from pydantic import ValidationError
 from app.service.recommend_service import RecommendationService
 
 
@@ -78,3 +79,8 @@ async def test_provider_failure_returns_rule_based_fallback(recommendation_reque
     assert [course.courseId for course in result.courses] == [1, 2]
     assert all(course.reason for course in result.courses)
     repository.save.assert_awaited_once()
+
+
+def test_course_candidate_rejects_unknown_status():
+    with pytest.raises(ValidationError):
+        candidate(1, status="ARCHIVED")
