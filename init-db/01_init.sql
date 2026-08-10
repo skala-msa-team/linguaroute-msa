@@ -29,6 +29,24 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT fk_users_company FOREIGN KEY (company_id) REFERENCES companies(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS invitations (
+    id                  BIGINT      NOT NULL AUTO_INCREMENT,
+    company_id          BIGINT      NOT NULL,
+    created_by_user_id  BIGINT      NOT NULL,
+    used_by_user_id     BIGINT,
+    code_hash           CHAR(64)    NOT NULL,
+    status              VARCHAR(20) NOT NULL COMMENT 'UNUSED | USED | EXPIRED | REVOKED',
+    expires_at          DATETIME(6) NOT NULL,
+    used_at             DATETIME(6),
+    created_at          DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_invitations_code_hash (code_hash),
+    KEY idx_invitations_company_created (company_id, created_at),
+    CONSTRAINT fk_invitations_company FOREIGN KEY (company_id) REFERENCES companies(id),
+    CONSTRAINT fk_invitations_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+    CONSTRAINT fk_invitations_used_by FOREIGN KEY (used_by_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS email_verifications (
     id                  BIGINT       NOT NULL AUTO_INCREMENT,
     email               VARCHAR(255) NOT NULL,

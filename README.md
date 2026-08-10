@@ -297,6 +297,143 @@ MariaDB            localhost:3379
 Kafka              localhost:9092
 ```
 
+### 기능별 요청 흐름
+
+기능을 처리할 때 어떤 서버가 어떤 순서로 통신하는지 보여 주는 요약입니다. 외부 요청은 `Vue Frontend → API Gateway → 대상 서비스` 순서이고, 서비스 간 내부 호출은 Gateway를 거치지 않는 `/internal/**` API입니다. URL·요청·응답은 [API 명세서](./docs/api-spec.md), 데이터 소유권과 이벤트 payload는 [ERD](./docs/erd.md)를 기준으로 합니다.
+
+#### 1. 이메일 인증과 기업 대표 회원가입
+
+```mermaid
+sequenceDiagram
+    participant FE as Vue Frontend
+    participant GW as API Gateway
+    participant US as user-service
+    participant Mail as MailHog/SMTP
+    participant DB as MariaDB
+
+    FE->>GW: 인증 코드 발송 요청
+    GW->>US: request-email-verification
+    US->>DB: 코드 해시·만료시각 저장
+    US->>Mail: 6자리 코드 발송
+    Mail-->>FE: 이메일 수신
+    FE->>GW: 인증 코드 확인 요청
+    GW->>US: confirm-email-verification
+    US->>DB: 코드 검증, 가입용 토큰 저장
+    US-->>FE: emailVerificationToken 반환
+    FE->>GW: 기업 대표 회원가입
+    GW->>US: 가입 요청
+    US->>DB: 토큰·약관 검증 후 기업·사용자·동의 저장
+    US-->>FE: 가입 결과 반환
+```
+
+#### 2. 로그인과 Access Token 발급
+
+```mermaid
+sequenceDiagram
+    participant FE as Vue Frontend
+    participant AS as Auth Server
+    participant DB as MariaDB
+    participant GW as API Gateway
+    participant US as user-service
+
+    FE->>AS: OAuth2 로그인 화면 요청·이메일/비밀번호 제출
+    AS->>DB: users 로그인 호환 필드 조회·검증
+    AS-->>FE: Authorization Code와 함께 콜백
+    FE->>GW: Authorization Code 교환 요청
+    GW->>US: exchange-oauth-code
+    US->>AS: 서버 간 Token 교환
+    AS-->>US: JWT Access Token
+    US-->>FE: Access Token 반환
+```
+
+#### 3. 직원 초대와 직원 회원가입
+
+```mermaid
+sequenceDiagram
+    participant Admin as 기업 관리자
+    participant Employee as 직원
+    participant GW as API Gateway
+    participant US as user-service
+    participant DB as MariaDB
+
+    Admin->>GW: 초대코드 생성 요청
+    GW->>US: 초대코드 생성
+    US->>DB: 기업 구독 권한·잔여 좌석 확인 후 초대 저장
+    US-->>Admin: 일회용 초대코드 반환
+    Employee->>GW: 초대코드 포함 회원가입
+    GW->>US: 직원 가입 요청
+    US->>DB: 이메일 인증·초대코드·구독·좌석 검증
+    US->>DB: 직원 생성, 좌석 배정, 초대코드 사용 처리
+    US-->>Employee: 가입 결과 반환
+```
+
+#### 4. 구독 결제와 기업 이용 권한 갱신
+
+```mermaid
+sequenceDiagram
+    participant FE as Vue Frontend
+    participant GW as API Gateway
+    participant PS as payment-service
+    participant US as user-service
+    participant DB as MariaDB
+    participant Kafka as Kafka
+
+    FE->>GW: 구독 결제 요청
+    GW->>PS: 결제 요청 및 인증 사용자 ID 전달
+    PS->>US: 내부 API로 기업 관리자 권한 확인
+    US-->>PS: companyId·권한 컨텍스트 반환
+    PS->>DB: 결제·구독·Outbox 이벤트 저장
+    PS->>Kafka: PaymentCompleted 등 구독 이벤트 발행
+    Kafka->>US: 구독 이벤트 전달
+    US->>DB: company_entitlements 갱신
+    PS-->>FE: 결제 결과 반환
+```
+
+#### 5. 수강신청과 학습 진도 처리
+
+```mermaid
+sequenceDiagram
+    participant FE as Vue Frontend
+    participant GW as API Gateway
+    participant ES as enrollment-service
+    participant US as user-service
+    participant CS as course-service
+    participant DB as MariaDB
+
+    FE->>GW: 수강신청 요청
+    GW->>ES: courseId와 인증 사용자 ID 전달
+    ES->>US: 내부 API로 사용자 권한·기업 구독 확인
+    US-->>ES: ACTIVE 구독 권한 반환
+    ES->>CS: 내부 API로 강의 수강 가능 여부 확인
+    CS-->>ES: ACTIVE 강의 정보 반환
+    ES->>DB: 중복 확인 후 수강신청 저장
+    ES-->>FE: 수강신청 결과 반환
+    FE->>GW: 차시 시작·완료 요청
+    GW->>ES: 학습 상태 변경
+    ES->>DB: 차시 상태·진도율·완료 상태 저장
+```
+
+#### 6. AI 강의 추천
+
+```mermaid
+sequenceDiagram
+    participant FE as Vue Frontend
+    participant GW as API Gateway
+    participant RS as recommend-service
+    participant CS as course-service
+    participant ES as enrollment-service
+    participant DB as MariaDB
+
+    FE->>GW: 언어·수준·직무·상황·목표로 추천 요청
+    GW->>RS: 추천 요청과 인증 사용자 ID 전달
+    RS->>CS: 내부 API로 언어가 일치하는 ACTIVE 강의 조회
+    CS-->>RS: 추천 후보 강의 반환
+    RS->>ES: 내부 API로 기존 수강 이력 조회
+    ES-->>RS: 제외할 수강 강의 반환
+    RS->>DB: 추천 요청·결과 저장
+    RS-->>FE: 추천 강의와 추천 이유 반환
+```
+
 ### 이메일 인증 로컬 확인
 
 이메일 인증 요청은 Gateway 공개 가입 경로를 사용합니다. 제공 Gateway 이미지가 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로, 기업 가입 경로에 `action` 쿼리 파라미터를 사용합니다.

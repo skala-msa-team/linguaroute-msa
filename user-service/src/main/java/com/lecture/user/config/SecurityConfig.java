@@ -38,6 +38,7 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/companies").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/employees/signup").permitAll()
                 .requestMatchers("/internal/users/**", "/internal/companies/**").permitAll()
                 .anyRequest().authenticated()
             )
