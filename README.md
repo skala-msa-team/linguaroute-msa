@@ -9,6 +9,7 @@
 - [MVP 체크리스트](./docs/mvp-checklist.md)
 - [API 명세서](./docs/api-spec.md)
 - [ERD](./docs/erd.md)
+- [구현 결정 및 착수 확인](./docs/open-decisions.md)
 
 ## 팀 Git 협업 규칙
 
@@ -168,14 +169,17 @@ git commit -m "fix: 중복 수강 신청 문제 수정" \
 다음 프로그램과 파일이 필요합니다.
 
 - Docker Desktop
-- `infra-images.tar`
+- 저장소에 포함된 `infra-images.tar.gz.part-*` 압축 조각
 
-`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함되지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+압축 조각에는 API Gateway와 Auth Server 이미지가 들어 있습니다. GitHub 파일 크기 제한을 지키기 위해 gzip 파일을 90MiB 단위로 분할했습니다.
 
 ```text
 linguaroute-msa/
 ├── docker-compose.yml
-├── infra-images.tar
+├── infra-images.tar.gz.part-aa
+├── infra-images.tar.gz.part-ab
+├── infra-images.tar.gz.part-ac
+├── infra-images.tar.gz.sha256
 ├── course-service/
 ├── enrollment-service/
 └── ...
@@ -203,16 +207,20 @@ cd linguaroute-msa
 
 ```bash
 pwd
-ls docker-compose.yml infra-images.tar
+ls docker-compose.yml infra-images.tar.gz.part-* infra-images.tar.gz.sha256
 ```
 
 ### 3. 공통 이미지 불러오기
 
-API Gateway와 Auth Server 이미지를 Docker에 불러옵니다. 처음 실행할 때 한 번만 하면 됩니다.
+API Gateway와 Auth Server 이미지 조각을 합치고 무결성을 검증한 뒤 Docker에 불러옵니다. 처음 실행할 때 한 번만 하면 됩니다.
 
 ```bash
-docker load -i infra-images.tar
+cat infra-images.tar.gz.part-* > infra-images.tar.gz
+shasum -a 256 -c infra-images.tar.gz.sha256
+gzip -dc infra-images.tar.gz | docker load
 ```
+
+체크섬 결과가 `infra-images.tar.gz: OK`일 때만 Docker 로드를 진행합니다.
 
 다음 명령으로 두 이미지가 있는지 확인합니다.
 
@@ -386,10 +394,12 @@ pull access denied
 No such image
 ```
 
-`infra-images.tar`가 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
+압축 조각과 체크섬 파일이 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
 
 ```bash
-docker load -i infra-images.tar
+cat infra-images.tar.gz.part-* > infra-images.tar.gz
+shasum -a 256 -c infra-images.tar.gz.sha256
+gzip -dc infra-images.tar.gz | docker load
 docker images
 ```
 

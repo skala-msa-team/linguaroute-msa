@@ -22,6 +22,7 @@
 - 기능별 진행 상황: [`docs/mvp-checklist.md`](./docs/mvp-checklist.md)
 - API 설계: [`docs/api-spec.md`](./docs/api-spec.md)
 - 데이터 소유권 및 ERD: [`docs/erd.md`](./docs/erd.md)
+- 확정 구현 방침과 착수 확인: [`docs/open-decisions.md`](./docs/open-decisions.md)
 
 API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문서를 같은 작업 범위에서 함께 갱신합니다.
 
@@ -30,6 +31,7 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 - Java 21 / Spring Boot: `user-service`, `course-service`, `enrollment-service`, `payment-service`, `eureka-server`
 - Python / FastAPI: `recommend-service`
 - Vue 3 / Vite: `vue-frontend`
+- 제공 Docker 이미지: Auth Server, API Gateway
 - 로컬 통합 환경: 루트 `docker-compose.yml`
 - 공통 API 진입점: API Gateway
 
@@ -37,6 +39,8 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 
 - `course-service`는 강의와 차시를 소유합니다.
 - `recommend-service`는 추천 요청과 추천 결과를 소유하며, `course-service` API로 `ACTIVE` 상태 및 요청 언어 일치 여부를 검증합니다.
+- Auth Server는 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정과 Access Token 발급을 소유합니다.
+- `user-service`는 기업·사용자 프로필, 역할·기업 소속, 초대·좌석과 약관 동의를 소유하며 비밀번호를 저장하지 않습니다.
 
 ### 3.1 목표 서비스
 
@@ -48,7 +52,7 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 
 - 기업 관리자는 월간·연간 구독, 결제, 좌석, 초대코드와 소속 직원을 관리합니다.
 - 직원은 초대코드로 가입하고 강의를 검색·신청·학습하며 AI 추천을 사용합니다.
-- 플랫폼 관리자는 기업, 사용자, 강의, 결제, 수강과 감사 로그를 운영합니다.
+- 플랫폼 관리자는 기업, 사용자, 강의, 결제와 수강 상태를 운영합니다.
 - AI는 직원의 언어, 수준, 직무, 상황과 목표를 분석하되 실제 등록된 `ACTIVE` 강의만 추천합니다.
 
 ### 3.2 요구사항 우선순위
@@ -70,13 +74,19 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 
 - `확정 MVP`: 현재 개발 대상입니다.
 - `선택 기능`: 필수 MVP 완료 후 사용자가 요청한 경우에만 구현합니다.
-- `보류 기능`: 정책이 확정되기 전에는 구현하지 않습니다.
+- `제외 기능`: 현재 프로젝트에서 구현하지 않습니다.
 - `추후 확장 기능`: 현재 작업 범위에서 제외합니다.
-- `미확정 사항`: 에이전트가 임의로 결정하지 말고 사용자 또는 담당자에게 확인합니다.
+- `착수 확인`: 구현 방침은 확정되어 있으며, 제공 이미지·기존 코드의 지원 여부만 담당자가 확인합니다.
 
 MVP 기능을 구현했을 때는 [`docs/mvp-checklist.md`](./docs/mvp-checklist.md)를 같은 Pull Request에서 갱신합니다. 기존 코드에 비슷한 기능이 있다는 이유만으로 완료 처리하지 않으며, 요구사항 일치·테스트·실행 확인·관련 문서 갱신까지 끝난 항목만 `[x]`로 표시합니다.
 
-특히 수강 취소의 진도율 5% 조건, AI 라우팅 범위, 실제 정기결제 범위, 비밀번호 재설정 채널과 환불 정책은 미확정 사항입니다.
+이메일 인증, 아이디 찾기, 회원 탈퇴와 기업 관리자의 직원별 진도율 조회는 확정 MVP이며 회원가입 시 필수 약관 동의를 저장합니다. 환불, AI 추천 거부·재추천, 언어별 강의 버전 관리와 최근 학습 위치 저장·이어보기는 제외 기능입니다. 주요 작업 감사 로그는 추후 확장 기능입니다.
+
+`PaymentCompleted`, `PaymentFailed`, `SubscriptionCanceled`, `SubscriptionExpired`, `SubscriptionRenewed` 이벤트의 발행·소비는 확정 MVP입니다. 구독 해지는 현재 이용 기간까지 권한을 유지하고, 만료 이벤트에서 실제 권한을 종료합니다.
+
+아이디 찾기는 이름과 기업 사업자번호를 조회 조건으로 사용하고, 등록된 로그인 이메일로만 안내 메일을 발송합니다. API 응답에는 이메일과 계정 존재 여부를 노출하지 않습니다.
+
+MVP는 모의 결제·기간 관리, SMTP 인증 이메일과 강의 추천만 구현합니다. 상세 구현 기준은 [`docs/open-decisions.md`](./docs/open-decisions.md)를 따릅니다.
 
 ### 3.4 팀 담당 영역
 
@@ -195,8 +205,9 @@ git diff --cached
 
 ## 7. MSA 및 데이터 설계 규칙
 
-- 각 마이크로서비스는 자신의 데이터와 테이블을 소유합니다.
-- 다른 서비스의 데이터베이스 테이블을 직접 조회하거나 조인하지 않습니다.
+- MVP 데이터베이스는 현재 구성대로 MariaDB 한 개와 공용 `lecture_db` 한 개를 유지합니다.
+- 각 마이크로서비스는 공용 DB 안에서 자신의 테이블만 소유하고 접근합니다.
+- 다른 서비스 소유 테이블을 직접 조회·조인하거나 서비스 사이 외래키를 만들지 않습니다.
 - 다른 서비스의 `company_id`, `user_id`, `course_id`, `lesson_id` 등은 논리 참조 ID로만 저장합니다.
 - 서비스 간 조회는 REST API, 비동기 상태 전달은 Kafka 이벤트를 사용합니다.
 - Kafka 소비자는 `eventId`를 기준으로 중복 이벤트를 안전하게 처리하도록 설계합니다.
@@ -209,6 +220,8 @@ git diff --cached
 
 - 외부 요청은 API Gateway와 `/api` 경로를 기준으로 설계합니다.
 - 보호 API는 Bearer Token과 역할·기업 소속 권한을 모두 검증합니다.
+- MVP에서는 Refresh Token을 구현하지 않습니다. Access Token 만료 시 재로그인하며, 로그아웃 시 클라이언트가 저장한 Access Token을 삭제합니다.
+- Auth Server는 로그인 시 `user-service`에서 최신 사용자 상태·역할·기업 소속을 조회하고 `userId`, `companyId`, `role`을 Access Token 클레임에 반영합니다.
 - 요청 DTO, 엔티티, 응답 DTO의 책임을 분리합니다.
 - 정상 및 예외 HTTP 상태 코드를 구분하고 공통 오류 형식을 유지합니다.
 - 생성 API는 `201 Created`, 일반 조회·수정은 `200 OK`, 본문 없는 삭제는 `204 No Content`를 우선 검토합니다.
