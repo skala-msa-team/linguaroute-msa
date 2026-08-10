@@ -170,7 +170,9 @@ git commit -m "fix: 중복 수강 신청 문제 수정" \
 - Docker Desktop
 - `infra-images.tar`
 
-`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함되지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+
+이 이미지는 강사 제공 출발 코드를 실행할 때 사용합니다. LinguaRoute 개발에서는 목표 인증 API와 Gateway 경로를 구현하기 위해 Auth Server와 API Gateway를 수정 가능한 소스 모듈로 교체합니다.
 
 ```text
 linguaroute-msa/
