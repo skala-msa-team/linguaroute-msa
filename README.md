@@ -7,6 +7,7 @@
 - [에이전트 작업 지침](./AGENTS.md)
 - [서비스 기획서](./docs/product-spec.md)
 - [MVP 체크리스트](./docs/mvp-checklist.md)
+- [팀원 1 user-service 구현 계획](./docs/team1-user-service-plan.md)
 - [API 명세서](./docs/api-spec.md)
 - [ERD](./docs/erd.md)
 
