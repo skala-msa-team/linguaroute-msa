@@ -48,8 +48,9 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 
 - `course-service`는 강의와 차시를 소유합니다.
 - `recommend-service`는 추천 요청과 추천 결과를 소유하며, `course-service` API로 `ACTIVE` 상태 및 요청 언어 일치 여부를 검증합니다.
-- Auth Server는 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정과 Access Token 발급을 소유합니다.
-- `user-service`는 기업·사용자 프로필, 역할·기업 소속, 초대·좌석과 약관 동의를 소유하며 비밀번호를 저장하지 않습니다.
+- 기존 Auth Server는 OAuth2 로그인과 Access Token 발급을 담당하며 공용 `users` 테이블의 호환 필드를 읽습니다.
+- `user-service`는 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정, 기업·사용자 프로필, 비즈니스 역할·기업 소속, 초대·좌석과 약관 동의를 소유합니다.
+- 서버 수를 늘리지 않습니다. 기존 Gateway 한 대의 라우팅·보안 설정만 목표 API에 맞게 수정합니다.
 
 ### 3.1 목표 서비스
 
@@ -223,7 +224,7 @@ git diff --cached
 - 외부 요청은 API Gateway와 `/api` 경로를 기준으로 설계합니다.
 - 보호 API는 Bearer Token과 역할·기업 소속 권한을 모두 검증합니다.
 - MVP에서는 Refresh Token을 구현하지 않습니다. Access Token 만료 시 재로그인하며, 로그아웃 시 클라이언트가 저장한 Access Token을 삭제합니다.
-- Auth Server는 로그인 시 `user-service`에서 최신 사용자 상태·역할·기업 소속을 조회하고 `userId`, `companyId`, `role`을 Access Token 클레임에 반영합니다.
+- Access Token의 기존 로그인 역할은 비즈니스 권한으로 사용하지 않습니다. 보호 API는 `user-service`의 내부 권한 조회로 최신 `businessRole`, `companyId`, `status`를 확인합니다.
 - 요청 DTO, 엔티티, 응답 DTO의 책임을 분리합니다.
 - 정상 및 예외 HTTP 상태 코드를 구분하고 공통 오류 형식을 유지합니다.
 - 생성 API는 `201 Created`, 일반 조회·수정은 `200 OK`, 본문 없는 삭제는 `204 No Content`를 우선 검토합니다.
