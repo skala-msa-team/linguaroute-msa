@@ -53,14 +53,15 @@ async def test_course_client_uses_internal_recommendation_contract(monkeypatch):
         lambda **kwargs: FakeAsyncClient(response, request_spy, **kwargs),
     )
 
-    courses = await CourseServiceClient("http://course-service:8082").get_candidates(
-        "ENGLISH"
-    )
+    courses = await CourseServiceClient(
+        "http://course-service:8082", internal_api_key="test-internal-key"
+    ).get_candidates("ENGLISH")
 
     assert courses[0].courseId == 12
     request_spy.assert_called_once_with(
         "http://course-service:8082/api/courses/internal/recommend",
         params={"language": "ENGLISH"},
+        headers={"X-Internal-Api-Key": "test-internal-key"},
     )
 
 

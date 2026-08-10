@@ -13,10 +13,15 @@ class CourseServiceUnavailable(RuntimeError):
 
 
 class CourseServiceClient:
-    """course-service 공개 API만 사용하여 실제 추천 후보를 조회한다."""
+    """course-service 내부 API에서 실제 추천 후보를 조회한다."""
 
-    def __init__(self, base_url: str | None = None):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        internal_api_key: str | None = None,
+    ):
         self.base_url = base_url or settings.course_service_url
+        self.internal_api_key = internal_api_key or settings.internal_api_key
 
     async def get_candidates(self, language: str) -> list[CourseCandidate]:
         # [설계 이유 - 추천 전용 내부 API 사용]
@@ -30,7 +35,16 @@ class CourseServiceClient:
         url = f"{self.base_url}/api/courses/internal/recommend"
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
-                response = await client.get(url, params={"language": language})
+                response = await client.get(
+                    url,
+                    params={"language": language},
+                    # [설계 이유 - 내부 네트워크도 신뢰 경계로 보지 않음]
+                    # Gateway에서 외부 내부 경로를 차단해도 같은 네트워크의 다른
+                    # 프로세스가 course-service를 직접 호출할 수 있다. 따라서 서비스
+                    # 소유자가 호출자를 검증할 수 있도록 공통 내부 키를 함께 보낸다.
+                    # 실제 키는 환경변수로 주입하며 로그나 응답에는 기록하지 않는다.
+                    headers={"X-Internal-Api-Key": self.internal_api_key},
+                )
                 response.raise_for_status()
                 payload = response.json()
                 raw_courses = (
