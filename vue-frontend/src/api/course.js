@@ -5,14 +5,6 @@ export const courseApi = {
     return api.get('/api/courses', { params })
   },
 
-  getAll(params) {
-    return api.get('/api/courses', { params })
-  },
-
-  getByLanguage(language) {
-    return api.get('/api/courses', { params: { language } })
-  },
-
   getById(id) {
     return api.get(`/api/courses/${id}`)
   },

@@ -12,8 +12,8 @@
         </template>
 
         <template v-else-if="step===2">
-          <p class="eyebrow">Mock payment</p><h2>결제 정보를 입력하세요</h2><p class="lead">MVP에서는 실제 카드정보를 받지 않고 테스트용 결제 토큰만 사용합니다.</p>
-          <div class="mock-banner"><FlaskConical :size="20"/><span><strong>모의 결제 환경</strong>결제 토큰은 mock-success 또는 mock-failure만 사용하며, 중복은 멱등성 키 재사용으로 확인합니다.</span></div>
+          <p class="eyebrow">Test payment</p><h2>결제 정보를 입력하세요</h2><p class="lead">MVP에서는 실제 카드정보를 받지 않고 테스트용 결제 토큰으로 결제 API를 호출합니다.</p>
+          <div class="mock-banner"><FlaskConical :size="20"/><span><strong>모의 결제 환경</strong>결제 토큰은 mock-success 또는 mock-failure만 사용하며, 중복 요청은 서버의 멱등성 키로 보호합니다.</span></div>
           <div class="field"><label>결제 결과 미리보기</label><div class="payment-options"><button v-for="option in paymentOptions" :key="option.value" :class="{selected:paymentToken===option.value}" @click="paymentToken=option.value"><component :is="option.icon" :size="18"/><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></button></div></div>
           <label class="agreement"><input v-model="reuseIdempotencyKey" type="checkbox"/><span>동일한 Idempotency-Key를 재사용해 중복 요청 보호 상태 확인</span></label>
           <div class="form-grid"><div class="field"><label>결제 담당자</label><input class="input" value="김관리"/></div><div class="field"><label>결제 안내 이메일</label><input class="input" value="admin@scalatech.co.kr"/></div></div>
@@ -25,11 +25,11 @@
             <span><component :is="resultContent.icon" :size="31"/></span><p class="eyebrow">{{ resultContent.eyebrow }}</p><h2>{{ resultContent.title }}</h2><p>{{ resultContent.description }}</p>
             <div class="result-details"><div><small>planPriceId</small><strong>{{ selectedPlan.priceIds[cycle] }}</strong></div><div><small>결제 금액</small><strong>₩{{ price }}</strong></div><div><small>멱등성 키</small><strong>{{ idempotencyKey }}</strong></div><div><small>상태</small><span class="tag" :class="paymentResult==='success'?'':paymentResult==='failed'?'red':'amber'">{{ resultContent.status }}</span></div></div>
             <div v-if="paymentResult==='success'" class="event-route"><span class="done">PaymentCompleted</span><i></i><span class="done">구독 ACTIVE</span><i></i><span class="done">좌석 {{ selectedPlan.seats }}석</span></div>
-            <div v-else class="error-help"><Info :size="17"/> {{ paymentResult==='failed'?'결제수단을 확인한 후 다시 시도할 수 있습니다.':'동일 요청으로 새 결제를 만들지 않고 기존 결과를 반환했습니다.' }}</div>
+          <div v-else class="error-help"><Info :size="17"/> {{ paymentFeedback || (paymentResult==='failed'?'결제수단을 확인한 후 다시 시도할 수 있습니다.':'동일 요청으로 새 결제를 만들지 않고 기존 결과를 반환했습니다.') }}</div>
           </div>
         </template>
 
-        <div class="checkout-actions"><button v-if="step>1&&step<3" class="button" @click="step--"><ArrowLeft :size="16"/> 이전</button><button v-if="step<2" class="button accent" @click="step=2">결제 정보 입력 <ArrowRight :size="16"/></button><button v-else-if="step===2" class="button accent" @click="completePayment">₩{{ price }} 결제하기 <LockKeyhole :size="15"/></button><router-link v-else-if="paymentResult==='success'" class="button accent" to="/company/subscription">구독 현황 보기 <ArrowRight :size="16"/></router-link><button v-else class="button primary" @click="step=2">다시 시도</button></div>
+        <div class="checkout-actions"><button v-if="step>1&&step<3" class="button" @click="step--"><ArrowLeft :size="16"/> 이전</button><button v-if="step<2" class="button accent" @click="step=2">결제 정보 입력 <ArrowRight :size="16"/></button><button v-else-if="step===2" class="button accent" :disabled="submitting" @click="completePayment">{{ submitting ? '결제 처리 중' : `₩${price} 결제하기` }} <LockKeyhole :size="15"/></button><router-link v-else-if="paymentResult==='success'" class="button accent" to="/company/subscription">구독 현황 보기 <ArrowRight :size="16"/></router-link><button v-else class="button primary" @click="step=2">다시 시도</button></div>
       </main>
 
       <aside class="order-summary card"><p>결제 요약</p><div class="summary-plan"><span class="plan-mark">LR</span><span><strong>{{ selectedPlan.name }}</strong><small>{{ cycle==='MONTHLY'?'월간':'연간' }} · {{ selectedPlan.seats }}석</small></span></div><div class="summary-lines"><span>구독 금액 <b>₩{{ price }}</b></span><span>부가세 <b>포함</b></span><span>오늘 결제 <strong>₩{{ price }}</strong></span></div><div class="entitlement"><ShieldCheck :size="18"/><span><strong>결제 완료 즉시 활성화</strong>초대와 수강신청 권한이 바로 열립니다.</span></div><small>같은 멱등성 키로 중복 결제되지 않습니다.</small></aside>
@@ -38,17 +38,45 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { CircleCheck, FlaskConical, CircleX, CopyCheck, ArrowLeft, ArrowRight, LockKeyhole, Info, ShieldCheck } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { subscriptionApi } from '@/api/subscription.js'
 
-const plans=[{name:'Business 30',seats:30,monthly:'199,000',yearly:'1,990,000',priceIds:{MONTHLY:1,YEARLY:2}},{name:'Business 50',seats:50,monthly:'299,000',yearly:'2,990,000',priceIds:{MONTHLY:3,YEARLY:4}},{name:'Business 100',seats:100,monthly:'549,000',yearly:'5,490,000',priceIds:{MONTHLY:5,YEARLY:6}}]
-const step=ref(1),cycle=ref('MONTHLY'),selectedPlan=ref(plans[1]),paymentToken=ref('mock-success'),paymentResult=ref('success'),reuseIdempotencyKey=ref(false),idempotencyKey=ref('1e7f•••ee65')
+const plans=ref([{name:'Business 30',seats:30,monthly:'199,000',yearly:'1,990,000',priceIds:{MONTHLY:1,YEARLY:2}},{name:'Business 50',seats:50,monthly:'299,000',yearly:'2,990,000',priceIds:{MONTHLY:3,YEARLY:4}},{name:'Business 100',seats:100,monthly:'549,000',yearly:'5,490,000',priceIds:{MONTHLY:5,YEARLY:6}}])
+const step=ref(1),cycle=ref('MONTHLY'),selectedPlan=ref(plans.value[1]),paymentToken=ref('mock-success'),paymentResult=ref('success'),reuseIdempotencyKey=ref(false),idempotencyKey=ref(''),submitting=ref(false),paymentFeedback=ref('')
+const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
 const paymentOptions=[{value:'mock-success',label:'결제 성공',description:'PaymentCompleted 상태 확인',icon:CircleCheck},{value:'mock-failure',label:'결제 실패',description:'PaymentFailed 상태 확인',icon:CircleX}]
 const price=computed(()=>cycle.value==='MONTHLY'?selectedPlan.value.monthly:selectedPlan.value.yearly)
 const resultContent=computed(()=>paymentResult.value==='success'?{icon:CircleCheck,eyebrow:'Payment completed',title:'구독 결제가 완료되었습니다',description:'기업 학습 공간과 좌석이 활성화되었습니다. 이제 직원을 초대할 수 있습니다.',status:'ACTIVE'}:paymentResult.value==='failed'?{icon:CircleX,eyebrow:'Payment failed',title:'결제를 완료하지 못했습니다',description:'결제 승인에 실패했습니다. 구독 권한과 좌석은 활성화되지 않았습니다.',status:'PAYMENT_FAILED'}:{icon:CopyCheck,eyebrow:'Duplicate protected',title:'이미 처리된 결제 요청입니다',description:'중복 결제를 만들지 않고 이전에 완료된 결제 결과를 불러왔습니다.',status:'DUPLICATE'} )
-function completePayment(){paymentResult.value=reuseIdempotencyKey.value?'duplicate':paymentToken.value==='mock-failure'?'failed':'success';step.value=3}
+onMounted(async()=>{
+  if(!useLiveApi)return
+  try {
+    const prices=(await subscriptionApi.getPlans()).data.data
+    const grouped=new Map()
+    prices.forEach((item)=>{
+      const plan=grouped.get(item.planName)||{name:item.planName,seats:item.seatLimit,monthly:'-',yearly:'-',priceIds:{}}
+      plan.seats=item.seatLimit
+      plan.priceIds[item.billingCycle]=item.planPriceId
+      plan[item.billingCycle==='MONTHLY'?'monthly':'yearly']=Number(item.price).toLocaleString()
+      grouped.set(item.planName,plan)
+    })
+    plans.value=[...grouped.values()]
+    selectedPlan.value=plans.value[0]||selectedPlan.value
+  } catch (_) { paymentFeedback.value='요금제 정보를 불러오지 못해 기본 테스트 요금제를 표시합니다.' }
+})
+async function completePayment(){
+  idempotencyKey.value=reuseIdempotencyKey.value&&idempotencyKey.value?idempotencyKey.value:crypto.randomUUID()
+  if(!useLiveApi){paymentResult.value=paymentToken.value==='mock-failure'?'failed':'success';step.value=3;return}
+  submitting.value=true;paymentFeedback.value=''
+  try {
+    const result=(await subscriptionApi.subscribe(selectedPlan.value.priceIds[cycle.value],paymentToken.value,idempotencyKey.value)).data.data
+    paymentResult.value=result.status==='ACTIVE'?'success':'failed'
+    paymentFeedback.value=result.status==='ACTIVE'?'결제와 구독 상태가 서버에 저장되었습니다.':'구독 상태를 확인해 주세요.'
+  } catch(error) { paymentResult.value='failed'; paymentFeedback.value=error.response?.data?.message||'결제 요청을 처리하지 못했습니다.' }
+  finally { submitting.value=false;step.value=3 }
+}
 </script>
 
 <style scoped>

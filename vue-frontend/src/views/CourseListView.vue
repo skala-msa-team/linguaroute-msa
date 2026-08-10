@@ -24,7 +24,7 @@
     <AsyncState v-else-if="viewState === 'empty' || !filtered.length" type="empty" title="조건에 맞는 강의가 없어요" description="검색어나 필터를 바꾸면 더 많은 강의를 찾을 수 있어요." />
     <template v-else>
       <section class="course-grid"><CourseTile v-for="course in filtered" :key="course.id" :course="course" /></section>
-      <nav class="pagination" aria-label="페이지 이동"><button><ChevronLeft :size="16" /></button><button class="active">1</button><button>2</button><button>3</button><button><ChevronRight :size="16" /></button></nav>
+      <nav v-if="totalPages > 1" class="pagination" aria-label="페이지 이동"><button :disabled="page===0" @click="goPage(page-1)"><ChevronLeft :size="16" /></button><button v-for="item in totalPages" :key="item" :class="{active:page===item-1}" @click="goPage(item-1)">{{ item }}</button><button :disabled="page===totalPages-1" @click="goPage(page+1)"><ChevronRight :size="16" /></button></nav>
     </template>
   </AppShell>
 </template>
@@ -47,8 +47,11 @@ const level = ref('')
 const viewState = ref('ready')
 const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const liveCourses = ref([])
+const liveLoaded = ref(false)
+const page = ref(0)
+const totalPages = ref(1)
 
-const filtered = computed(() => (liveCourses.value.length ? liveCourses.value : courses).filter((course) => {
+const filtered = computed(() => (liveLoaded.value ? liveCourses.value : courses).filter((course) => {
   const query = keyword.value.trim().toLowerCase()
   return (!query || `${course.title} ${course.description}`.toLowerCase().includes(query))
     && (!language.value || course.languageCode === language.value)
@@ -60,12 +63,14 @@ async function loadCourses() {
   if (!useLiveApi) return
   viewState.value = 'loading'
   try {
-    const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, situation: situation.value || undefined, level: level.value || undefined, page: 0, size: 20 })
+    const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, situation: situation.value || undefined, level: level.value || undefined, page: page.value, size: 20 })
     liveCourses.value = response.data.data.content.map((course) => ({
       ...courses[0], id: course.courseId, title: course.title, languageCode: course.language,
       language: course.language, situationCode: course.situation, situation: course.situation,
       levelCode: course.level, level: course.level, status: course.status, tone: 'green'
     }))
+    liveLoaded.value = true
+    totalPages.value = Math.max(1, Math.ceil(response.data.data.totalElements / response.data.data.size))
     viewState.value = 'ready'
   } catch (_) {
     viewState.value = 'error'
@@ -73,7 +78,12 @@ async function loadCourses() {
 }
 
 onMounted(loadCourses)
-watch([keyword, language, situation, level], loadCourses)
+watch([keyword, language, situation, level], () => { page.value = 0; loadCourses() })
+
+function goPage(nextPage) {
+  page.value = nextPage
+  loadCourses()
+}
 
 function clearFilters() {
   keyword.value = ''

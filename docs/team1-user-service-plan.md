@@ -48,7 +48,7 @@
 - [x] Gateway를 통한 OAuth2 Authorization Code JWT 발급 후 보호 API 호출
 - [x] 공개 비밀번호 재설정 요청·확인과 아이디 찾기 SMTP 발송
 - [x] 보호 API 비밀번호 변경·회원 탈퇴 서버 구현 및 MockMvc 검증
-- [ ] 실제 Bearer Token Gateway 호출로 비밀번호 변경·회원 탈퇴 검증
+- [x] 실제 Bearer Token Gateway 호출로 비밀번호 변경·회원 탈퇴 검증
 
 ## 3. 기업 대표계정 가입 처리
 

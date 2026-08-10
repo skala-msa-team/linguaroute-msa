@@ -197,11 +197,9 @@ erDiagram
         bigint course_id FK
         varchar title
         text content_url
-        int sequence
+        int sequence_no
         boolean required
         int duration_seconds
-        datetime created_at
-        datetime updated_at
     }
 
 ```
@@ -210,10 +208,10 @@ erDiagram
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `course` | 상태는 `ACTIVE`, `INACTIVE`만 사용 |
-| `lesson` | `(course_id, sequence)` 유일 |
+| `courses` | 상태는 `ACTIVE`, `INACTIVE`만 사용 |
+| `lessons` | `(course_id, sequence_no)` 유일 |
 
-강의 등록·수정·활성·비활성 상태 관리는 확정 MVP입니다. 별도의 게시·비게시 상태는 두지 않고 `ACTIVE`, `INACTIVE`로 통합합니다.
+실제 물리 테이블은 `courses`, `lessons`입니다. `lessons`는 현재 생성·수정 시각 컬럼을 저장하지 않습니다. 강의 등록·수정·활성·비활성 상태 관리는 확정 MVP입니다. 별도의 게시·비게시 상태는 두지 않고 `ACTIVE`, `INACTIVE`로 통합합니다.
 
 ---
 
@@ -450,7 +448,7 @@ erDiagram
 
 ## 11. Kafka 이벤트
 
-이벤트 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다. `payment-service`는 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 단일 Kafka 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다.
+구독 이벤트의 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 구독 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다. `payment-service`는 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 단일 Kafka 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다.
 
 ### 11.1 PaymentCompleted
 
@@ -539,7 +537,24 @@ erDiagram
 
 `user-service`는 `entitlement_status=ACTIVE`, `auto_renew=true`, 좌석 한도와 새 이용 기간을 반영합니다.
 
-### 11.6 처리 흐름
+### 11.6 EnrollmentCompleted
+
+`enrollment-service`는 수강신청 생성 시점이 아니라 모든 필수 차시가 완료되어 `Enrollment.status=COMPLETED`로 전환될 때만 `enrollment.completed` 토픽에 아래 이벤트를 발행합니다.
+
+```json
+{
+  "eventId": "c149229f-c428-4bf9-bb1a-b97431c4f8b5",
+  "eventType": "EnrollmentCompleted",
+  "occurredAt": "2026-08-11T10:45:00",
+  "enrollmentId": 9001,
+  "userId": 101,
+  "courseId": 9101
+}
+```
+
+현재 `recommend-service`는 이 이벤트를 추천 캐시 갱신을 위한 힌트로만 소비하며, 추천 결과의 기준 데이터는 `course-service`와 `enrollment-service` 내부 조회 API입니다. 추천 기능 담당자가 소비 로직을 확정할 때 이벤트 중복 처리와 영속화 필요 여부를 함께 결정합니다.
+
+### 11.7 구독 이벤트 처리 흐름
 
 ```text
 payment-service가 상태 변경과 같은 트랜잭션에서 Outbox 이벤트 저장

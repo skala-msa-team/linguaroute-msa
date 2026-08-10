@@ -398,10 +398,10 @@ AI 추천 처리 흐름은 다음과 같습니다.
 | P0 | 구독·결제·권한 | 요금제, 월간·연간 구독, 모의 결제, 멱등성, 해지·만료·갱신, Kafka 결제 이벤트 | 기업이 비용을 내고 직원에게 권한을 제공하는 수익 모델의 핵심 |
 | P0 | 초대·좌석·직원 | 일회용 초대코드, 만료·중복 방지, 좌석 배정·회수, 직원 상태 관리 | B2B 계약 인원 통제를 검증하는 핵심 기능 |
 | P0 | 강의·수강·학습 | 강의 검색·필터·상세, 수강신청, 중복 방지, 차시 시작·완료, 진도율 | 직원이 실제 교육 가치를 얻는 최소 학습 흐름 |
-| P0 | AI 추천 | 조건 입력, 추천 이유, 실제 `ACTIVE` 강의 검증, 규칙 기반 대체 | LinguaRoute의 차별화 가치인 맞춤 탐색을 검증 |
-| P1 | 역할별 운영 화면 | 기업 관리자 대시보드·진도·구독·직원 관리, 플랫폼 관리자 통합 조회 | 구매자와 운영자가 서비스 상태를 확인해야 B2B 운영이 완결됨 |
+| P1 | AI 추천 (개발 중) | 조건 입력, 추천 이유, 실제 `ACTIVE` 강의 검증, 규칙 기반 대체 | LinguaRoute의 차별화 가치이나 Gateway 통합 계약 정비가 남아 있음 |
+| P1 | 역할별 운영 화면 | 기업 관리자 대시보드·진도·구독·직원 관리, 플랫폼 관리자 통합 조회 | 기업 관리자 화면은 연동 중이며 플랫폼 관리자 통합 조회 API는 미구현 |
 
-Sprint 1의 완료 기준은 `기업 구독 → 직원 초대 → 직원 가입 → AI 추천 → 수강신청 → 학습 완료 → 기업 진도 확인`이 API Gateway를 통해 한 흐름으로 동작하는 것입니다.
+현재 Sprint 1의 구현 완료 기준은 `기업 구독 → 직원 초대 → 직원 가입 → 수강신청 → 학습 완료 → 기업 진도 확인`이 API Gateway를 통해 한 흐름으로 동작하는 것입니다. AI 추천과 플랫폼 운영 조회는 확정 MVP 목표이지만, 구현·통합 검증 전에는 이 완료 기준에 포함하지 않습니다.
 
 #### Sprint 2: 학습 경험과 운영 고도화
 
@@ -510,9 +510,9 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 | 수강신청 | `POST` | `/api/enrollments` | 직원 | `courseId` | `enrollmentId`, `ENROLLED`, 진도율 |
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작·완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start`, `/complete` | 직원 | 경로 ID | 차시 상태와 서버 계산 진도율 |
-| AI 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 추천 강의, 이유, `source` |
+| AI 추천 (개발 중) | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 목표 계약. 구현·통합 검증 후 라이브 호출 |
 | 강의 관리 | `POST`, `PATCH` | `/api/admin/courses`, `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 강의 정보 | 생성·수정된 강의 |
-| 플랫폼 운영 | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 영역별 운영 목록 |
+| 플랫폼 운영 (설계·목업) | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 목표 계약. 관리자 집계 API 구현 후 라이브 호출 |
 
 #### Request/Response 예시 1 — 구독 결제
 
@@ -566,7 +566,7 @@ Content-Type: application/json
 }
 ```
 
-#### Request/Response 예시 3 — AI 강의 추천
+#### Request/Response 예시 3 — AI 강의 추천 목표 계약
 
 ```http
 POST /api/courses/recommendations
@@ -620,7 +620,7 @@ Content-Type: application/json
 
 ### 13.6 동작 화면 스냅샷 — 구현 결과를 어떻게 보여주는가
 
-현재 캡처는 최신 프론트 퍼블리싱을 `VITE_USE_LIVE_API=false`로 실행하여 브라우저에서 버튼과 상태 변화를 직접 조작한 **UI 프로토타입 증거**입니다. 실제 API 호출 증거는 바로 위 Swagger 캡처이며, 프론트와 전체 목표 API의 통합 완료를 의미하지 않습니다. 발표 최종본에서는 같은 구도로 라이브 API 응답을 연결한 캡처로 교체해야 합니다.
+현재 캡처는 최신 프론트 퍼블리싱을 `VITE_USE_LIVE_API=false`로 실행하여 브라우저에서 버튼과 상태 변화를 직접 조작한 **UI 프로토타입 증거**입니다. 실제 API 호출 증거는 바로 위 Swagger 캡처이며, 프론트와 전체 목표 API의 통합 완료를 의미하지 않습니다. AI 추천과 플랫폼 운영 화면은 구현·통합 검증 후 라이브 API 응답 캡처로 교체해야 합니다.
 
 #### 화면 1 — B2B2E 서비스 소개
 
