@@ -135,7 +135,34 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 기존 Auth Server는 현재 Access Token과 함께 Refresh Token도 반환한다. 확정 MVP 문서는 Refresh Token을 사용하지 않는다고 정의하므로 프론트엔드는 이를 저장·사용하지 않아야 하며, 기존 Auth 이미지를 수정하지 않는 방침과의 차이는 팀에 공유해야 한다.
 
-## 6. 다음 개발 순서
+## 6. `dev` 병합 후 필수 주의사항
+
+### 공용 초기 DDL 충돌
+
+- 최신 `origin/dev`를 병합한 상태에서 `course-service`의 `Course.Category` 참조 6건으로 `compileJava`가 실패한다.
+- 이 실패는 `feature/user-company` 변경이 아니라 현재 `dev`의 강의 Entity와 Controller·Service·Repository 계약 불일치이며 `feature/course-domain-fix`가 수정 중이다.
+- `feature/course-domain-fix`도 `init-db/01_init.sql`의 `courses` 정의를 변경한다.
+- 해당 브랜치와 `feature/user-company`의 병합 시뮬레이션에서 같은 파일의 충돌을 확인했다.
+- 충돌 해결 시 이 브랜치가 추가한 `companies`, 사용자 확장 컬럼, `email_verifications`, `terms`, `user_agreements`를 유지해야 한다.
+- 동시에 강의 담당 브랜치의 외국어 강의 컬럼 `language`, `situation`, `level`, `status`를 유지하고 기존 `category`, `price`, `instructor_id`, `enrollment_count` 정의는 제거해야 한다.
+
+### 기존 `users` 데이터 마이그레이션
+
+- 기존 데이터가 있는 DB에서 `ddl-auto=update`로 실행하면 MariaDB가 새 `business_role`의 첫 enum 값인 `COMPANY_ADMIN`을 모든 기존 사용자에게 자동 입력한다.
+- 실제 로컬 공유 DB의 기존 사용자 4건과 동일한 구조로 격리 검증하여 이 동작을 확인했다.
+- 기존 `INSTRUCTOR`만으로는 `PLATFORM_ADMIN`과 `COMPANY_ADMIN`을 구분할 수 없고, 기존 `STUDENT`에는 필수 `company_id`가 없으므로 자동 매핑하면 안 된다.
+- 통합 환경의 `user-service`를 재빌드하기 전에 다음 중 하나를 팀에서 합의해야 한다.
+  1. 개발 DB 볼륨을 초기화하고 새 DDL로 재생성한다.
+  2. 새 컬럼을 nullable로 추가하고 사용자별 `business_role`, `status`, `company_id`를 명시적으로 보정한 뒤 제약조건을 적용한다.
+- `docker compose down -v`는 팀 데이터를 삭제하므로 합의와 백업 없이 실행하지 않는다.
+- 기존 볼륨에는 `init-db/01_init.sql`이 다시 실행되지 않으므로 파일 병합만으로 기존 DB가 정상 마이그레이션되지는 않는다.
+
+### 기존 Auth Server 제한
+
+- 기존 Auth Server는 확정 MVP 문서와 달리 Refresh Token도 반환한다.
+- 프론트엔드는 Refresh Token을 저장하거나 사용하지 않고, 정책 차이는 팀 결정사항으로 남긴다.
+
+## 7. 다음 개발 순서
 
 ### PR 1 — 기업 계정 기반 마무리
 
@@ -168,7 +195,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [ ] 회원 탈퇴와 로그인 불가 비밀번호 교체
 - [ ] 플랫폼 관리자용 기업·사용자 상태 조회
 
-## 7. 커밋·PR 전 체크
+## 8. 커밋·PR 전 체크
 
 ```bash
 git status
