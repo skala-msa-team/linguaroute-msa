@@ -12,9 +12,8 @@
         <div><p class="eyebrow">Sign in</p><h2>LinguaRoute 로그인</h2><p class="muted">회사에서 사용하는 이메일로 로그인하세요.</p></div>
         <div v-if="reasonMessage" class="login-notice"><TriangleAlert :size="17" />{{ reasonMessage }}</div>
         <form class="form-stack" @submit.prevent="login">
-          <div class="field"><label for="email">이메일</label><div class="input-with-icon"><Mail :size="17" /><input id="email" v-model.trim="email" class="input" type="email" autocomplete="username" required /></div></div>
-          <div class="field"><div class="label-row"><label for="password">비밀번호</label><router-link to="/account/recovery">비밀번호를 잊으셨나요?</router-link></div><div class="input-with-icon"><LockKeyhole :size="17" /><input id="password" v-model="password" class="input" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" aria-label="비밀번호 표시" @click="showPassword=!showPassword"><Eye :size="17" /></button></div></div>
-          <label class="check-row"><input type="checkbox" checked /> 로그인 상태 유지</label>
+          <template v-if="!useLiveApi"><div class="field"><label for="email">이메일</label><div class="input-with-icon"><Mail :size="17" /><input id="email" v-model.trim="email" class="input" type="email" autocomplete="username" required /></div></div><div class="field"><div class="label-row"><label for="password">비밀번호</label><router-link to="/account/recovery">비밀번호를 잊으셨나요?</router-link></div><div class="input-with-icon"><LockKeyhole :size="17" /><input id="password" v-model="password" class="input" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" aria-label="비밀번호 표시" @click="showPassword=!showPassword"><Eye :size="17" /></button></div></div><label class="check-row"><input type="checkbox" checked /> 로그인 상태 유지</label></template>
+          <p v-else class="muted">계정 정보는 다음 Auth Server 로그인 화면에서 입력합니다.</p>
           <div v-if="loginError" class="login-notice"><TriangleAlert :size="17" />{{ loginError }}</div>
           <button class="button primary" type="submit" :disabled="isSubmitting">{{ isSubmitting ? '로그인 중...' : '로그인' }} <ArrowRight :size="17" /></button>
         </form>
@@ -41,8 +40,7 @@ async function login(){
   if(!useLiveApi){router.push('/app');return}
   isSubmitting.value=true
   try{
-    const user=await auth.login(email.value,password.value)
-    await router.push(homeByRole[user?.businessRole]||'/app')
+    auth.startOAuthLogin()
   }catch(error){
     loginError.value=error.response?.data?.message||'이메일 또는 비밀번호를 확인해 주세요.'
   }finally{isSubmitting.value=false}

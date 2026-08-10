@@ -1,7 +1,7 @@
 import api from './index.js'
 
 export const authApi = {
-  login(email, password) { return api.post('/api/auth/login', { email, password }) },
+  exchangeOAuthCode(code) { return api.post('/api/users/register?action=exchange-oauth-code', { code }) },
 
   // 내 정보 조회
   getMe() {
@@ -12,14 +12,14 @@ export const authApi = {
   withdrawMe() { return api.delete('/api/users/me') },
   getMyCompany() { return api.get('/api/companies/me') },
   updateMyCompany(name) { return api.patch('/api/companies/me', { name }) },
-  registerCompany(data) { return api.post('/api/companies', data) },
+  registerCompany(data) { return api.post('/api/users/register', data) },
   registerEmployee(data) { return api.post('/api/employees/signup', data) },
   getActiveTerms() { return api.get('/api/terms/active') },
   agreeToTerms(agreementIds) { return api.post('/api/users/me/agreements', { agreementIds }) },
-  requestEmailVerification(email) { return api.post('/api/auth/email-verifications', { email, purpose: 'SIGNUP' }) },
-  confirmEmailVerification(email, verificationCode) { return api.post('/api/auth/email-verifications/confirm', { email, verificationCode }) },
-  requestPasswordReset(email) { return api.post('/api/auth/password-reset/requests', { email }) },
-  confirmPasswordReset(resetToken, newPassword) { return api.post('/api/auth/password-reset/confirm', { resetToken, newPassword }) },
-  requestIdFind(name, businessNumber) { return api.post('/api/auth/id-find/requests', { name, businessNumber }) },
-  changePassword(currentPassword, newPassword) { return api.put('/api/auth/password', { currentPassword, newPassword }) }
+  requestEmailVerification(email) { return api.post('/api/users/register?action=request-email-verification', { email, purpose: 'SIGNUP' }) },
+  confirmEmailVerification(email, verificationCode) { return api.post('/api/users/register?action=confirm-email-verification', { email, verificationCode }) },
+  requestPasswordReset(email) { return api.post('/api/users/register?action=request-password-reset', { email }) },
+  confirmPasswordReset(resetToken, newPassword) { return api.post('/api/users/register?action=confirm-password-reset', { resetToken, newPassword }) },
+  requestIdFind(name, businessNumber) { return api.post('/api/users/register?action=request-id-find', { name, businessNumber }) },
+  changePassword(currentPassword, newPassword) { return api.put('/api/users/me/password', { currentPassword, newPassword }) }
 }

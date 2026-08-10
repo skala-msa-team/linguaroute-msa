@@ -10,13 +10,13 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | MVP 설계 초안 |
+| 문서 상태 | 인증·구독·직원·강의·수강 API는 구현·검증 기록 반영, AI 추천·플랫폼 운영 API는 설계·미구현 |
 
-이 문서의 URL은 기능 설계를 위한 초안입니다. 구현 후에는 Swagger UI에서 실제 Method, URL, Request 및 Response를 호출하여 최종 명세와 일치시켜야 합니다.
+인증·구독·직원·강의·수강 API의 구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. AI 추천과 플랫폼 운영 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
 
-기존 API Gateway 서버는 유지합니다. 다만 현재 이미지의 라우트와 공개 경로가 JAR에 고정되어 있으므로 동일한 Gateway 한 대의 라우팅·보안 설정을 수정하여 아래 외부 경로를 연결합니다. Gateway 서버를 추가하지 않습니다.
+기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
-로그인을 포함한 모든 외부 API는 기본 경로 `/api`를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 구현하지 않습니다.
+일반 외부 API는 기본 경로 `/api`를 사용합니다. 로그인만 Auth Server의 OAuth2 경로(`/oauth2/**`, `/login`)를 사용하며, 자체 이메일·비밀번호 로그인 후 Authorization Code를 JWT Access Token으로 교환합니다. 소셜 로그인은 사용하지 않습니다. Auth Server가 Refresh Token을 반환해도 MVP 프론트엔드는 저장·갱신에 사용하지 않습니다.
 
 ---
 
@@ -81,54 +81,56 @@
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
-| AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
-| AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
-| AUTH-05 | `POST` | `/api/auth/email-verifications` | 공개 | 이메일 인증 요청 | 필수 |
-| AUTH-06 | `POST` | `/api/auth/email-verifications/confirm` | 공개 | 이메일 인증 확인 | 필수 |
-| AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
-| AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
+| AUTH-01 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | 자체 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
+| AUTH-03 | `POST` | `/api/users/register?action=request-password-reset` | 공개 | 비밀번호 재설정 요청 | 필수 |
+| AUTH-04 | `POST` | `/api/users/register?action=confirm-password-reset` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
+| AUTH-05 | `POST` | `/api/users/register?action=request-email-verification` | 공개 | 이메일 인증 요청 | 필수 |
+| AUTH-06 | `POST` | `/api/users/register?action=confirm-email-verification` | 공개 | 이메일 인증 확인 | 필수 |
+| AUTH-07 | `POST` | `/api/users/register?action=request-id-find` | 공개 | 아이디 찾기 | 필수 |
+| AUTH-08 | `PUT` | `/api/users/me/password` | 로그인 | 비밀번호 변경 | 필수 |
+| AUTH-09 | `POST` | `/api/users/register?action=exchange-oauth-code` | 공개 | Authorization Code를 Access Token으로 교환 | 필수 |
 
-Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 각 `/api/auth/**` 요청을 소유 서비스로 전달합니다. 서버를 새로 추가하지 않습니다.
+수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 Gateway/Auth 이미지와 다르며 실제 요청은 `401`을 반환합니다. 제공 Auth Server는 `authorization_code` grant를 지원하므로, 자체 이메일·비밀번호 로그인 후 `/oauth2/authorize`에서 Authorization Code를 받고 `/oauth2/token`에서 JWT를 발급받는 계약을 사용합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로 공개 보조 인증 API는 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다.
 
-이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
+이메일 인증은 SMTP로 6자리 코드를 보내며 로컬 개발에서는 MailHog를 사용합니다. SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 가입용 토큰은 해시로 저장하고 각각 15분 동안 한 번만 사용할 수 있습니다. 이메일 인증 요청은 이메일별 1분에 1회, 1시간에 5회로 제한합니다. 비밀번호 재설정 토큰도 해시로 저장하며 요청은 계정 존재 여부와 무관하게 같은 응답을 반환하고, 활성 계정별 1분에 1회, 1시간에 5회로 제한합니다.
 
 ### AUTH-01 로그인
 
-프론트엔드는 이메일과 비밀번호를 API Gateway의 로그인 API로 전송합니다.
+브라우저는 Auth Server 로그인 화면으로 이동하고, 성공 후 콜백으로 받은 Authorization Code를 서버 측에서 토큰으로 교환합니다. 등록된 브라우저 클라이언트의 비밀값은 프론트엔드 번들에 포함하지 않습니다.
 
 ```http
-POST /api/auth/login
-Content-Type: application/json
+GET /oauth2/authorize?response_type=code&client_id=web-client&redirect_uri=http://localhost:3000/callback&scope=openid%20profile%20read%20write&state={random-state}
 ```
+
+로그인 페이지에서 이메일과 비밀번호를 제출하면 Auth Server가 BCrypt 비밀번호 해시를 검증합니다. 성공 시 `redirect_uri`에 `code`와 `state`를 붙여 리디렉션합니다. 콜백은 `AUTH-09`로 코드를 전달하고 user-service가 서버 측 코드 교환을 수행합니다. 성공 시 프론트가 받는 응답은 다음과 같습니다.
 
 ```json
 {
-  "email": "employee@company.com",
-  "password": "Password123!"
-}
-```
-
-인증 서버가 이메일과 BCrypt 비밀번호 해시를 검증하고 JWT Access Token을 직접 반환합니다.
-
-```json
-{
-  "data": {
-    "accessToken": "jwt-access-token",
-    "tokenType": "Bearer",
-    "expiresIn": 3600
-  },
+  "data": { "accessToken": "jwt-access-token", "tokenType": "Bearer", "expiresIn": 300 },
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
 
-MVP에서는 OAuth2 Authorization Code와 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 별도 서버 세션 없이 클라이언트가 저장한 Access Token을 삭제합니다.
+MVP에서는 Authorization Code로 Access Token을 발급받고 sessionStorage에 Access Token만 저장합니다. Refresh Token이 응답에 포함되어도 저장·사용하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 Auth Server 세션 종료 요청과 클라이언트 Access Token 삭제를 함께 처리합니다.
+
+콜백 화면은 다음 Gateway 공개 API로 Authorization Code를 전달합니다. `user-service`만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 Auth Server와 통신하며, 비밀값은 프론트엔드 번들·문서·저장소에 기록하지 않습니다.
+
+```http
+POST /api/users/register?action=exchange-oauth-code
+Content-Type: application/json
+
+{"code":"authorization-code"}
+```
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
 
 ### AUTH-03·04 비밀번호 재설정
 
 재설정 요청:
+
+```http
+POST /api/users/register?action=request-password-reset
+```
 
 ```json
 {
@@ -139,6 +141,10 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 계정 존재 여부와 관계없이 `202 Accepted`와 공통 성공 형식을 반환합니다. 계정이 존재하면 등록된 이메일로 15분 동안 한 번만 사용할 수 있는 재설정 링크를 발송합니다.
 
 재설정 확인:
+
+```http
+POST /api/users/register?action=confirm-password-reset
+```
 
 ```json
 {
@@ -151,6 +157,11 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 
 ### AUTH-05 이메일 인증 요청
 
+```http
+POST /api/users/register?action=request-email-verification
+Content-Type: application/json
+```
+
 ```json
 {
   "email": "admin@company.com",
@@ -158,7 +169,25 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
+응답 `202 Accepted`:
+
+```json
+{
+  "data": {
+    "accepted": true
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+서버는 이메일을 소문자로 정규화하고 6자리 인증 코드를 SMTP로 발송합니다. 코드 원문은 저장하지 않습니다.
+
 ### AUTH-06 이메일 인증 확인
+
+```http
+POST /api/users/register?action=confirm-email-verification
+Content-Type: application/json
+```
 
 ```json
 {
@@ -167,7 +196,7 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
-성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 만료시간을 적용하고 재사용을 금지합니다.
+성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 15분 만료시간을 적용하고 재사용을 금지합니다. 가입 요청은 `action` 없이 기존 `POST /api/users/register` 본문을 사용합니다.
 
 응답 `200 OK`:
 
@@ -183,6 +212,10 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 ### AUTH-07 아이디 찾기
 
 요청:
+
+```http
+POST /api/users/register?action=request-id-find
+```
 
 ```json
 {
@@ -202,9 +235,14 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
-`user-service`는 이름과 기업 사업자번호가 일치하는 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다. 요청 횟수 제한을 적용합니다.
+`user-service`는 이름과 기업 사업자번호가 일치하는 활성 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다.
 
 ### AUTH-08 로그인 사용자 비밀번호 변경
+
+```http
+PUT /api/users/me/password
+Authorization: Bearer {accessToken}
+```
 
 ```json
 {
@@ -213,7 +251,7 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 }
 ```
 
-현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `401 INVALID_CREDENTIALS`로 처리합니다.
+현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `422 INVALID_PASSWORD`로 처리합니다.
 
 ---
 
@@ -221,11 +259,12 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| COMPANY-01 | `POST` | `/api/companies` | 공개 | 기업 대표계정 회원가입 | 필수 |
+| COMPANY-01 | `POST` | `/api/users/register` | 공개 | 기업 대표계정 회원가입 | 필수 |
 | COMPANY-02 | `GET` | `/api/companies/me` | 기업 관리자 | 기업 정보 조회 | 필수 |
 | COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
 | USER-02 | `PATCH` | `/api/users/me` | 로그인 | 내 정보 수정 | 필수 |
+| USER-03 | `PUT` | `/api/users/me/password` | 로그인 | 현재 비밀번호 확인 후 변경 | 필수 |
 | USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 필수 |
 
 회원 탈퇴 시 `user-service`가 사용자를 `WITHDRAWN` 처리하고 비밀번호 해시를 로그인할 수 없는 임의 값으로 교체합니다. 이미 발급된 Access Token은 만료 전까지 남을 수 있으므로 보호 API는 사용자 상태를 확인해 탈퇴 사용자의 요청을 거부합니다.
@@ -233,6 +272,8 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 로그인 이메일과 비밀번호 해시의 원본은 공용 `users` 테이블이며 `user-service`가 관리합니다. MVP에서는 `USER-02`로 로그인 이메일을 변경하지 않습니다.
 
 ### COMPANY-01 기업 대표계정 회원가입
+
+Gateway 제공 이미지가 공개 허용하는 가입 경로에 맞춰 외부 클라이언트는 `POST /api/users/register`를 사용합니다. `user-service`는 같은 요청 구조를 기존 `POST /api/companies`에서도 처리하지만, Gateway 경유 MVP 흐름의 기준 경로는 `/api/users/register`입니다.
 
 요청:
 
@@ -350,9 +391,39 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
   "data": {
     "invitationId": 501,
     "code": "A7K9-P2QM",
+    "codeMasked": "****-****",
     "status": "UNUSED",
     "expiresAt": "2026-08-17T23:59:59+09:00"
   },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+초대코드 원문은 해시만 저장하므로 `POST` 생성·재발급 응답의 `code`에서만 한 번 제공됩니다. 기업 관리자는 이 응답을 복사해 전달해야 하며, 이후 목록 조회에서는 `code`가 `null`이고 `codeMasked`만 제공됩니다.
+
+### INVITE-02 목록 조회와 INVITE-03 폐기, INVITE-04 재발급
+
+```http
+GET /api/companies/me/invitations
+DELETE /api/companies/me/invitations/{invitationId}
+POST /api/companies/me/invitations/{invitationId}/reissue
+```
+
+목록은 `UNUSED`, `USED`, `EXPIRED`, `REVOKED` 상태와 생성·만료·사용 시각을 반환합니다. 만료 시각이 지난 `UNUSED` 초대코드는 조회 시 `EXPIRED`로 반영됩니다. 폐기는 `UNUSED` 초대코드만 `REVOKED`로 변경합니다. 재발급은 기존 `UNUSED` 초대코드를 먼저 폐기하고 새 일회용 코드를 `7`일 유효 기간으로 발급합니다.
+
+```json
+{
+  "data": [
+    {
+      "invitationId": 501,
+      "code": null,
+      "codeMasked": "****-****",
+      "status": "UNUSED",
+      "expiresAt": "2026-08-17T23:59:59+09:00",
+      "createdAt": "2026-08-10T10:30:00+09:00",
+      "usedAt": null
+    }
+  ],
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
@@ -390,10 +461,12 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
 
 | HTTP | 오류 코드 | 조건 |
 | --- | --- | --- |
+| `404` | `INVITATION_NOT_FOUND` | 존재하지 않는 초대코드 |
 | `409` | `INVITATION_ALREADY_USED` | 이미 사용한 코드 |
 | `409` | `SEAT_LIMIT_EXCEEDED` | 잔여 좌석 없음 |
 | `422` | `INVITATION_EXPIRED` | 코드 만료 |
 | `422` | `SUBSCRIPTION_INACTIVE` | 구독 비활성 |
+| `422` | `INVITATION_REVOKED` | 폐기된 초대코드 |
 
 ### SEAT-01 좌석 조회 응답
 
@@ -407,6 +480,35 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
+
+### EMPLOYEE-02 직원 목록, EMPLOYEE-03 상태 변경
+
+`GET /api/companies/me/employees`는 요청한 기업 관리자의 소속 직원만 반환합니다. 수강 강의·진도는 `enrollment-service` 소유 데이터이므로 이 API에 포함하지 않습니다.
+
+```json
+{
+  "data": [{
+    "userId": 101,
+    "email": "employee@company.com",
+    "name": "이직원",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-10T10:30:00"
+  }],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+`PATCH /api/companies/me/employees/{userId}/status` 요청은 아래 상태 중 하나를 사용합니다.
+
+```json
+{ "status": "INACTIVE" }
+```
+
+- `ACTIVE`: 비활성 직원을 다시 활성화하며, 활성 구독과 잔여 좌석을 확인한 뒤 좌석을 배정합니다.
+- `INACTIVE`: 기업 소속은 유지하고 계정을 비활성화하며, 활성 직원 수에서 제외해 좌석을 회수합니다.
+- `RELEASED`: 계정은 삭제하지 않고 기업 소속을 해제하며 계정을 비활성화합니다. 이후 해당 기업의 직원 목록에서는 조회되지 않습니다.
+
+`SEAT-01`의 `purchased`는 현재 활성 구독의 좌석 한도이고, `used`는 해당 기업의 `ACTIVE` 직원 수, `remaining`은 `purchased - used`입니다. 활성 구독이 없거나 만료되었으면 직원 활성화·좌석 조회는 `422 SUBSCRIPTION_INACTIVE`를 반환합니다.
 
 ### 내부 구독 권한 조회
 
@@ -545,6 +647,28 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 }
 ```
 
+### COURSE-03 강의 차시 목록 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "lessonId": 1201,
+      "title": "고객 미팅 시작하기",
+      "contentUrl": "https://example.com/lessons/1201",
+      "sequence": 1,
+      "required": true,
+      "durationSeconds": 900
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+직원용 강의 상세 조회와 동일하게 `ACTIVE` 강의만 조회할 수 있습니다.
+
 ### ADMIN-COURSE-01 강의 등록
 
 API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. `course-service`는 내부 사용자 권한 조회 API로 활성 상태의 `PLATFORM_ADMIN`인지 다시 확인합니다.
@@ -582,6 +706,20 @@ API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. 
 ```
 
 플랫폼 관리자 권한이 아니면 `403 PLATFORM_ADMIN_REQUIRED`, 사용자 권한 서비스에 연결할 수 없으면 `503 USER_AUTHORIZATION_UNAVAILABLE`를 반환합니다.
+
+### ADMIN-LESSON-01 강의 차시 등록
+
+```json
+{
+  "title": "고객 미팅 시작하기",
+  "contentUrl": "https://example.com/lessons/1201",
+  "sequence": 1,
+  "required": true,
+  "durationSeconds": 900
+}
+```
+
+성공 시 `201 Created`로 등록된 차시를 반환합니다. 같은 강의의 `sequence`는 중복될 수 없습니다.
 
 ### course-service 내부 API
 
@@ -630,6 +768,15 @@ X-Internal-Api-Key: {internalApiKey}
 ```
 
 `enrollable=false`이면 `enrollment-service`는 수강신청을 생성하지 않습니다. 강의가 없으면 `404 COURSE_NOT_FOUND`, 내부 API 키가 없거나 다르면 `401 INVALID_INTERNAL_API_KEY`를 반환합니다.
+
+#### 차시 목록 조회
+
+```http
+GET /internal/courses/{courseId}/lessons
+X-Internal-Api-Key: {internalApiKey}
+```
+
+`enrollment-service`가 차시 소속 검증과 필수 차시 기준 진도율 계산에 사용합니다. 외부 Gateway에는 노출하지 않습니다.
 
 ---
 
@@ -683,6 +830,35 @@ X-Internal-Api-Key: {internalApiKey}
 
 현재 구현은 개별 강의 결제를 요청하지 않습니다. `payment-service`의 구독 결제 결과가 `user-service`의 기업 구독 권한에 반영되어 있고, 해당 권한이 `ACTIVE`인 경우에만 수강신청을 허용합니다.
 
+### ENROLL-02·03 수강 목록·상세
+
+`GET /api/enrollments/me`은 본인의 수강 목록을, `GET /api/enrollments/{enrollmentId}`은 본인 수강의 차시별 상태와 서버 계산 진도율을 반환합니다. 둘 다 활성 `EMPLOYEE` 권한과 같은 기업 소속을 서버에서 재확인합니다.
+
+### LEARNING-01·02 차시 시작·완료
+
+차시 시작과 완료는 각각 `200 OK`로 아래와 같은 응답을 반환합니다. 차시 ID가 해당 강의에 없으면 `422 LESSON_NOT_IN_COURSE`를 반환합니다.
+
+```json
+{
+  "data": {
+    "enrollmentId": 9001,
+    "lessonId": 1201,
+    "lessonStatus": "COMPLETED",
+    "progressRate": 100.0,
+    "enrollmentStatus": "COMPLETED",
+    "startedAt": "2026-08-10T10:30:00+09:00",
+    "completedAt": "2026-08-10T10:45:00+09:00"
+  },
+  "timestamp": "2026-08-10T10:45:00+09:00"
+}
+```
+
+서버는 필수 차시의 완료 수를 기준으로 진도율을 계산하고, 첫 시작 시각 및 모든 필수 차시 완료 시각을 저장합니다.
+
+### COMPANY-ENROLL-01·02 직원별 수강 상태·진도율
+
+기업 관리자는 자기 기업의 수강 레코드를 페이지 단위로 조회합니다. `page`(기본 0), `size`(기본 20, 최대 100)를 사용할 수 있습니다. 두 경로 모두 `enrollmentId`, `userId`, `courseId`, `status`, `progressRate`, 학습 시각을 반환하며, `/progress`는 진도율 조회용 별칭입니다. 사용자 이름·부서 정보는 `user-service` 소유이므로 이 API 응답에는 포함하지 않습니다.
+
 ### enrollment-service 내부 API
 
 추천 서비스는 이미 신청한 강의를 제외하기 위해 수강 이력을 내부 API로 조회합니다. 이 경로는 Gateway에 노출하지 않고 `X-Internal-Api-Key`를 검증합니다.
@@ -733,7 +909,7 @@ X-Internal-Api-Key: {internalApiKey}
 | SUB-03 | `POST` | `/api/subscriptions/me/cancel` | 기업 관리자 | 구독 해지 | 필수 |
 | PAY-01 | `GET` | `/api/payments` | 기업 관리자 | 결제 내역 조회 | 필수 |
 
-현재 `payment-service` 구현은 Gateway가 인증 사용자와 기업 소속을 검증한 뒤 `X-Company-Id`를 전달한다는 전제로 동작합니다. Gateway의 JWT claim 전달 방식이 확정되면 이 헤더 전제는 Gateway 계약에 맞춰 다시 정리합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
+Gateway는 인증된 사용자 ID를 `X-User-Id`로 전달합니다. `payment-service`는 클라이언트가 보낸 회사 식별값을 신뢰하지 않고, `user-service`의 내부 권한 조회 API로 활성 상태의 `COMPANY_ADMIN`인지 확인한 뒤 응답의 `companyId`를 구독·결제 범위로 사용합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
 
 ### PLAN-01 요금제 조회 응답
 
@@ -766,7 +942,7 @@ X-Internal-Api-Key: {internalApiKey}
 헤더:
 
 ```http
-X-Company-Id: 10
+Authorization: Bearer {accessToken}
 Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 ```
 
@@ -825,12 +1001,11 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 
 ### PAY-01 결제 내역
 
-Gateway가 전달한 `X-Company-Id` 기준으로 해당 기업의 결제 이력을 최신 요청순으로 반환합니다.
+인증 사용자의 `user-service` 권한 컨텍스트에서 확인한 기업 기준으로 결제 이력을 최신 요청순으로 반환합니다.
 
 ```http
 GET /api/payments
 Authorization: Bearer {accessToken}
-X-Company-Id: 10
 ```
 
 응답 `200 OK`:
@@ -872,7 +1047,9 @@ X-Company-Id: 10
 
 ---
 
-## 9. AI 강의 추천 API
+## 9. AI 강의 추천 API (설계·미구현)
+
+> 이 절의 경로와 요청·응답은 확정 MVP 목표 계약이다. 현재 `recommend-service`의 외부 경로와 내부 호출이 이 계약에 맞지 않아 Gateway 통합 API로 사용할 수 없다. 구현·curl 검증 전에는 완료 API로 공유하지 않는다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -990,7 +1167,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 ---
 
-## 11. 플랫폼 운영 API
+## 11. 플랫폼 운영 API (설계·미구현)
+
+> 아래 운영 조회 API는 화면·클라이언트에서 호출하지 않는다. 현재 각 소유 서비스에 플랫폼 관리자용 집계 API가 구현되어 있지 않으므로, 구현 및 Gateway 검증 전에는 설계 계약으로만 관리한다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -1008,12 +1187,11 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 | 오류 코드 | HTTP | 설명 |
 | --- | --- | --- |
-| `INVALID_CREDENTIALS` | `401` | 이메일 또는 비밀번호 불일치 |
-| `EMAIL_NOT_VERIFIED` | `422` | 이메일 인증 미완료 |
-| `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치 |
-| `VERIFICATION_CODE_EXPIRED` | `422` | 이메일 인증 코드 만료 |
-| `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
-| `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
+| `INVALID_PASSWORD` | `422` | 현재 비밀번호 불일치 |
+| `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치·만료·재사용 |
+| `EMAIL_VERIFICATION_REQUEST_LIMIT` | `429` | 이메일별 인증 요청 1분 1회 또는 1시간 5회 초과 |
+| `INVALID_PASSWORD_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 만료·재사용됨 |
+| `PASSWORD_RESET_REQUEST_LIMIT` | `429` | 활성 계정별 재설정 요청 1분 1회 또는 1시간 5회 초과 |
 | `INVALID_INTERNAL_API_KEY` | `401` 또는 `403` | 서비스 간 내부 API 키 누락·불일치. 신규 내부 API는 `401`을 우선 사용하며, 기존 user-service 내부 API는 현재 구현상 `403`을 반환 |
 | `INVALID_EMAIL_VERIFICATION` | `422` | 이메일 인증 토큰이 유효하지 않거나 이미 사용됨 |
 | `USER_INACTIVE` | `403` | 비활성 또는 탈퇴 사용자의 보호 API 요청 |
@@ -1028,6 +1206,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `SEAT_LIMIT_EXCEEDED` | `409` | 좌석 한도 초과 |
 | `SUBSCRIPTION_INACTIVE` | `422` | 활성 구독 없음 |
 | `DUPLICATE_PAYMENT` | `409` | 중복 결제 요청 |
+| `INVALID_USER_CONTEXT` | `401` | Gateway가 전달한 인증 사용자 정보가 없거나 올바르지 않음 |
+| `COMPANY_ADMIN_REQUIRED` | `403` | 기업 관리자 권한 필요 |
+| `USER_AUTHORIZATION_UNAVAILABLE` | `503` | 사용자 권한 정보를 확인할 수 없음 |
 | `PAYMENT_FAILED` | `422` | 결제 실패 |
 | `COURSE_NOT_FOUND` | `404` | 강의 없음 |
 | `COURSE_INACTIVE` | `422` | 비활성 강의 |

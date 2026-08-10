@@ -1,3 +1,73 @@
 <template><AppShell><nav class="breadcrumbs"><router-link to="/courses">강의 찾기</router-link><ChevronRight :size="13"/><span>{{ course.title }}</span></nav><section class="course-hero"><div class="hero-copy"><div class="tags"><span class="tag">{{ course.language }}</span><span class="tag gray">{{ course.level }}</span><span class="tag gray">{{ course.situation }}</span></div><h1>{{ course.title }}</h1><p>{{ course.description }}</p><div class="facts"><span><Clock3 :size="16"/><b>{{ course.duration }}</b>학습 기간</span><span><BookOpen :size="16"/><b>12개</b>전체 차시</span><span><UsersRound :size="16"/><b>{{ course.students }}명</b>수강 중</span></div></div><div class="hero-image" :class="`tone-${course.tone}`"><img :src="course.image" :alt="course.title"/><span>LINGUAROUTE · COURSE {{ course.id }}</span></div></section><div class="detail-grid"><main><section class="detail-section panel"><p class="eyebrow">About this course</p><h2>이 과정에서 배우는 것</h2><div class="outcomes"><p v-for="item in outcomes" :key="item"><CircleCheck :size="17"/>{{ item }}</p></div></section><section class="detail-section panel"><div class="section-head"><div><p class="eyebrow">Curriculum</p><h2>전체 커리큘럼</h2></div><span>총 4시간 20분</span></div><div class="lesson-list"><div v-for="lesson in lessons" :key="lesson.id"><span class="lesson-index">{{ lesson.index }}</span><span><strong>{{ lesson.title }}</strong><small>{{ lesson.length }}</small></span><span class="tag" :class="lesson.status==='완료'?'':'gray'">{{ lesson.status }}</span><PlayCircle :size="18"/></div></div></section></main><aside><div class="enroll-card card"><span class="tag blue">기업 구독으로 이용 가능</span><h3>지금 바로 시작하세요</h3><p>스칼라테크의 구독과 소속 권한을 확인합니다.</p><label class="scenario-label">권한 상태 미리보기<select v-model="entitlement" class="select"><option value="active">활성 구독</option><option value="duplicate">이미 수강 중</option><option value="inactive">구독 만료</option></select></label><div class="entitlement" :class="{blocked:entitlement==='inactive',warning:entitlement==='duplicate'}"><component :is="entitlement==='inactive'?LockKeyhole:entitlement==='duplicate'?Info:ShieldCheck" :size="18"/><span><b>{{ entitlementTitle }}</b>{{ entitlementDescription }}</span></div><button class="button accent" :disabled="entitlement==='inactive'" @click="requestEnrollment">{{ actionLabel }} <CircleCheck v-if="enrolled" :size="16"/><ArrowRight v-else :size="16"/></button><button class="button"><Bookmark :size="16"/> 나중에 보기</button><small>{{ feedback || '수강 신청 시 서버에서 중복과 구독 권한을 다시 확인합니다.' }}</small></div><div class="ai-note"><Sparkles :size="19"/><span><b>AI 추천 이유</b>해외영업 직무와 고객 미팅 목표에 잘 맞는 과정입니다.</span></div></aside></div></AppShell></template>
-<script setup>import { computed,ref,watch } from 'vue'; import { useRoute } from 'vue-router'; import { ChevronRight,Clock3,BookOpen,UsersRound,CircleCheck,PlayCircle,ShieldCheck,ArrowRight,Bookmark,Sparkles,Info,LockKeyhole } from '@lucide/vue'; import AppShell from '@/components/AppShell.vue'; import { courses,lessons } from '@/data/mockData.js'; const route=useRoute(); const course=computed(()=>courses.find(c=>c.id===Number(route.params.id))||courses[0]); const enrolled=ref(false),entitlement=ref('active'),feedback=ref(''); const entitlementTitle=computed(()=>entitlement.value==='active'?'수강 가능':entitlement.value==='duplicate'?'이미 신청한 강의예요':'구독 권한이 만료되었어요'); const entitlementDescription=computed(()=>entitlement.value==='active'?'잔여 좌석에 영향 없이 신청할 수 있어요.':entitlement.value==='duplicate'?'내 학습에서 바로 이어서 학습할 수 있어요.':'기업 관리자에게 구독 상태를 문의해 주세요.'); const actionLabel=computed(()=>enrolled.value||entitlement.value==='duplicate'?'내 학습으로 이동':'이 강의 수강 신청'); watch(entitlement,()=>{enrolled.value=entitlement.value==='duplicate';feedback.value='' }); function requestEnrollment(){if(enrolled.value||entitlement.value==='duplicate'){feedback.value='중복 신청 없이 기존 수강 정보로 이동합니다.';return} enrolled.value=true;feedback.value='수강 신청이 완료되었습니다. 내 학습에서 확인할 수 있어요.'} const outcomes=['고객 미팅의 단계별 핵심 표현을 자연스럽게 사용할 수 있어요.','제품의 특징을 고객 관점의 가치로 바꾸어 설명할 수 있어요.','질문과 이견에 침착하게 대응하고 다음 단계를 합의할 수 있어요.','실제 업무 상황을 반영한 롤플레이로 말하기 자신감을 높여요.']</script>
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ChevronRight,Clock3,BookOpen,UsersRound,CircleCheck,PlayCircle,ShieldCheck,ArrowRight,Bookmark,Sparkles,Info,LockKeyhole } from '@lucide/vue'
+import AppShell from '@/components/AppShell.vue'
+import { courses, lessons as mockLessons } from '@/data/mockData.js'
+import { courseApi } from '@/api/course.js'
+import { enrollmentApi } from '@/api/enrollment.js'
+
+const route = useRoute()
+const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
+const liveCourse = ref(null)
+const liveLessons = ref([])
+const course = computed(() => liveCourse.value || courses.find((item) => item.id === Number(route.params.id)) || courses[0])
+const lessons = computed(() => liveLessons.value.length ? liveLessons.value : mockLessons)
+const enrolled = ref(false)
+const entitlement = ref('active')
+const feedback = ref('')
+const entitlementTitle = computed(() => entitlement.value === 'active' ? '수강 가능' : entitlement.value === 'duplicate' ? '이미 신청한 강의예요' : '구독 권한이 만료되었어요')
+const entitlementDescription = computed(() => entitlement.value === 'active' ? '잔여 좌석에 영향 없이 신청할 수 있어요.' : entitlement.value === 'duplicate' ? '내 학습에서 바로 이어서 학습할 수 있어요.' : '기업 관리자에게 구독 상태를 문의해 주세요.')
+const actionLabel = computed(() => enrolled.value || entitlement.value === 'duplicate' ? '내 학습으로 이동' : '이 강의 수강 신청')
+
+watch(entitlement, () => { enrolled.value = entitlement.value === 'duplicate'; feedback.value = '' })
+
+onMounted(async () => {
+  if (!useLiveApi) return
+  try {
+    const [courseResponse, lessonResponse] = await Promise.all([
+      courseApi.getById(route.params.id),
+      courseApi.getLessons(route.params.id)
+    ])
+    const data = courseResponse.data.data
+    const fallback = courses[0]
+    liveCourse.value = {
+      ...fallback, ...data, id: data.id, language: data.language, level: data.level,
+      situation: data.situation, duration: '등록된 차시 기준', students: '-', tone: 'green'
+    }
+    liveLessons.value = lessonResponse.data.data.map((lesson) => ({
+      id: lesson.lessonId, index: String(lesson.sequence).padStart(2, '0'), title: lesson.title,
+      length: `${Math.ceil(lesson.durationSeconds / 60)}분`, status: lesson.required ? '필수' : '선택'
+    }))
+  } catch (error) {
+    feedback.value = error.response?.data?.message || '강의 정보를 불러오지 못했습니다.'
+  }
+})
+
+async function requestEnrollment() {
+  if (enrolled.value || entitlement.value === 'duplicate') {
+    feedback.value = '중복 신청 없이 기존 수강 정보로 이동합니다.'
+    return
+  }
+  if (!useLiveApi) {
+    enrolled.value = true
+    feedback.value = '수강 신청이 완료되었습니다. 내 학습에서 확인할 수 있어요.'
+    return
+  }
+  try {
+    await enrollmentApi.enroll(course.value.id)
+    enrolled.value = true
+    feedback.value = '수강 신청이 완료되었습니다. 내 학습에서 확인할 수 있어요.'
+  } catch (error) {
+    if (error.response?.status === 409) {
+      enrolled.value = true
+      entitlement.value = 'duplicate'
+    }
+    feedback.value = error.response?.data?.message || '수강 신청에 실패했습니다.'
+  }
+}
+
+const outcomes = ['고객 미팅의 단계별 핵심 표현을 자연스럽게 사용할 수 있어요.','제품의 특징을 고객 관점의 가치로 바꾸어 설명할 수 있어요.','질문과 이견에 침착하게 대응하고 다음 단계를 합의할 수 있어요.','실제 업무 상황을 반영한 롤플레이로 말하기 자신감을 높여요.']
+</script>
 <style scoped>.breadcrumbs{display:flex;align-items:center;gap:7px;margin-bottom:16px;color:var(--muted);font-size:10px}.breadcrumbs span{color:var(--ink)}.course-hero{min-height:292px;display:grid;grid-template-columns:1.12fr .88fr;overflow:hidden;color:white;background:var(--forest);border-radius:21px}.hero-copy{display:flex;align-items:flex-start;flex-direction:column;justify-content:center;padding:36px}.tags{display:flex;flex-wrap:wrap;gap:6px}.hero-copy h1{margin:16px 0 12px;font-family:var(--font-display);font-size:38px;line-height:1.1;letter-spacing:0}.hero-copy>p{max-width:610px;color:#b8ccbf;font-size:13px;line-height:1.75}.facts{display:flex;flex-wrap:wrap;gap:22px;margin-top:24px}.facts span{display:grid;grid-template-columns:auto auto;align-items:center;gap:3px 7px;color:#8fad9b;font-size:9px}.facts svg{grid-row:span 2;color:var(--lime)}.facts b{color:white;font-size:11px}.hero-image{position:relative;display:grid;place-items:center;background:#d8e9dc}.hero-image img{width:74%;height:74%;object-fit:contain;mix-blend-mode:multiply}.hero-image span{position:absolute;right:18px;bottom:15px;color:rgba(23,33,27,.55);font-family:var(--font-display);font-size:8px;font-weight:800;letter-spacing:.12em}.tone-blue{background:#dce7f3}.tone-amber{background:#f4e8d0}.tone-purple{background:#e8e1f0}.tone-red{background:#f1ddd8}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px;margin-top:14px}.detail-grid main{display:grid;gap:14px}.detail-section h2{margin:10px 0 18px;font-size:19px}.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px}.outcomes p{display:flex;align-items:flex-start;gap:9px;color:var(--muted);font-size:11px;line-height:1.7}.outcomes svg{flex:none;color:var(--forest-2)}.section-head{display:flex;justify-content:space-between}.section-head>span{color:var(--muted);font-size:10px}.lesson-list{border-top:1px solid var(--line)}.lesson-list>div{display:grid;grid-template-columns:32px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:13px 5px;border-bottom:1px solid var(--line)}.lesson-index{color:var(--subtle);font-family:var(--font-display);font-size:11px;font-weight:700}.lesson-list strong,.lesson-list small{display:block}.lesson-list strong{font-size:12px}.lesson-list small{margin-top:3px;color:var(--muted);font-size:9px}.lesson-list>div>svg{color:var(--subtle)}.enroll-card{position:sticky;top:90px;display:grid;gap:12px;padding:20px}.enroll-card h3{margin-top:4px;font-size:18px}.enroll-card>p{color:var(--muted);font-size:10px}.entitlement{display:flex;gap:10px;padding:12px;color:var(--forest);background:var(--mint);border-radius:10px;font-size:9px}.entitlement span,.entitlement b{display:block}.entitlement b{font-size:10px}.enroll-card small{color:var(--subtle);font-size:8px;text-align:center}.ai-note{display:flex;gap:10px;margin-top:10px;padding:14px;color:var(--purple);background:var(--purple-soft);border-radius:13px;font-size:9px;line-height:1.6}.ai-note span,.ai-note b{display:block}.ai-note b{margin-bottom:3px;font-size:10px}@media(max-width:900px){.course-hero{grid-template-columns:1fr}.hero-image{height:230px}.detail-grid{grid-template-columns:1fr}.enroll-card{position:static}}@media(max-width:600px){.hero-copy{padding:28px 22px}.hero-copy h1{font-size:32px}.facts{flex-wrap:wrap}.outcomes{grid-template-columns:1fr}}</style>

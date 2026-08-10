@@ -19,10 +19,10 @@ public class SubscriptionController {
 
     @PostMapping
     public ResponseEntity<PaymentDto.ApiResponse<PaymentDto.SubscriptionResponse>> createSubscription(
-            @RequestHeader(value = "X-Company-Id", required = false) String companyIdHeader,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody PaymentDto.CreateSubscriptionRequest request) {
-        Long companyId = paymentRequestContext.companyId(companyIdHeader);
+        Long companyId = paymentRequestContext.companyId(userIdHeader);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(PaymentDto.ApiResponse.success(
                         subscriptionService.createSubscription(companyId, idempotencyKey, request)
@@ -31,16 +31,16 @@ public class SubscriptionController {
 
     @GetMapping("/me")
     public ResponseEntity<PaymentDto.ApiResponse<PaymentDto.SubscriptionResponse>> getMySubscription(
-            @RequestHeader(value = "X-Company-Id", required = false) String companyIdHeader) {
-        Long companyId = paymentRequestContext.companyId(companyIdHeader);
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
+        Long companyId = paymentRequestContext.companyId(userIdHeader);
         return ResponseEntity.ok(PaymentDto.ApiResponse.success(subscriptionService.getMySubscription(companyId)));
     }
 
     @PostMapping("/me/cancel")
     public ResponseEntity<PaymentDto.ApiResponse<PaymentDto.SubscriptionResponse>> cancelSubscription(
-            @RequestHeader(value = "X-Company-Id", required = false) String companyIdHeader,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @RequestBody(required = false) PaymentDto.CancelSubscriptionRequest request) {
-        Long companyId = paymentRequestContext.companyId(companyIdHeader);
+        Long companyId = paymentRequestContext.companyId(userIdHeader);
         PaymentDto.CancelSubscriptionRequest cancelRequest =
                 request == null ? new PaymentDto.CancelSubscriptionRequest(null) : request;
         return ResponseEntity.ok(PaymentDto.ApiResponse.success(

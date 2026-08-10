@@ -3,9 +3,14 @@ package com.lecture.user.repository;
 import com.lecture.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+    List<User> findAllByNameAndCompany_BusinessNumberAndStatus(String name, String businessNumber, User.Status status);
+    List<User> findAllByCompany_IdAndBusinessRoleOrderByCreatedAtDesc(Long companyId, User.BusinessRole businessRole);
+    Optional<User> findByIdAndCompany_IdAndBusinessRole(Long id, Long companyId, User.BusinessRole businessRole);
+    long countByCompany_IdAndBusinessRoleAndStatus(Long companyId, User.BusinessRole businessRole, User.Status status);
 }

@@ -144,14 +144,14 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 
 ## 5. 프론트엔드 API 명세
 
-모든 보호 API는 `Authorization: Bearer {accessToken}`을 사용합니다. 로그인과 모든 외부 요청은 API Gateway의 `/api` 경로를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 사용하지 않습니다.
+모든 보호 API는 `Authorization: Bearer {accessToken}`을 사용합니다. 로그인은 API Gateway가 Auth Server로 전달하는 OAuth2 Authorization Code 경로(`/oauth2/**`, `/login`)를 사용하고, 나머지 외부 API는 `/api` 경로를 사용합니다. 자체 이메일·비밀번호 로그인만 사용하며 소셜 로그인은 사용하지 않습니다. Refresh Token은 프론트에 저장·사용하지 않습니다.
 
 ### 핵심 엔드포인트 목록
 
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
-| 로그인 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 | JWT Access Token과 만료시간 |
-| 기업 가입 | `POST` | `/api/companies` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
+| 로그인 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | 이메일·비밀번호 세션, Authorization Code | JWT Access Token과 만료시간 |
+| 기업 가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
 | 직원 가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·인증·약관 | 직원 계정과 좌석 배정 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정할 사용자 정보 | 사용자·역할·기업 정보 |
 | 기업 정보 | `GET`, `PATCH` | `/api/companies/me` | 기업 관리자 | 수정할 기업 정보 | 자신의 기업 정보 |
@@ -173,24 +173,18 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start` | 직원 | 수강·차시 ID | 학습 시작 시각과 상태 |
 | 차시 완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/complete` | 직원 | 수강·차시 ID | 서버 계산 진도율 |
-| AI 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 추천 강의·이유·생성 방식 |
+| AI 추천 (개발 중) | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 목표 계약. 발표 라이브 시연 제외 |
 | 강의 등록 | `POST` | `/api/admin/courses` | 플랫폼 관리자 | 강의 정보 | 생성 강의 |
 | 강의 수정 | `PATCH` | `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 변경 정보 | 수정 강의 |
-| 운영 조회 | `GET` | `/api/admin/users`, `/companies`, `/payments`, `/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 영역별 운영 목록 |
+| 운영 조회 (설계·목업) | `GET` | `/api/admin/users`, `/companies`, `/payments`, `/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 목표 계약. 발표 라이브 시연 제외 |
 
 ### 예시 1. 이메일·비밀번호 로그인
 
 ```http
-POST /api/auth/login
-Content-Type: application/json
+GET /oauth2/authorize?response_type=code&client_id=web-client&redirect_uri=http://localhost:3000/callback
 ```
 
-```json
-{
-  "email": "employee@company.com",
-  "password": "Password123!"
-}
-```
+Auth Server 로그인 화면에서 이메일과 비밀번호를 검증한 뒤 콜백의 Authorization Code를 서버가 교환하면 다음 JWT 응답을 받습니다.
 
 ```json
 {
@@ -287,7 +281,9 @@ Content-Type: application/json
 
 서버는 직원 역할, 기업의 활성 구독, 강의의 `ACTIVE` 상태와 중복 신청 여부를 모두 확인합니다.
 
-### 예시 5. AI 강의 추천
+### 예시 5. AI 강의 추천 목표 계약
+
+> 이 요청·응답은 추천 기능 구현 중인 목표 계약입니다. 발표 라이브 시연에서는 사용하지 않고, 구현·curl 검증 후 실제 결과로 교체합니다.
 
 ```http
 POST /api/courses/recommendations
@@ -327,7 +323,7 @@ Content-Type: application/json
 
 | HTTP | 오류 코드 | 상황 |
 | --- | --- | --- |
-| 401 | `INVALID_CREDENTIALS` | 로그인 정보 불일치 |
+| 422 | `INVALID_PASSWORD` | 로그인 사용자 비밀번호 변경 시 현재 비밀번호 불일치 |
 | 403 | `USER_INACTIVE` | 비활성 또는 탈퇴 사용자 |
 | 409 | `DUPLICATE_PAYMENT` | 중복 결제 요청 |
 | 409 | `INVITATION_ALREADY_USED` | 이미 사용한 초대코드 |
@@ -404,13 +400,11 @@ Content-Type: application/json
 ```text
 기업 관리자: 요금제 선택 → 모의 결제 → 구독 ACTIVE·좌석 활성화
 → 기업 관리자: 초대코드 생성
-→ 직원: 초대 가입 → AI 추천 조건 입력 → 추천 강의 확인
-→ 직원: 강의 상세 → 수강신청 → 차시 완료 → 진도율 증가
+→ 직원: 초대 가입 → 강의 상세 → 수강신청 → 차시 완료 → 진도율 증가
 → 기업 관리자: 직원별 진도 확인
-→ 플랫폼 관리자: 기업·결제·수강 운영 상태 확인
 ```
 
-발표에서는 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화를 같은 순서로 설명합니다.
+AI 추천과 플랫폼 운영 화면은 현재 UI 프로토타입 또는 목표 구조 설명용으로만 사용합니다. 라이브 시연에는 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화가 확인된 구현 기능만 포함합니다.
 
 ## 팀 담당 영역
 

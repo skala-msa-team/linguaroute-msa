@@ -48,9 +48,9 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 
 - `course-service`는 강의와 차시를 소유합니다.
 - `recommend-service`는 추천 요청과 추천 결과를 소유하며, `course-service` API로 `ACTIVE` 상태 및 요청 언어 일치 여부를 검증합니다.
-- 기존 Auth Server는 OAuth2 로그인과 Access Token 발급을 담당하며 공용 `users` 테이블의 호환 필드를 읽습니다.
+- 기존 Auth Server는 공용 `users` 테이블의 호환 필드를 읽어 자체 이메일·비밀번호 로그인 후 OAuth2 Authorization Code 흐름으로 JWT Access Token을 발급합니다. 소셜 로그인은 구현하지 않습니다.
 - `user-service`는 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정, 기업·사용자 프로필, 비즈니스 역할·기업 소속, 초대·좌석과 약관 동의를 소유합니다.
-- 서버 수를 늘리지 않습니다. 기존 Gateway 한 대의 라우팅·보안 설정만 목표 API에 맞게 수정합니다.
+- 서버 수를 늘리지 않습니다. 제공 Gateway 이미지는 수정하지 않고, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. Gateway 이미지의 공개 허용 경로가 고정되어 있으면 외부 API 계약을 그 허용 경로에 맞추고 문서에 명시합니다.
 
 ### 3.1 목표 서비스
 
@@ -228,7 +228,7 @@ git diff --cached
 - 내부 API 제공 서비스는 `X-Internal-Api-Key`를 실행 환경의 `INTERNAL_API_KEY`와 비교하여 검증합니다.
 - 신규 내부 API를 `/api/{service}/internal/**` 형태로 만들지 않습니다. 기존 코드에 남은 `/api/**/internal/**` 경로는 담당 범위에서 `/internal/**`로 이전하고 호출 코드를 함께 수정합니다.
 - 보호 API는 Bearer Token과 역할·기업 소속 권한을 모두 검증합니다.
-- MVP에서는 Refresh Token을 구현하지 않습니다. Access Token 만료 시 재로그인하며, 로그아웃 시 클라이언트가 저장한 Access Token을 삭제합니다.
+- 브라우저 로그인은 Auth Server의 OAuth2 Authorization Code 흐름을 사용합니다. Auth Server가 Refresh Token을 반환하더라도 MVP 프론트엔드는 저장·갱신에 사용하지 않으며, Access Token 만료 시 재로그인합니다. 로그아웃은 Auth Server의 `POST /logout`과 클라이언트 Access Token 삭제를 함께 처리합니다.
 - Access Token의 기존 로그인 역할은 비즈니스 권한으로 사용하지 않습니다. 보호 API는 `user-service`의 내부 권한 조회로 최신 `businessRole`, `companyId`, `status`를 확인합니다.
 - 요청 DTO, 엔티티, 응답 DTO의 책임을 분리합니다.
 - 정상 및 예외 HTTP 상태 코드를 구분하고 공통 오류 형식을 유지합니다.

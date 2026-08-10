@@ -5,6 +5,16 @@ spring:
   application:
     name: user-service
 
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
   datasource:
     url: jdbc:mariadb://lecturedb:3306/lecture_db
     # 컨테이너 이름 lecturedb 로 입력 (원래 IP를 입력하지만, 재부팅 시 변경될 수 있는 가능성 제거)
@@ -69,6 +79,15 @@ management:
         include: health,info
 
 app:
+  mail:
+    from: ${MAIL_FROM:no-reply@linguaroute.local}
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  auth:
+    token-url: ${AUTH_SERVER_TOKEN_URL:http://localhost:9000/oauth2/token}
+    web-client-id: ${AUTH_WEB_CLIENT_ID:web-client}
+    web-client-secret: ${AUTH_WEB_CLIENT_SECRET:}
+    redirect-uri: ${AUTH_WEB_REDIRECT_URI:http://localhost:3000/callback}
   security:
     internal-api-key: ${INTERNAL_API_KEY:local-internal-api-key}
 

@@ -37,6 +37,7 @@
 # Local archives and bundled infrastructure images
 *.tar
 *.tar.gz
+msa-lecture-images.part.*
 infra-images.tar.gz.part-*
 infra-images.tar.gz.sha256
 *.zip

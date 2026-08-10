@@ -59,7 +59,7 @@
 
 기업 대표자가 월간 또는 연간 정기권을 결제하면 구매 좌석 수에 따라 직원을 초대할 수 있습니다. 직원은 일회용 초대코드로 가입하며, 잔여 좌석이 없거나 구독이 비활성 상태이면 가입할 수 없습니다.
 
-MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습니다. Access Token이 만료되면 사용자는 다시 로그인합니다.
+MVP 인증은 자체 이메일·비밀번호 로그인 뒤 Auth Server의 OAuth2 Authorization Code 흐름으로 JWT Access Token을 발급받습니다. 소셜 로그인은 사용하지 않습니다. Auth Server가 Refresh Token을 반환할 수 있으나 MVP 프론트엔드는 저장·갱신에 사용하지 않고, Access Token 만료 시 다시 로그인합니다.
 
 인증 서버는 이메일·비밀번호를 검증하고 JWT Access Token을 발급합니다. `user-service`는 공용 `users` 테이블, 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정, 기업·사용자 프로필과 비즈니스 역할을 담당합니다. 인증 서버는 같은 `users` 테이블의 로그인 필드를 읽습니다.
 
@@ -311,9 +311,9 @@ MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습�
 
 - 데이터베이스는 현재 Docker Compose와 동일하게 MariaDB 한 개와 `lecture_db` 한 개를 유지하며 서비스별 소유 테이블만 추가·변경합니다.
 - 서버를 추가하지 않고 현재 Docker Compose의 서비스 수와 MariaDB 한 개를 유지합니다.
-- 인증 서버는 이메일·비밀번호 로그인과 JWT Access Token 발급을 담당합니다. OAuth2 Authorization Code 흐름은 사용하지 않으며, 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
+- 인증 서버는 이메일·비밀번호 로그인과 OAuth2 Authorization Code 기반 JWT Access Token 발급을 담당합니다. 소셜 로그인은 사용하지 않으며, 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
 - 기존 Auth Server 호환을 위해 `EMPLOYEE`는 `users.role=STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `users.role=INSTRUCTOR`로 저장합니다. 실제 서비스 권한은 새 `business_role` 컬럼으로 관리합니다.
-- 기존 API Gateway 서버는 유지하되 목표 API 경로와 공개 경로가 JAR에 고정되어 있으므로, 동일한 Gateway 한 대의 라우팅·보안 설정만 수정합니다. 새 Gateway 서버를 추가하지 않습니다.
+- 기존 API Gateway 서버는 유지합니다. 제공 Gateway 이미지는 수정하지 않고, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 그 경로를 외부 MVP 계약에 맞춰 사용합니다.
 - 이메일 인증은 SMTP로 6자리 코드를 보내고 비밀번호 재설정은 SMTP 링크로 처리하며, 세부 보안 정책은 API 명세를 따릅니다.
 - 수강신청 시 `enrollment-service`가 `user-service`의 내부 구독 권한 API를 동기 호출하며, 호출 실패 시 신청을 허용하지 않습니다.
 - 실제 PG 없이 모의 결제와 구독 기간·갱신·만료를 구현합니다.
@@ -322,7 +322,7 @@ MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습�
 개발은 다음 순서로 시작합니다.
 
 1. 인증 서버의 이메일·비밀번호 로그인과 현재 `users` 테이블 호환성을 유지합니다.
-2. 기존 API Gateway 한 대에 목표 라우트와 공개·보호 경로를 반영합니다.
+2. 제공 API Gateway 이미지는 수정하지 않고 `docker-compose.yml` 환경변수로 가능한 라우팅만 보정하며, 이미지에 고정된 공개 경로와 충돌하는 API는 Gateway 허용 경로에 맞춰 외부 계약을 정리합니다.
 3. `user-service`에 인증 보조 기능과 비즈니스 역할을 추가하고 각 서비스 API를 구현합니다.
 4. 내부 구독 권한 조회와 Kafka 구독 이벤트를 연동합니다.
 5. 프론트엔드를 Gateway 경로에 연결하고 전체 사용자 흐름을 통합 테스트합니다.
@@ -398,10 +398,10 @@ AI 추천 처리 흐름은 다음과 같습니다.
 | P0 | 구독·결제·권한 | 요금제, 월간·연간 구독, 모의 결제, 멱등성, 해지·만료·갱신, Kafka 결제 이벤트 | 기업이 비용을 내고 직원에게 권한을 제공하는 수익 모델의 핵심 |
 | P0 | 초대·좌석·직원 | 일회용 초대코드, 만료·중복 방지, 좌석 배정·회수, 직원 상태 관리 | B2B 계약 인원 통제를 검증하는 핵심 기능 |
 | P0 | 강의·수강·학습 | 강의 검색·필터·상세, 수강신청, 중복 방지, 차시 시작·완료, 진도율 | 직원이 실제 교육 가치를 얻는 최소 학습 흐름 |
-| P0 | AI 추천 | 조건 입력, 추천 이유, 실제 `ACTIVE` 강의 검증, 규칙 기반 대체 | LinguaRoute의 차별화 가치인 맞춤 탐색을 검증 |
-| P1 | 역할별 운영 화면 | 기업 관리자 대시보드·진도·구독·직원 관리, 플랫폼 관리자 통합 조회 | 구매자와 운영자가 서비스 상태를 확인해야 B2B 운영이 완결됨 |
+| P1 | AI 추천 (개발 중) | 조건 입력, 추천 이유, 실제 `ACTIVE` 강의 검증, 규칙 기반 대체 | LinguaRoute의 차별화 가치이나 Gateway 통합 계약 정비가 남아 있음 |
+| P1 | 역할별 운영 화면 | 기업 관리자 대시보드·진도·구독·직원 관리, 플랫폼 관리자 통합 조회 | 기업 관리자 화면은 연동 중이며 플랫폼 관리자 통합 조회 API는 미구현 |
 
-Sprint 1의 완료 기준은 `기업 구독 → 직원 초대 → 직원 가입 → AI 추천 → 수강신청 → 학습 완료 → 기업 진도 확인`이 API Gateway를 통해 한 흐름으로 동작하는 것입니다.
+현재 Sprint 1의 구현 완료 기준은 `기업 구독 → 직원 초대 → 직원 가입 → 수강신청 → 학습 완료 → 기업 진도 확인`이 API Gateway를 통해 한 흐름으로 동작하는 것입니다. AI 추천과 플랫폼 운영 조회는 확정 MVP 목표이지만, 구현·통합 검증 전에는 이 완료 기준에 포함하지 않습니다.
 
 #### Sprint 2: 학습 경험과 운영 고도화
 
@@ -492,8 +492,8 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
-| 로그인 | `POST` | `/api/auth/login` | 공개 | `email`, `password` | JWT `accessToken`, `expiresIn` |
-| 기업 회원가입 | `POST` | `/api/companies` | 공개 | 기업·관리자·이메일 인증·약관 | `companyId`, `userId`, `COMPANY_ADMIN` |
+| 로그인 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | Auth Server 이메일·비밀번호 세션, Authorization Code | JWT `access_token`, `expires_in` |
+| 기업 회원가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·이메일 인증·약관 | `companyId`, `userId`, `COMPANY_ADMIN` |
 | 직원 회원가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·이메일 인증·약관 | 직원 계정과 좌석 배정 결과 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정 시 이름 등 | 사용자·역할·기업 정보 |
 | 기업 정보 | `GET`, `PATCH` | `/api/companies/me` | 기업 관리자 | 수정 기업 정보 | 자신의 기업 정보 |
@@ -510,9 +510,9 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 | 수강신청 | `POST` | `/api/enrollments` | 직원 | `courseId` | `enrollmentId`, `ENROLLED`, 진도율 |
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작·완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start`, `/complete` | 직원 | 경로 ID | 차시 상태와 서버 계산 진도율 |
-| AI 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 추천 강의, 이유, `source` |
+| AI 추천 (개발 중) | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 목표 계약. 구현·통합 검증 후 라이브 호출 |
 | 강의 관리 | `POST`, `PATCH` | `/api/admin/courses`, `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 강의 정보 | 생성·수정된 강의 |
-| 플랫폼 운영 | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 영역별 운영 목록 |
+| 플랫폼 운영 (설계·목업) | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 목표 계약. 관리자 집계 API 구현 후 라이브 호출 |
 
 #### Request/Response 예시 1 — 구독 결제
 
@@ -566,7 +566,7 @@ Content-Type: application/json
 }
 ```
 
-#### Request/Response 예시 3 — AI 강의 추천
+#### Request/Response 예시 3 — AI 강의 추천 목표 계약
 
 ```http
 POST /api/courses/recommendations
@@ -620,7 +620,7 @@ Content-Type: application/json
 
 ### 13.6 동작 화면 스냅샷 — 구현 결과를 어떻게 보여주는가
 
-현재 캡처는 최신 프론트 퍼블리싱을 `VITE_USE_LIVE_API=false`로 실행하여 브라우저에서 버튼과 상태 변화를 직접 조작한 **UI 프로토타입 증거**입니다. 실제 API 호출 증거는 바로 위 Swagger 캡처이며, 프론트와 전체 목표 API의 통합 완료를 의미하지 않습니다. 발표 최종본에서는 같은 구도로 라이브 API 응답을 연결한 캡처로 교체해야 합니다.
+현재 캡처는 최신 프론트 퍼블리싱을 `VITE_USE_LIVE_API=false`로 실행하여 브라우저에서 버튼과 상태 변화를 직접 조작한 **UI 프로토타입 증거**입니다. 실제 API 호출 증거는 바로 위 Swagger 캡처이며, 프론트와 전체 목표 API의 통합 완료를 의미하지 않습니다. AI 추천과 플랫폼 운영 화면은 구현·통합 검증 후 라이브 API 응답 캡처로 교체해야 합니다.
 
 #### 화면 1 — B2B2E 서비스 소개
 

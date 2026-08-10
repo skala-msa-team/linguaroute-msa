@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final com.lecture.course.repository.LessonRepository lessonRepository;
+    @Transactional public CourseDto.LessonResponse addLesson(Long courseId, CourseDto.LessonRequest request) { Course c=findCourseById(courseId); return CourseDto.LessonResponse.from(lessonRepository.save(com.lecture.course.entity.Lesson.builder().course(c).title(request.getTitle()).contentUrl(request.getContentUrl()).sequence(request.getSequence()).required(request.getRequired()).durationSeconds(request.getDurationSeconds()).build())); }
+    public List<CourseDto.LessonResponse> getLessons(Long courseId) { findCourseById(courseId); return lessonRepository.findByCourse_IdOrderBySequenceAsc(courseId).stream().map(CourseDto.LessonResponse::from).toList(); }
 
     /**
      * 강의 등록

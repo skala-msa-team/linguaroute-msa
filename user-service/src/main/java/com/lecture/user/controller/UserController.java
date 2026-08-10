@@ -1,12 +1,16 @@
 package com.lecture.user.controller;
 
 import com.lecture.user.dto.ApiResponse;
+import com.lecture.user.dto.AuthDto;
+import com.lecture.user.dto.CompanyDto;
 import com.lecture.user.dto.UserDto;
+import com.lecture.user.service.CompanyService;
 import com.lecture.user.service.UserService;
 import com.lecture.user.service.UserAgreementService;
 import com.lecture.user.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -19,7 +23,15 @@ public class UserController {
 
     private final UserService userService;
     private final UserAgreementService userAgreementService;
+    private final CompanyService companyService;
     private final AuthenticatedUser authenticatedUser;
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<CompanyDto.RegisterResponse>> registerCompanyAdmin(
+            @Valid @RequestBody CompanyDto.RegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(companyService.register(request)));
+    }
 
     /**
      * GET /users/me - 내 정보 조회
@@ -40,6 +52,20 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(
                 userService.updateMe(authenticatedUser.userId(jwt), request)
         ));
+    }
+
+    @PutMapping("/me/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody AuthDto.PasswordChangeRequest request) {
+        userService.changePassword(authenticatedUser.userId(jwt), request);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> withdraw(@AuthenticationPrincipal Jwt jwt) {
+        userService.withdraw(authenticatedUser.userId(jwt));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/me/agreements")

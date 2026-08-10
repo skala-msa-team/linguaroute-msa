@@ -20,13 +20,31 @@ CREATE TABLE IF NOT EXISTS users (
     password            VARCHAR(255) NOT NULL,
     name                VARCHAR(100) NOT NULL,
     role                VARCHAR(20)  NOT NULL COMMENT 'STUDENT | INSTRUCTOR',
-    business_role       VARCHAR(30)  NOT NULL COMMENT 'PLATFORM_ADMIN | COMPANY_ADMIN | EMPLOYEE',
+    business_role       VARCHAR(30)  NOT NULL DEFAULT 'EMPLOYEE' COMMENT 'PLATFORM_ADMIN | COMPANY_ADMIN | EMPLOYEE',
     status              VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE | INACTIVE | WITHDRAWN',
     created_at          DATETIME(6),
     updated_at          DATETIME(6),
     PRIMARY KEY (id),
     UNIQUE KEY uk_users_email (email),
     CONSTRAINT fk_users_company FOREIGN KEY (company_id) REFERENCES companies(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS invitations (
+    id                  BIGINT      NOT NULL AUTO_INCREMENT,
+    company_id          BIGINT      NOT NULL,
+    created_by_user_id  BIGINT      NOT NULL,
+    used_by_user_id     BIGINT,
+    code_hash           CHAR(64)    NOT NULL,
+    status              VARCHAR(20) NOT NULL COMMENT 'UNUSED | USED | EXPIRED | REVOKED',
+    expires_at          DATETIME(6) NOT NULL,
+    used_at             DATETIME(6),
+    created_at          DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_invitations_code_hash (code_hash),
+    KEY idx_invitations_company_created (company_id, created_at),
+    CONSTRAINT fk_invitations_company FOREIGN KEY (company_id) REFERENCES companies(id),
+    CONSTRAINT fk_invitations_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+    CONSTRAINT fk_invitations_used_by FOREIGN KEY (used_by_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS email_verifications (
@@ -42,6 +60,19 @@ CREATE TABLE IF NOT EXISTS email_verifications (
     PRIMARY KEY (id),
     UNIQUE KEY uk_email_verifications_token_hash (token_hash),
     KEY idx_email_verifications_email_purpose (email, purpose)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id                  BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id             BIGINT      NOT NULL,
+    token_hash          CHAR(64)    NOT NULL,
+    expires_at          DATETIME(6) NOT NULL,
+    used_at             DATETIME(6),
+    created_at          DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_password_reset_tokens_token_hash (token_hash),
+    KEY idx_password_reset_tokens_user_created (user_id, created_at),
+    CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS terms (
@@ -148,7 +179,19 @@ CREATE TABLE IF NOT EXISTS recommendation_items (
     FOREIGN KEY (recommendation_id) REFERENCES recommendations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 수강생이 수강 신청 (user_id → users.id, course_id → courses.id)
+CREATE TABLE IF NOT EXISTS lessons (
+    id                  BIGINT       NOT NULL AUTO_INCREMENT,
+    course_id           BIGINT       NOT NULL,
+    title               VARCHAR(255) NOT NULL,
+    content_url         TEXT         NOT NULL,
+    sequence_no         INT          NOT NULL,
+    required            BOOLEAN      NOT NULL DEFAULT TRUE,
+    duration_seconds    INT          NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_lesson_course_sequence (course_id, sequence_no),
+    CONSTRAINT fk_lessons_course FOREIGN KEY (course_id) REFERENCES courses(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS enrollments (
     id                  BIGINT        NOT NULL AUTO_INCREMENT,
     company_id          BIGINT        NOT NULL COMMENT 'user-service companies.id 논리 참조',
@@ -254,3 +297,154 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     UNIQUE KEY uk_outbox_event_id (event_id),
     KEY idx_outbox_events_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
+-- Demo seed data
+-- ---------------------------------------------------------------------------
+-- 발표와 로컬 검증에서 바로 사용할 수 있는 최소 데이터셋입니다.
+-- 공통 비밀번호는 Password123! 이며 BCrypt 해시만 저장합니다.
+
+INSERT INTO companies (id, name, business_number, status, created_at, updated_at)
+VALUES
+    (9101, '스칼라테크', '9910000001', 'ACTIVE', '2026-08-10 09:00:00', '2026-08-10 09:00:00'),
+    (9102, '글로벌링크', '9910000002', 'ACTIVE', '2026-08-10 09:05:00', '2026-08-10 09:05:00')
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    status = VALUES(status),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO users (id, company_id, email, password, name, role, business_role, status, created_at, updated_at)
+VALUES
+    (9100, NULL, 'platform-admin@linguaroute.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '플랫폼 관리자', 'INSTRUCTOR', 'PLATFORM_ADMIN', 'ACTIVE', '2026-08-10 09:10:00', '2026-08-10 09:10:00'),
+    (9101, 9101, 'admin@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '박관리', 'INSTRUCTOR', 'COMPANY_ADMIN', 'ACTIVE', '2026-08-10 09:11:00', '2026-08-10 09:11:00'),
+    (9102, 9101, 'employee.lee@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '이수강', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:12:00', '2026-08-10 09:12:00'),
+    (9103, 9101, 'employee.kim@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '김학습', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:13:00', '2026-08-10 09:13:00'),
+    (9104, 9102, 'admin@global-link.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '정관리', 'INSTRUCTOR', 'COMPANY_ADMIN', 'ACTIVE', '2026-08-10 09:14:00', '2026-08-10 09:14:00')
+ON DUPLICATE KEY UPDATE
+    company_id = VALUES(company_id),
+    name = VALUES(name),
+    role = VALUES(role),
+    business_role = VALUES(business_role),
+    status = VALUES(status),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO user_agreements (user_id, term_id, agreed, agreed_at)
+VALUES
+    (9101, 1, TRUE, '2026-08-10 09:20:00'),
+    (9101, 2, TRUE, '2026-08-10 09:20:00'),
+    (9102, 1, TRUE, '2026-08-10 09:21:00'),
+    (9102, 2, TRUE, '2026-08-10 09:21:00'),
+    (9103, 1, TRUE, '2026-08-10 09:22:00'),
+    (9103, 2, TRUE, '2026-08-10 09:22:00'),
+    (9104, 1, TRUE, '2026-08-10 09:23:00'),
+    (9104, 2, TRUE, '2026-08-10 09:23:00')
+ON DUPLICATE KEY UPDATE
+    agreed = VALUES(agreed),
+    agreed_at = VALUES(agreed_at);
+
+INSERT INTO courses (id, title, description, language, situation, level, status, created_at, updated_at)
+VALUES
+    (9101, '해외 고객 미팅 영어', '해외 고객과 요구사항을 확인하고 제품을 설명하는 실전 영어 과정입니다.', 'ENGLISH', 'CUSTOMER_MEETING', 'INTERMEDIATE', 'ACTIVE', '2026-08-10 10:00:00', '2026-08-10 10:00:00'),
+    (9102, '비즈니스 이메일 영어', '견적, 일정, 회신을 명확하게 작성하는 이메일 표현을 학습합니다.', 'ENGLISH', 'EMAIL', 'ELEMENTARY', 'ACTIVE', '2026-08-10 10:05:00', '2026-08-10 10:05:00'),
+    (9103, '일본 출장 회화', '공항, 호텔, 회의실에서 바로 쓰는 일본어 출장 회화 과정입니다.', 'JAPANESE', 'BUSINESS_TRIP', 'BEGINNER', 'ACTIVE', '2026-08-10 10:10:00', '2026-08-10 10:10:00'),
+    (9104, '중국어 프레젠테이션', '중국 파트너 앞에서 서비스와 성과를 발표하는 표현을 연습합니다.', 'CHINESE', 'PRESENTATION', 'INTERMEDIATE', 'ACTIVE', '2026-08-10 10:15:00', '2026-08-10 10:15:00'),
+    (9105, '임원 보고 영어 프레젠테이션', '핵심 수치를 설명하고 질의응답에 대응하는 고급 발표 영어입니다.', 'ENGLISH', 'PRESENTATION', 'ADVANCED', 'ACTIVE', '2026-08-10 10:20:00', '2026-08-10 10:20:00'),
+    (9106, '일상 스몰토크 영어', '동료와 자연스럽게 대화하는 초급 일상 영어 과정입니다.', 'ENGLISH', 'DAILY_CONVERSATION', 'BEGINNER', 'INACTIVE', '2026-08-10 10:25:00', '2026-08-10 10:25:00')
+ON DUPLICATE KEY UPDATE
+    title = VALUES(title),
+    description = VALUES(description),
+    language = VALUES(language),
+    situation = VALUES(situation),
+    level = VALUES(level),
+    status = VALUES(status),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO lessons (id, course_id, title, content_url, sequence_no, required, duration_seconds)
+VALUES
+    (910101, 9101, '고객 미팅 시작하기', 'https://example.com/lessons/910101', 1, TRUE, 900),
+    (910102, 9101, '제품 핵심 가치 설명하기', 'https://example.com/lessons/910102', 2, TRUE, 1200),
+    (910103, 9101, '질문과 이견에 대응하기', 'https://example.com/lessons/910103', 3, TRUE, 1100)
+ON DUPLICATE KEY UPDATE
+    title = VALUES(title), content_url = VALUES(content_url), required = VALUES(required), duration_seconds = VALUES(duration_seconds);
+
+INSERT INTO plans (id, name, description, status, created_at)
+VALUES
+    (1, 'BUSINESS_50', '직원 50명까지 이용 가능한 기업 구독 플랜', 'ACTIVE', '2026-08-10 10:30:00'),
+    (2, 'STARTUP_20', '직원 20명까지 이용 가능한 스타트업 구독 플랜', 'ACTIVE', '2026-08-10 10:31:00')
+ON DUPLICATE KEY UPDATE
+    description = VALUES(description),
+    status = VALUES(status);
+
+INSERT INTO plan_prices (id, plan_id, billing_cycle, price, currency, seat_limit, status, created_at)
+VALUES
+    (1, 1, 'MONTHLY', 299000, 'KRW', 50, 'ACTIVE', '2026-08-10 10:35:00'),
+    (2, 1, 'YEARLY', 2990000, 'KRW', 50, 'ACTIVE', '2026-08-10 10:36:00'),
+    (3, 2, 'MONTHLY', 129000, 'KRW', 20, 'ACTIVE', '2026-08-10 10:37:00'),
+    (4, 2, 'YEARLY', 1290000, 'KRW', 20, 'ACTIVE', '2026-08-10 10:38:00')
+ON DUPLICATE KEY UPDATE
+    price = VALUES(price),
+    currency = VALUES(currency),
+    seat_limit = VALUES(seat_limit),
+    status = VALUES(status);
+
+INSERT INTO subscriptions (id, company_id, plan_price_id, status, auto_renew, current_period_start, current_period_end, next_billing_at, canceled_at, created_at, updated_at)
+VALUES
+    (9101, 9101, 1, 'ACTIVE', TRUE, '2026-08-10 11:00:00', '2026-09-10 11:00:00', '2026-09-10 11:00:00', NULL, '2026-08-10 11:00:00', '2026-08-10 11:00:00')
+ON DUPLICATE KEY UPDATE
+    plan_price_id = VALUES(plan_price_id),
+    status = VALUES(status),
+    auto_renew = VALUES(auto_renew),
+    current_period_start = VALUES(current_period_start),
+    current_period_end = VALUES(current_period_end),
+    next_billing_at = VALUES(next_billing_at),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO payments (id, subscription_id, company_id, idempotency_key, amount, currency, status, provider_payment_id, failure_reason, requested_at, paid_at, failed_at, created_at)
+VALUES
+    (9101, 9101, 9101, 'demo-subscription-20260810', 299000, 'KRW', 'SUCCESS', 'mock-demo-20260810-1001', NULL, '2026-08-10 11:00:00', '2026-08-10 11:00:02', NULL, '2026-08-10 11:00:00')
+ON DUPLICATE KEY UPDATE
+    subscription_id = VALUES(subscription_id),
+    amount = VALUES(amount),
+    currency = VALUES(currency),
+    status = VALUES(status),
+    provider_payment_id = VALUES(provider_payment_id),
+    failure_reason = VALUES(failure_reason),
+    paid_at = VALUES(paid_at);
+
+INSERT INTO company_entitlements (company_id, subscription_id, entitlement_status, seat_limit, current_period_end, auto_renew, created_at, updated_at)
+VALUES
+    (9101, 9101, 'ACTIVE', 50, '2026-09-10 11:00:00', TRUE, '2026-08-10 11:00:03', '2026-08-10 11:00:03')
+ON DUPLICATE KEY UPDATE
+    subscription_id = VALUES(subscription_id),
+    entitlement_status = VALUES(entitlement_status),
+    seat_limit = VALUES(seat_limit),
+    current_period_end = VALUES(current_period_end),
+    auto_renew = VALUES(auto_renew),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO enrollments (id, company_id, user_id, course_id, status, progress_rate, enrolled_at, started_at, completed_at, created_at, updated_at)
+VALUES
+    (9101, 9101, 9102, 9101, 'LEARNING', 50.00, '2026-08-10 12:00:00', '2026-08-10 12:05:00', NULL, '2026-08-10 12:00:00', '2026-08-10 12:30:00'),
+    (9102, 9101, 9102, 9102, 'COMPLETED', 100.00, '2026-08-10 13:00:00', '2026-08-10 13:05:00', '2026-08-10 14:00:00', '2026-08-10 13:00:00', '2026-08-10 14:00:00'),
+    (9103, 9101, 9103, 9103, 'ENROLLED', 0.00, '2026-08-10 15:00:00', NULL, NULL, '2026-08-10 15:00:00', '2026-08-10 15:00:00')
+ON DUPLICATE KEY UPDATE
+    company_id = VALUES(company_id),
+    user_id = VALUES(user_id),
+    course_id = VALUES(course_id),
+    status = VALUES(status),
+    progress_rate = VALUES(progress_rate),
+    started_at = VALUES(started_at),
+    completed_at = VALUES(completed_at),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO lesson_progress (enrollment_id, lesson_id, status, started_at, completed_at, updated_at)
+VALUES
+    (9101, 1, 'COMPLETED', '2026-08-10 12:05:00', '2026-08-10 12:20:00', '2026-08-10 12:20:00'),
+    (9101, 2, 'LEARNING', '2026-08-10 12:21:00', NULL, '2026-08-10 12:30:00'),
+    (9102, 3, 'COMPLETED', '2026-08-10 13:05:00', '2026-08-10 13:30:00', '2026-08-10 13:30:00'),
+    (9102, 4, 'COMPLETED', '2026-08-10 13:35:00', '2026-08-10 14:00:00', '2026-08-10 14:00:00')
+ON DUPLICATE KEY UPDATE
+    status = VALUES(status),
+    started_at = VALUES(started_at),
+    completed_at = VALUES(completed_at),
+    updated_at = VALUES(updated_at);

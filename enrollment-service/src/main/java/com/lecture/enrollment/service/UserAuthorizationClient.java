@@ -84,5 +84,11 @@ public class UserAuthorizationClient {
                     && "EMPLOYEE".equals(businessRole)
                     && companyId != null;
         }
+
+        public boolean isActiveCompanyAdmin() {
+            return "ACTIVE".equals(status)
+                    && "COMPANY_ADMIN".equals(businessRole)
+                    && companyId != null;
+        }
     }
 }

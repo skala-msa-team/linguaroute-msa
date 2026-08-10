@@ -69,6 +69,20 @@ public class EmailVerification {
         this.usedAt = usedAt;
     }
 
+    public boolean canConfirm(String requestedEmail, String requestedCode, LocalDateTime now) {
+        return purpose == Purpose.SIGNUP
+                && email.equalsIgnoreCase(requestedEmail)
+                && verifiedAt == null
+                && usedAt == null
+                && expiresAt.isAfter(now)
+                && codeHash.equals(com.lecture.user.security.TokenHash.sha256(requestedCode));
+    }
+
+    public void confirm(String tokenHash, LocalDateTime confirmedAt) {
+        this.tokenHash = tokenHash;
+        this.verifiedAt = confirmedAt;
+    }
+
     public enum Purpose {
         SIGNUP
     }

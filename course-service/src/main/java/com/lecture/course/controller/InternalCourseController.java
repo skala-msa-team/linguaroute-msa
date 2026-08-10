@@ -34,6 +34,14 @@ public class InternalCourseController {
         return ResponseEntity.ok(courseService.getEnrollmentValidation(id));
     }
 
+    @GetMapping("/{id}/lessons")
+    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.LessonResponse>>> getLessons(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String internalApiKey) {
+        internalApiKeyValidator.validate(internalApiKey);
+        return ResponseEntity.ok(CourseDto.ApiResponse.success(courseService.getLessons(id)));
+    }
+
     @GetMapping("/recommend")
     public ResponseEntity<List<CourseDto.CourseResponse>> getRecommendCourses(
             @RequestParam Course.Language language,

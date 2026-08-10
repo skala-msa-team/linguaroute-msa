@@ -30,7 +30,7 @@ export const useCourseStore = defineStore('course', () => {
     loading.value = true
     error.value = null
     try {
-      const payload = unwrapApiData(await courseApi.getAll(params))
+      const payload = unwrapApiData(await courseApi.getCourses(params))
       const rawCourses = Array.isArray(payload) ? payload : payload?.content ?? []
       courses.value = rawCourses.map(normalizeCourse)
     } catch (requestError) {
