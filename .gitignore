@@ -1,0 +1,29 @@
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Java / Gradle build outputs
+**/.gradle/
+**/build/
+**/bin/
+**/out/
+
+# Node / Vite build outputs
+**/node_modules/
+**/dist/
+
+# Python caches
+**/__pycache__/
+*.py[cod]
+
+# IDE files
+**/.idea/
+**/.vscode/
+*.iml
+
+# Local archives and bundled infrastructure images
+*.tar
+*.zip
