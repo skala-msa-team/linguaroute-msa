@@ -119,6 +119,21 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=lb://user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/api/users/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_URI=lb://recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/api/courses/recommendations,/api/courses/recommendations/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/courses/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/payments/**
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -244,14 +259,19 @@ services:
     ports:
       - "8085:8085"
     environment:
+      - APP_PORT=8085
       - EUREKA_SERVER_URL=http://eureka-server:8761/eureka
       - EUREKA_INSTANCE_HOST=recommend-service
       - JWT_ISSUER_URI=http://localhost:8080
       - JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
+      - USER_SERVICE_URL=http://user-service:8081
+      - DATABASE_URL=mysql+pymysql://manager:SqlDba-1@lecturedb:3306/lecture_db
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
+      mariadb:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
       auth-server:
@@ -261,6 +281,8 @@ services:
       enrollment-service:
         condition: service_started
       course-service:
+        condition: service_started
+      user-service:
         condition: service_started
     networks:
       - lecture-net
