@@ -77,6 +77,11 @@ python -m compileall -q app tests main.py
 3. Gateway 내부 경로 차단과 인증 헤더 처리
 4. Gateway부터 MariaDB까지 전체 추천 흐름
 
+최신 `main`과 `dev`는 `feature/ai-recommendation`에 병합됐으며 병합 커밋은
+`b2e3dd3`입니다. 병합 후 recommend-service 테스트 16개, Course·Enrollment·User·Payment
+서비스의 Gradle 테스트와 Vue 프로덕션 빌드가 통과했습니다. 이는 정적·자동 검증 결과이며,
+Docker Compose를 이용한 실제 네트워크·인증·DB 통합 성공을 의미하지는 않습니다.
+
 ---
 
 ## 3. 우선순위 1: 팀용 OpenAI API 키 준비
@@ -173,16 +178,16 @@ Compose를 실행해야 합니다. 키가 유출되면 즉시 폐기하고 새 �
 
 ---
 
-## 5. 우선순위 3: 신규 내부 API 공통 계약 반영
+## 5. 우선순위 3: 신규 내부 API 공통 계약 통합 검증
 
 팀 합의에 따라 신규 내부 API는 `/api/{service}/internal/**`가 아니라
 `/internal/{service}/**`로 분리합니다. 공통 규칙은 다른 담당자의 브랜치에서
-`AGENTS.md`와 `docs/api-spec.md`에 먼저 작성됐으므로, 해당 변경이 `dev`에 들어온 뒤
-문서와 실제 제공 서비스 코드를 함께 확인해야 합니다.
+`AGENTS.md`와 `docs/api-spec.md` 및 실제 제공 서비스 코드에 반영됐고 최신 `dev` 병합도
+완료했습니다. 다음 환경에서는 코드 변경보다 실제 통합 동작을 확인합니다.
 
 recommend-service에 영향을 주는 경로 변경:
 
-| 대상 | 현재 호출 코드 | 목표 계약 |
+| 대상 | 폐기한 레거시 경로 | 현재 계약 |
 |---|---|---|
 | Course 추천 후보 | `/api/courses/internal/recommend` | `/internal/courses/recommend` |
 | Enrollment 이력 | `/api/enrollments/internal/history/{userId}` | `/internal/enrollments/history/{userId}` |
@@ -195,7 +200,7 @@ X-Internal-Api-Key: {internalApiKey}
 
 ### 5.1 Course 담당자 구현 확인
 
-목표 계약:
+현재 계약:
 
 ```http
 GET /internal/courses/recommend?language=ENGLISH&excludeIds=3&excludeIds=5
@@ -204,16 +209,16 @@ X-Internal-Api-Key: {internalApiKey}
 
 필수 동작:
 
-- 키 누락 → `403 Forbidden`
-- 키 불일치 → `403 Forbidden`
+- 키 누락 → `401 Unauthorized` (`INVALID_INTERNAL_API_KEY`)
+- 키 불일치 → `401 Unauthorized` (`INVALID_INTERNAL_API_KEY`)
 - 정상 키 → `200 OK`
 - 응답은 강의 배열
 - 요청 언어와 일치하는 `ACTIVE` 강의만 반환
 - 각 항목에 `id`, `title`, `language`, `level`, `situation`, `status` 포함
 
 recommend-service는 이 API를 Gateway를 거치지 않고 course-service에 직접 호출합니다.
-Course 담당자의 신규 경로와 키 검증이 준비되기 전에 소비자 URL만 먼저 변경하면 호출이
-실패하므로 제공자 변경이 `dev`에 들어온 시점에 함께 맞춥니다.
+제공자와 소비자 변경은 최신 `dev` 병합으로 함께 반영됐습니다. 자동 테스트 통과와 별개로
+실제 실행 환경에서 정상 키와 누락·불일치 키를 각각 호출해 응답을 확인합니다.
 
 ### 5.2 Enrollment 이력 호출 정리
 
@@ -235,13 +240,14 @@ recommend-service 쪽 계약 반영은 완료했습니다.
 `/api/subscriptions`, `/api/payments` 외부 보호 API를 사용합니다. 따라서 recommend-service의
 직접 수정 대상은 아닙니다.
 
-다만 enrollment-service에 기존 PaymentServiceClient 호출이 남아 있으므로 이 부분은
-Enrollment·구독 담당자가 별도로 정리합니다. 앞으로 payment-service에 내부 API가 필요하면
+최신 `dev`에서는 enrollment-service의 기존 `PaymentServiceClient`도 제거됐습니다.
+앞으로 payment-service에 내부 API가 필요하면
 `/internal/payments/**`와 `X-Internal-Api-Key` 계약을 적용합니다.
 
-### 5.4 최신 dev 반영 전 확인
+### 5.4 이후 dev 재병합 전 확인
 
-공통 문서와 제공 서비스 변경이 `dev`에 들어오면 다음을 먼저 확인한 후 병합합니다.
+현재 기준 최신 `dev` 병합은 완료됐습니다. 이후 추가 변경을 다시 병합할 때 다음을 먼저
+확인합니다.
 
 ```powershell
 git fetch origin
@@ -395,3 +401,100 @@ API 키, Access Token, Authorization 헤더, 전체 개인정보는 캡처 전�
 
 검증 후 커밋은 실행 환경, 통합 테스트, 문서 갱신을 논리적으로 분리합니다. 실제 키와 토큰이
 staging 영역에 포함되지 않았는지 `git diff --cached`로 반드시 확인한 뒤 push합니다.
+
+---
+
+## 10. 담당 범위 코드 점검 결과와 보완 우선순위
+
+아래 항목은 최신 `dev` 병합 후 `recommend-service`, Gateway 연동, 내부 API 소비 코드를
+검토한 결과입니다. 현재 자동 테스트 통과와 운영 적합성을 구분하며, 실제 수정 전에는 팀의
+Gateway 운영 방식과 실패 정책을 합의합니다.
+
+### 10.1 최우선: 추천 API의 사용자 식별 신뢰 경계 확정
+
+현재 추천 라우터는 `Authorization` 헤더의 존재만 요구하고 토큰을 직접 검증하지 않으며,
+사용자 식별에는 `X-User-Id`를 사용합니다. 저장소에 JWT 검증 코드가 있지만 추천 라우터의
+의존성으로 연결돼 있지 않습니다. 따라서 다음 중 하나를 반드시 확정해야 합니다.
+
+1. Gateway가 외부의 `X-User-Id`, `X-User-Role`을 제거하고 검증된 토큰 값으로 다시 설정하는
+   것을 실제 요청과 로그로 증명합니다.
+2. Gateway 동작을 보장할 수 없다면 recommend-service도 JWT를 검증하고 토큰의 사용자 ID를
+   기준으로 처리합니다.
+
+특히 Compose가 recommend-service의 `8085` 포트를 호스트에 직접 공개하므로 Gateway를 우회해
+위조 헤더로 호출할 수 있는지 확인해야 합니다. 운영·공유 환경에서는 직접 포트 공개를 제거하거나
+방화벽·네트워크 정책으로 Gateway만 접근하도록 제한합니다. 이 검증 전에는 권한 처리를 완료로
+표현하지 않습니다.
+
+### 10.2 최우선: 개발 기본 비밀값의 운영 유입 차단
+
+현재 `local-internal-api-key`와 MariaDB의 `SqlDba-1`이 설정 및 Compose 기본값으로 남아 있습니다.
+로컬 교육 환경의 실행 편의를 위한 값이지만, 환경변수 누락 시 서비스가 알려진 동일 값으로
+실행되는 fail-open 설정입니다.
+
+- 운영·공유 프로필에서는 `INTERNAL_API_KEY`, DB 사용자와 비밀번호가 없으면 시작을 실패시킵니다.
+- 실제 값은 Git, Compose 파일, 로그가 아니라 Secret Manager 또는 배포 환경의 secret으로
+  주입합니다.
+- 하나의 내부 키를 여러 서비스가 공유하면 한 서비스 유출의 영향 범위가 전체로 넓어집니다.
+  MVP 이후에는 서비스별 자격 증명이나 OAuth Client Credentials와 scope로 전환합니다.
+- 내부 호출은 현재 평문 HTTP이므로 배포 환경에서는 네트워크 정책과 TLS 적용 여부를 함께
+  검토합니다.
+
+### 10.3 높음: Enrollment 장애의 fail-open 정책 재검토
+
+`EnrollmentServiceClient`는 timeout, `401`, `500`, 응답 파싱 오류를 구분하지 않고 빈
+`activeCourseIds`를 반환합니다. 추천 기능의 가용성은 유지되지만 내부 키 설정 오류나 서비스
+장애가 숨겨지고, 이미 수강한 강의가 다시 추천될 수 있습니다.
+
+- 인증 실패(`401`)와 계약·응답 오류는 설정 장애로 보고 실패를 노출하거나 `503`으로 변환합니다.
+- timeout·일시적 `5xx`에만 제한적으로 빈 이력 fallback을 허용할지 팀과 결정합니다.
+- fallback을 허용한다면 로그·메트릭에 원인과 횟수를 남기되 내부 키와 개인정보는 기록하지
+  않습니다.
+- 정상 빈 이력과 장애로 만든 빈 이력을 구분하는 테스트를 추가합니다.
+
+### 10.4 높음: 내부 서비스 장애 응답을 일관되게 변환
+
+user-service 장애는 라우터에서 `503`으로 변환하지만 course-service의
+`CourseServiceUnavailable`은 현재 명시적으로 처리하지 않아 `500`이 될 수 있습니다.
+Enrollment는 반대로 빈 값으로 계속 진행합니다. 동일한 내부 의존성 실패가 서로 다른 정책으로
+처리되므로, 예외 유형과 외부 응답을 `503 Service Unavailable` 기준으로 정리하고 로그에는
+상관관계 ID를 남기는 방안을 검토합니다.
+
+### 10.5 높음: LLM 비용·남용 제한
+
+요청 본문 길이와 출력 토큰에는 상한이 있지만 사용자별·회사별 요청 횟수 제한은 없습니다.
+인증된 사용자라도 반복 호출하면 비용과 지연을 유발할 수 있습니다.
+
+- Gateway 또는 recommend-service에 사용자·회사 기준 rate limit과 일일 사용량 제한을 둡니다.
+- 후보가 0개이면 OpenAI를 호출하지 않고 명확한 빈 결과 또는 도메인 오류를 반환합니다.
+- `MAX_CANDIDATES=20`, `MAX_RECOMMEND_COUNT=3`, timeout 값은 의미 있는 도메인 상수이지만
+  운영 조정이 필요하면 환경 설정으로 이동하고 허용 범위를 검증합니다.
+- OpenAI에 전달되는 `job`, `goal`은 외부 전송 데이터이므로 개인정보 입력 금지 안내와
+  최소 수집·보관 기준을 정합니다. 프롬프트 지시는 보안 경계로 보지 않고 현재처럼 구조화 출력과
+  후보 ID 재검증을 유지합니다.
+
+### 10.6 중간: 시작 실패와 상태 확인 정책
+
+현재 DB 테이블 준비, Eureka 등록, Kafka 시작 실패를 경고만 남기고 애플리케이션 시작을
+계속합니다. 로컬 개발에는 편리하지만 DB 저장이 필수인 추천 요청은 실행 후에야 실패할 수 있고
+단순 `/health`는 이를 구분하지 못합니다.
+
+- 필수 의존성(DB)은 운영 프로필에서 시작 실패로 처리합니다.
+- 선택 의존성(Eureka·Kafka)은 readiness와 liveness를 분리해 상태를 표시합니다.
+- health 응답에 비밀값이나 내부 오류 문자열을 노출하지 않고 의존성 준비 여부만 제공합니다.
+
+### 10.7 중간: 의존성 취약점과 재현 가능한 빌드
+
+최신 `dev` 병합 후 `npm ci`는 프론트엔드 의존성에서 moderate 1개와 high 5개를 보고했습니다.
+이는 취약 코드가 실제로 실행 가능하다는 결론은 아니므로 담당자와 함께 advisory, runtime 도달
+가능성, 수정 버전의 breaking change를 확인합니다. `npm audit fix --force`는 사용하지 않고
+lockfile을 유지한 상태에서 개별 업데이트와 프로덕션 빌드를 검증합니다. Python·Gradle 의존성도
+릴리스 전에 각 생태계의 보안 점검을 수행하고 결과와 보류 이유를 기록합니다.
+
+### 10.8 정리 대상: 사용되지 않는 JWT 보안 코드
+
+`recommend-service/app/config/security.py`의 JWT 검증 함수는 현재 추천 라우터에서 사용되지
+않습니다. Gateway 단독 검증을 최종 선택한다면 오해를 만드는 미사용 코드를 제거하고 계약을
+문서화합니다. 서비스에서도 JWT를 검증하기로 하면 라우터 의존성으로 실제 연결하고 issuer,
+JWKS timeout·캐시 갱신, 오류 메시지의 내부 정보 노출 여부를 테스트합니다. 존재만 하는 보안
+코드는 보호 기능으로 간주하지 않습니다.
