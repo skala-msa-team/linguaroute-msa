@@ -14,6 +14,8 @@
 
 이 문서의 URL은 기능 설계를 위한 초안입니다. 구현 후에는 Swagger UI에서 실제 Method, URL, Request 및 Response를 호출하여 최종 명세와 일치시켜야 합니다.
 
+제공 API Gateway 이미지의 고정 라우트는 아래 목표 URL을 모두 지원하지 않으므로, 개발 시 수정 가능한 `api-gateway` 소스 모듈로 교체하여 이 문서의 외부 경로를 라우팅합니다.
+
 ---
 
 ## 2. 공통 규칙
@@ -78,6 +80,8 @@
 
 인증 API는 Auth Server가 소유합니다. Auth Server는 로그인 ID, 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정과 Access Token 발급을 담당합니다. `user-service`는 비밀번호를 저장하지 않습니다.
 
+이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
+
 ### AUTH-01 로그인
 
 요청:
@@ -106,6 +110,29 @@ MVP에서는 Refresh Token을 발급하거나 저장하지 않습니다. Access 
 
 Auth Server는 로그인 성공 전에 `user-service`에서 사용자 상태·역할·기업 소속을 조회합니다. Access Token에는 최소 `userId`, `companyId`, `role` 클레임을 포함하며, 비활성 또는 탈퇴 사용자의 토큰은 발급하지 않습니다.
 
+### AUTH-03·04 비밀번호 재설정
+
+재설정 요청:
+
+```json
+{
+  "email": "admin@company.com"
+}
+```
+
+계정 존재 여부와 관계없이 `202 Accepted`와 공통 성공 형식을 반환합니다. 계정이 존재하면 등록된 이메일로 15분 동안 한 번만 사용할 수 있는 재설정 링크를 발송합니다.
+
+재설정 확인:
+
+```json
+{
+  "resetToken": "password-reset-token",
+  "newPassword": "NewPassword123!"
+}
+```
+
+토큰이 유효하면 비밀번호를 변경하고 `200 OK`를 반환합니다. 사용되었거나 만료된 토큰은 `422 Unprocessable Entity`로 처리합니다.
+
 ### AUTH-05 이메일 인증 요청
 
 ```json
@@ -125,6 +152,17 @@ Auth Server는 로그인 성공 전에 `user-service`에서 사용자 상태·�
 ```
 
 성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 만료시간을 적용하고 재사용을 금지합니다.
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "emailVerificationToken": "email-verification-token"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
 
 ### AUTH-07 아이디 찾기
 
@@ -150,7 +188,16 @@ Auth Server는 로그인 성공 전에 `user-service`에서 사용자 상태·�
 
 Auth Server는 `user-service`에서 이름과 기업 사업자번호가 일치하는 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다. 요청 횟수 제한을 적용합니다.
 
-비밀번호 재설정 링크는 이메일 인증이 완료된 계정의 이메일로 전달합니다. 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있으며, 요청은 이메일별 1분에 1회와 1시간에 5회로 제한합니다.
+### AUTH-08 로그인 사용자 비밀번호 변경
+
+```json
+{
+  "currentPassword": "Password123!",
+  "newPassword": "NewPassword123!"
+}
+```
+
+현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `401 INVALID_CREDENTIALS`로 처리합니다.
 
 ---
 
@@ -500,6 +547,8 @@ Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 }
 ```
 
+MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `paymentMethodToken` 값 `mock-success`는 성공, `mock-failure`는 실패 결과를 생성하며 그 외 값은 `400 Bad Request`로 처리합니다.
+
 성공 응답 `201 Created`:
 
 ```json
@@ -639,6 +688,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `EMAIL_NOT_VERIFIED` | `422` | 이메일 인증 미완료 |
 | `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치 |
 | `VERIFICATION_CODE_EXPIRED` | `422` | 이메일 인증 코드 만료 |
+| `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
+| `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
+| `INVALID_INTERNAL_API_KEY` | `403` | 서비스 간 내부 API 키 불일치 |
 | `COMPANY_NOT_FOUND` | `404` | 기업 없음 |
 | `INVITATION_NOT_FOUND` | `404` | 초대코드 없음 |
 | `INVITATION_ALREADY_USED` | `409` | 사용된 초대코드 |

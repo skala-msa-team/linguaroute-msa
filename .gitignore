@@ -37,4 +37,6 @@
 # Local archives and bundled infrastructure images
 *.tar
 *.tar.gz
+infra-images.tar.gz.part-*
+infra-images.tar.gz.sha256
 *.zip

@@ -22,9 +22,18 @@
 - 기능별 진행 상황: [`docs/mvp-checklist.md`](./docs/mvp-checklist.md)
 - API 설계: [`docs/api-spec.md`](./docs/api-spec.md)
 - 데이터 소유권 및 ERD: [`docs/erd.md`](./docs/erd.md)
-- 확정 구현 방침과 착수 확인: [`docs/open-decisions.md`](./docs/open-decisions.md)
 
 API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문서를 같은 작업 범위에서 함께 갱신합니다.
+
+문서별 책임은 다음과 같습니다.
+
+- `README.md`: 팀 협업과 로컬 실행 방법
+- `docs/product-spec.md`: 기능 범위, 사용자 흐름, 담당자와 확정 구현 방침
+- `docs/mvp-checklist.md`: 기획서의 기능 목록을 그대로 반영한 구현 진행 상태
+- `docs/api-spec.md`: 외부·내부 API, 인증, 요청·응답, 오류와 Gateway 경로
+- `docs/erd.md`: 테이블, 서비스별 데이터 소유권, 상태값과 Kafka 이벤트
+
+같은 세부 명세를 여러 문서에 복사하지 말고 소유 문서로 연결합니다. 단, 기획서의 MVP 기능과 체크리스트는 진행 확인을 위해 의도적으로 1:1로 유지합니다.
 
 ## 3. 프로젝트 구성
 
@@ -76,7 +85,6 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 - `선택 기능`: 필수 MVP 완료 후 사용자가 요청한 경우에만 구현합니다.
 - `제외 기능`: 현재 프로젝트에서 구현하지 않습니다.
 - `추후 확장 기능`: 현재 작업 범위에서 제외합니다.
-- `착수 확인`: 구현 방침은 확정되어 있으며, 제공 이미지·기존 코드의 지원 여부만 담당자가 확인합니다.
 
 MVP 기능을 구현했을 때는 [`docs/mvp-checklist.md`](./docs/mvp-checklist.md)를 같은 Pull Request에서 갱신합니다. 기존 코드에 비슷한 기능이 있다는 이유만으로 완료 처리하지 않으며, 요구사항 일치·테스트·실행 확인·관련 문서 갱신까지 끝난 항목만 `[x]`로 표시합니다.
 
@@ -86,17 +94,11 @@ MVP 기능을 구현했을 때는 [`docs/mvp-checklist.md`](./docs/mvp-checklist
 
 아이디 찾기는 이름과 기업 사업자번호를 조회 조건으로 사용하고, 등록된 로그인 이메일로만 안내 메일을 발송합니다. API 응답에는 이메일과 계정 존재 여부를 노출하지 않습니다.
 
-MVP는 모의 결제·기간 관리, SMTP 인증 이메일과 강의 추천만 구현합니다. 상세 구현 기준은 [`docs/open-decisions.md`](./docs/open-decisions.md)를 따릅니다.
+확정 범위와 기술 선택은 [`docs/product-spec.md`](./docs/product-spec.md)의 「확정 구현 방침」을 따릅니다. 통신 세부값은 API 명세, 데이터·이벤트 세부값은 ERD를 기준으로 구현하며 다른 문서에 별도 값을 만들지 않습니다.
 
 ### 3.4 팀 담당 영역
 
-| 담당자 | 담당 영역 | 담당 서비스 |
-| --- | --- | --- |
-| 임해안 | 기업·회원·직원·초대코드·좌석 | `user-service` |
-| 김주오 | 강의 CRUD·검색·필터·차시 | `course-service` |
-| 성가연 | 수강신청·진도율·완료 처리 | `enrollment-service` |
-| 박건우 | 요금제·구독·결제·이벤트·프론트엔드 | `payment-service`, Kafka, `vue-frontend` |
-| 김지민 | AI 추천·Gateway 연동·통합 테스트 | `recommend-service` |
+담당자와 서비스별 책임의 원본은 [`docs/product-spec.md`](./docs/product-spec.md#10-팀-담당-영역)에서 관리합니다.
 
 - 담당 서비스 밖의 API나 이벤트 계약을 변경하면 관련 담당자와 함께 확인합니다.
 - 여러 서비스에 걸친 작업은 소유 서비스별 변경을 분리하고 통합 검증 계획을 작성합니다.
