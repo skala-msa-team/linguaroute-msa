@@ -173,12 +173,32 @@ Compose를 실행해야 합니다. 키가 유출되면 즉시 폐기하고 새 �
 
 ---
 
-## 5. 우선순위 3: Course 내부 API 보안 계약 완료
+## 5. 우선순위 3: 신규 내부 API 공통 계약 반영
 
-course-service 담당자가 다음 계약을 구현했는지 확인합니다.
+팀 합의에 따라 신규 내부 API는 `/api/{service}/internal/**`가 아니라
+`/internal/{service}/**`로 분리합니다. 공통 규칙은 다른 담당자의 브랜치에서
+`AGENTS.md`와 `docs/api-spec.md`에 먼저 작성됐으므로, 해당 변경이 `dev`에 들어온 뒤
+문서와 실제 제공 서비스 코드를 함께 확인해야 합니다.
+
+recommend-service에 영향을 주는 경로 변경:
+
+| 대상 | 현재 호출 코드 | 목표 계약 |
+|---|---|---|
+| Course 추천 후보 | `/api/courses/internal/recommend` | `/internal/courses/recommend` |
+| Enrollment 이력 | `/api/enrollments/internal/history/{userId}` | `/internal/enrollments/history/{userId}` |
+
+두 호출 모두 다음 헤더를 전달해야 합니다.
 
 ```http
-GET /api/courses/internal/recommend?language=ENGLISH
+X-Internal-Api-Key: {internalApiKey}
+```
+
+### 5.1 Course 담당자 구현 확인
+
+목표 계약:
+
+```http
+GET /internal/courses/recommend?language=ENGLISH
 X-Internal-Api-Key: {internalApiKey}
 ```
 
@@ -192,7 +212,34 @@ X-Internal-Api-Key: {internalApiKey}
 - 각 항목에 `id`, `title`, `language`, `level`, `situation`, `status` 포함
 
 recommend-service는 이 API를 Gateway를 거치지 않고 course-service에 직접 호출합니다.
-course-service 변경이 `dev`에 들어오면 다음을 먼저 확인한 후 병합합니다.
+Course 담당자의 신규 경로와 키 검증이 준비되기 전에 소비자 URL만 먼저 변경하면 호출이
+실패하므로 제공자 변경이 `dev`에 들어온 시점에 함께 맞춥니다.
+
+### 5.2 Enrollment 이력 호출 정리
+
+`recommend-service/app/client/enrollment_client.py`에는 기존 Enrollment 내부 API 호출이
+남아 있습니다. 다음 순서로 처리합니다.
+
+1. 현재 추천 요청 흐름에서 이 클라이언트가 실제 사용되는지 확인합니다.
+2. 미수강 강의 제외에 필요하면 `/internal/enrollments/history/{userId}`로 변경합니다.
+3. `X-Internal-Api-Key` 헤더를 추가합니다.
+4. Enrollment 담당자의 신규 경로와 키 검증 테스트가 준비됐는지 확인합니다.
+5. 더 이상 사용하지 않는 코드라면 팀 합의 후 제거합니다.
+
+### 5.3 Payment 변경 영향
+
+구독·결제 담당자 기준으로 현재 payment-service에는 실행 중인 내부 API가 없습니다.
+기존 `/api/payments/internal/request`는 제거됐고 새 API는 `/api/plans`,
+`/api/subscriptions`, `/api/payments` 외부 보호 API를 사용합니다. 따라서 recommend-service의
+직접 수정 대상은 아닙니다.
+
+다만 enrollment-service에 기존 PaymentServiceClient 호출이 남아 있으므로 이 부분은
+Enrollment·구독 담당자가 별도로 정리합니다. 앞으로 payment-service에 내부 API가 필요하면
+`/internal/payments/**`와 `X-Internal-Api-Key` 계약을 적용합니다.
+
+### 5.4 최신 dev 반영 전 확인
+
+공통 문서와 제공 서비스 변경이 `dev`에 들어오면 다음을 먼저 확인한 후 병합합니다.
 
 ```powershell
 git fetch origin
@@ -204,6 +251,7 @@ git diff HEAD...origin/dev -- course-service recommend-service docker-compose.ym
 특히 다음 충돌을 확인합니다.
 
 - 추천 내부 API 경로 또는 query parameter 변경
+- Enrollment 이력 API의 유지·삭제 여부
 - `id`와 `courseId` 필드 변경
 - 응답 배열과 `data.content` 페이지 구조 혼용
 - Course enum 변경
@@ -222,8 +270,13 @@ POST /api/courses/recommendations
 /api/courses/internal/**
 /api/enrollments/internal/**
 /api/payments/internal/**
+/internal/**
 → 404 Not Found
 ```
+
+`/api/**/internal/**`는 기존 경로 마이그레이션 기간의 레거시 차단이고, `/internal/**`는
+신규 공통 계약의 외부 차단입니다. 신규 경로는 현재 공개 `/api/**` 라우트와 일치하지 않지만,
+향후 catch-all 또는 Discovery Locator가 추가돼도 노출되지 않도록 명시적으로 차단합니다.
 
 검증 시나리오:
 
@@ -236,6 +289,7 @@ POST /api/courses/recommendations
 | 외부 `/api/courses/internal/**` | `404 Not Found` |
 | 외부 `/api/enrollments/internal/**` | `404 Not Found` |
 | 외부 `/api/payments/internal/**` | `404 Not Found` |
+| 외부 `/internal/**` | `404 Not Found` |
 
 추가로 외부 클라이언트가 임의의 `X-User-Id`, `X-User-Role`을 보냈을 때 Gateway가 이를
 제거하고 검증된 토큰 값으로 덮어쓰는지 확인합니다. 이 동작이 확인되지 않으면 추천 API의
@@ -327,7 +381,8 @@ API 키, Access Token, Authorization 헤더, 전체 개인정보는 캡처 전�
 
 - 팀 프로젝트 키로 Luna 실제 호출 성공
 - 구조화 출력과 서버 재검증 성공
-- course-service 내부 키 검증 성공·실패 케이스 확인
+- `/internal/courses/recommend` 전환과 내부 키 검증 성공·실패 케이스 확인
+- Enrollment 이력 클라이언트의 사용 여부와 `/internal/enrollments/**` 전환 결정 완료
 - Gateway 외부 내부 경로 차단 확인
 - Gateway 인증 헤더 위조 방지 확인
 - 권한별 `200/401/403/422` 확인
