@@ -40,6 +40,10 @@ service:
   user-service:
     url: http://user-service
 
+app:
+  security:
+    internal-api-key: ${INTERNAL_API_KEY:local-internal-api-key}
+
 springdoc:
   api-docs:
     path: /api-docs

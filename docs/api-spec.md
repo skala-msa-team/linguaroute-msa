@@ -485,7 +485,34 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 }
 ```
 
+- `keyword`는 강의명 부분 검색입니다.
+- `language`, `situation`, `level`은 enum 값과 정확히 일치해야 합니다.
+- 직원용 목록과 상세 조회에는 `ACTIVE` 강의만 노출됩니다. 비활성 강의 상세 조회는 `422 COURSE_INACTIVE`를 반환합니다.
+
+### COURSE-02 강의 상세 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "id": 12,
+    "title": "해외 고객 미팅 영어",
+    "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+    "language": "ENGLISH",
+    "situation": "CUSTOMER_MEETING",
+    "level": "INTERMEDIATE",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-10T10:30:00",
+    "updatedAt": "2026-08-10T10:30:00"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
 ### ADMIN-COURSE-01 강의 등록
+
+API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. `course-service`는 내부 사용자 권한 조회 API로 활성 상태의 `PLATFORM_ADMIN`인지 다시 확인합니다.
 
 ```json
 {
@@ -496,6 +523,30 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
   "level": "INTERMEDIATE"
 }
 ```
+
+등록 성공 시 `201 Created`, 수정 및 상태 변경 성공 시 `200 OK`를 반환합니다.
+
+### ADMIN-COURSE-02 강의 수정
+
+```json
+{
+  "title": "해외 고객 미팅 영어 실전",
+  "description": "실전 중심으로 수정된 과정",
+  "language": "ENGLISH",
+  "situation": "CUSTOMER_MEETING",
+  "level": "ADVANCED"
+}
+```
+
+### ADMIN-COURSE-03 강의 활성·비활성
+
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+플랫폼 관리자 권한이 아니면 `403 PLATFORM_ADMIN_REQUIRED`, 사용자 권한 서비스에 연결할 수 없으면 `503 USER_AUTHORIZATION_UNAVAILABLE`를 반환합니다.
 
 ---
 

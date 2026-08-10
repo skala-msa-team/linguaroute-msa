@@ -2,10 +2,11 @@ package com.lecture.course.repository;
 
 import com.lecture.course.entity.Course;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 
-public interface CourseRepository extends JpaRepository<Course, Long> {
+public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecificationExecutor<Course> {
 
     // 언어별 강의 조회 (추천 서비스 사용)
     List<Course> findByLanguageAndStatus(Course.Language language, Course.Status status);
