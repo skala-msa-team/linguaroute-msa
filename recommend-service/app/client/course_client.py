@@ -23,7 +23,9 @@ class CourseServiceClient:
         self.base_url = base_url or settings.course_service_url
         self.internal_api_key = internal_api_key or settings.internal_api_key
 
-    async def get_candidates(self, language: str) -> list[CourseCandidate]:
+    async def get_candidates(
+        self, language: str, *, exclude_ids: list[int] | None = None
+    ) -> list[CourseCandidate]:
         # [설계 이유 - 추천 전용 내부 API 사용]
         # 문제: 초기 추천 코드는 문서에 적힌 공개 목록 API(`/api/courses`)가
         # language/status 필터를 지원한다고 가정했지만, dev의 실제 구현에는 해당
@@ -32,12 +34,15 @@ class CourseServiceClient:
         # 선택: course-service 담당자가 추천용으로 만든 내부 API만 호출한다.
         # 이유: 강의 조회와 ACTIVE 필터는 강의 데이터를 소유한 서비스가 수행하고,
         # recommend-service는 응답을 소비하는 역할에 집중해야 MSA 책임이 분리된다.
-        url = f"{self.base_url}/api/courses/internal/recommend"
+        url = f"{self.base_url}/internal/courses/recommend"
+        params: dict[str, str | list[int]] = {"language": language}
+        if exclude_ids:
+            params["excludeIds"] = exclude_ids
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 response = await client.get(
                     url,
-                    params={"language": language},
+                    params=params,
                     # [설계 이유 - 내부 네트워크도 신뢰 경계로 보지 않음]
                     # Gateway에서 외부 내부 경로를 차단해도 같은 네트워크의 다른
                     # 프로세스가 course-service를 직접 호출할 수 있다. 따라서 서비스

@@ -1,6 +1,7 @@
 import logging
 
 from app.client.course_client import CourseServiceClient, course_client
+from app.client.enrollment_client import EnrollmentServiceClient, enrollment_client
 from app.model.schemas import (
     CourseCandidate,
     CourseStatus,
@@ -27,17 +28,26 @@ class RecommendationService:
     def __init__(
         self,
         course_client: CourseServiceClient,
+        enrollment_client: EnrollmentServiceClient,
         provider: RecommendationProvider,
         repository: RecommendationRepository,
     ):
         self.course_client = course_client
+        self.enrollment_client = enrollment_client
         self.provider = provider
         self.repository = repository
 
     async def recommend(
         self, *, user_id: int, company_id: int, request: RecommendationRequest
     ) -> RecommendationData:
-        candidates = await self.course_client.get_candidates(request.language)
+        enrollment_history = await self.enrollment_client.get_enrollment_history(user_id)
+        # activeCourseIds라는 이름은 기존 소비자 호환을 위해 유지되지만 실제로는
+        # ENROLLED/LEARNING/COMPLETED 강의 전체다. 이미 접한 강의를 다시 추천하지 않도록
+        # course-service의 excludeIds 계약으로 경계에서 명시적으로 변환한다.
+        excluded_course_ids = enrollment_history.activeCourseIds
+        candidates = await self.course_client.get_candidates(
+            request.language, exclude_ids=excluded_course_ids
+        )
         # [방어적 재검증]
         # course-service가 ACTIVE와 언어 필터를 적용하지만, AI 추천 결과의 신뢰성과
         # 저장 데이터의 무결성은 recommend-service의 책임이기도 하다. 상대 서비스의
@@ -131,6 +141,7 @@ class RecommendationService:
 
 recommend_service = RecommendationService(
     course_client=course_client,
+    enrollment_client=enrollment_client,
     provider=build_recommendation_provider(),
     repository=SqlAlchemyRecommendationRepository(),
 )

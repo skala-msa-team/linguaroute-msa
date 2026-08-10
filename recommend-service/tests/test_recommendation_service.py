@@ -4,6 +4,7 @@ import pytest
 
 from app.model.schemas import (
     CourseCandidate,
+    EnrollmentHistoryResponse,
     RecommendationRequest,
     RecommendationSource,
 )
@@ -49,8 +50,12 @@ async def test_ai_result_keeps_only_active_matching_unique_courses(recommendatio
     ]
     repository = AsyncMock()
     repository.save.return_value = 3001
+    enrollment_client = AsyncMock()
+    enrollment_client.get_enrollment_history.return_value = EnrollmentHistoryResponse(
+        userId=7, activeCourseIds=[8, 9]
+    )
 
-    service = RecommendationService(course_client, provider, repository)
+    service = RecommendationService(course_client, enrollment_client, provider, repository)
     result = await service.recommend(
         user_id=7, company_id=10, request=recommendation_request
     )
@@ -58,6 +63,9 @@ async def test_ai_result_keeps_only_active_matching_unique_courses(recommendatio
     assert result.recommendationId == 3001
     assert result.source is RecommendationSource.AI
     assert [course.courseId for course in result.courses] == [1]
+    course_client.get_candidates.assert_awaited_once_with(
+        recommendation_request.language, exclude_ids=[8, 9]
+    )
     repository.save.assert_awaited_once()
 
 
@@ -69,8 +77,12 @@ async def test_provider_failure_returns_rule_based_fallback(recommendation_reque
     provider.recommend.side_effect = RuntimeError("AI provider unavailable")
     repository = AsyncMock()
     repository.save.return_value = 3002
+    enrollment_client = AsyncMock()
+    enrollment_client.get_enrollment_history.return_value = EnrollmentHistoryResponse(
+        userId=7, activeCourseIds=[]
+    )
 
-    service = RecommendationService(course_client, provider, repository)
+    service = RecommendationService(course_client, enrollment_client, provider, repository)
     result = await service.recommend(
         user_id=7, company_id=10, request=recommendation_request
     )

@@ -65,6 +65,11 @@ class CourseCandidate(BaseModel):
     status: CourseStatus
 
 
+class EnrollmentHistoryResponse(BaseModel):
+    userId: int
+    activeCourseIds: list[int]
+
+
 class ProviderRecommendation(BaseModel):
     courseId: int
     reason: str = Field(min_length=1, max_length=500)

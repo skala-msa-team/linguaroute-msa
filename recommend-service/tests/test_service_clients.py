@@ -3,6 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.client.course_client import CourseServiceClient
+from app.client.enrollment_client import EnrollmentServiceClient
 from app.client.user_client import UserServiceClient
 
 
@@ -55,12 +56,32 @@ async def test_course_client_uses_internal_recommendation_contract(monkeypatch):
 
     courses = await CourseServiceClient(
         "http://course-service:8082", internal_api_key="test-internal-key"
-    ).get_candidates("ENGLISH")
+    ).get_candidates("ENGLISH", exclude_ids=[3, 5])
 
     assert courses[0].courseId == 12
     request_spy.assert_called_once_with(
-        "http://course-service:8082/api/courses/internal/recommend",
-        params={"language": "ENGLISH"},
+        "http://course-service:8082/internal/courses/recommend",
+        params={"language": "ENGLISH", "excludeIds": [3, 5]},
+        headers={"X-Internal-Api-Key": "test-internal-key"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_enrollment_client_uses_secured_internal_history_contract(monkeypatch):
+    request_spy = Mock()
+    response = FakeResponse({"userId": 7, "activeCourseIds": [3, 5]})
+    monkeypatch.setattr(
+        "app.client.enrollment_client.httpx.AsyncClient",
+        lambda **kwargs: FakeAsyncClient(response, request_spy, **kwargs),
+    )
+
+    history = await EnrollmentServiceClient(
+        "http://enrollment-service:8083", internal_api_key="test-internal-key"
+    ).get_enrollment_history(7)
+
+    assert history.activeCourseIds == [3, 5]
+    request_spy.assert_called_once_with(
+        "http://enrollment-service:8083/internal/enrollments/history/7",
         headers={"X-Internal-Api-Key": "test-internal-key"},
     )
 
