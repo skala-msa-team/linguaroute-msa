@@ -90,12 +90,12 @@ public class CompanyService {
     }
 
     public CompanyDto.Response getMyCompany(Long userId) {
-        return CompanyDto.Response.from(findCompanyAdmin(userId).getCompany());
+        return CompanyDto.Response.from(requireCompanyAdmin(userId).getCompany());
     }
 
     @Transactional
     public CompanyDto.Response updateMyCompany(Long userId, CompanyDto.UpdateRequest request) {
-        Company company = findCompanyAdmin(userId).getCompany();
+        Company company = requireCompanyAdmin(userId).getCompany();
         company.updateName(request.getName().trim());
         return CompanyDto.Response.from(company);
     }
@@ -113,7 +113,7 @@ public class CompanyService {
         return businessNumber.replace("-", "");
     }
 
-    private User findCompanyAdmin(Long userId) {
+    public User requireCompanyAdmin(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         if (user.getStatus() != User.Status.ACTIVE) {

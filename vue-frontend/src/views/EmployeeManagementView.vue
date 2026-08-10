@@ -44,10 +44,10 @@
       <div class="invite-list">
         <article v-for="invite in invitationRows" :key="invite.code">
           <span class="invite-icon"><TicketCheck :size="19"/></span>
-          <span><strong>{{ invite.code }}</strong><small>{{ invite.created }} 생성 · {{ invite.expires }} 만료</small></span>
-          <span class="tag" :class="invite.status==='미사용'?'':invite.status==='사용됨'?'gray':'red'">{{ invite.status }}</span>
-          <button class="button small" :disabled="invite.status!=='미사용'" @click="copyCode(invite.code)"><Copy :size="14"/> {{ copied===invite.code?'복사됨':'복사' }}</button>
-          <button v-if="invite.status==='미사용'" class="icon-action danger" aria-label="초대코드 폐기" @click="discardInvitation(invite)"><Trash2 :size="15"/></button>
+          <span><strong>{{ invite.code || invite.codeMasked }}</strong><small>{{ invite.created }} 생성 · {{ invite.expires }} 만료</small></span>
+          <span class="tag" :class="isUnused(invite)?'':invite.status==='USED'?'gray':'red'">{{ invitationStatusLabel(invite.status) }}</span>
+          <button class="button small" :disabled="!invite.code || !isUnused(invite)" @click="copyCode(invite.code)"><Copy :size="14"/> {{ copied===invite.code?'복사됨':'복사' }}</button>
+          <button v-if="isUnused(invite)" class="icon-action danger" aria-label="초대코드 폐기" @click="discardInvitation(invite)"><Trash2 :size="15"/></button>
           <button v-else class="button small" @click="reissueInvitation(invite)"><RefreshCw :size="14"/> 재발급</button>
         </article>
       </div>
@@ -57,7 +57,7 @@
       <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="invite-title">
         <button class="modal-close" aria-label="닫기" @click="inviteModal=false"><X :size="18"/></button>
         <span class="modal-icon"><TicketPlus :size="23"/></span><h2 id="invite-title">초대코드 만들기</h2><p>한 명의 직원이 한 번만 사용할 수 있는 코드입니다.</p>
-        <div class="field"><label>유효 기간</label><select class="select"><option>7일</option><option>3일</option><option>14일</option></select></div>
+        <div class="field"><label>유효 기간</label><select v-model.number="expiresInDays" class="select"><option :value="7">7일</option><option :value="3">3일</option><option :value="14">14일</option></select></div>
         <div class="modal-note"><ShieldCheck :size="16"/> 활성 구독과 잔여 좌석이 확인되어야 가입할 수 있습니다.</div>
         <div v-if="generatedCode" class="generated-code"><small>새 초대코드</small><strong>{{ generatedCode }}</strong><button @click="copyCode(generatedCode)"><Copy :size="15"/> 복사</button></div>
         <div class="modal-actions"><button class="button" @click="inviteModal=false">닫기</button><button class="button accent" @click="generateInvitation">{{ generatedCode?'코드 하나 더 생성':'코드 생성' }}</button></div>
@@ -71,13 +71,15 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { UserPlus, Armchair, ArrowUpRight, Search, Download, Plus, TicketCheck, Copy, X, TicketPlus, ShieldCheck, CircleCheck, UserRoundMinus, SearchX, Trash2, RefreshCw } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { employees, invitations } from '@/data/mockData.js'
+import { companyApi } from '@/api/company.js'
 
-const tab=ref('employees'), inviteModal=ref(false), copied=ref(''), generatedCode=ref(''), toast=ref(''), keyword=ref(''), statusFilter=ref('전체 상태'), employeeDialog=ref(null)
+const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
+const tab=ref('employees'), inviteModal=ref(false), copied=ref(''), generatedCode=ref(''), toast=ref(''), keyword=ref(''), statusFilter=ref('전체 상태'), employeeDialog=ref(null), expiresInDays=ref(7)
 const employeeRows=ref(employees.map(item=>({...item})))
 const invitationRows=ref(invitations.map(item=>({...item})))
 const activeSeatCount=computed(()=>employeeRows.value.filter(item=>item.status==='활성').length+38)
@@ -88,9 +90,15 @@ function copyCode(code){copied.value=code;navigator.clipboard?.writeText(code);n
 function toggleEmployee(employee){employee.status=employee.status==='활성'?'비활성':'활성';notify(`${employee.name}님의 계정을 ${employee.status} 상태로 변경했습니다.`)}
 function openEmployeeDialog(employee){employeeDialog.value=employee}
 function releaseEmployee(){employeeDialog.value.status='소속 해제';notify(`${employeeDialog.value.name}님의 소속을 해제하고 좌석을 회수했습니다.`);employeeDialog.value=null}
-function discardInvitation(invite){invite.status='폐기';notify(`${invite.code} 초대코드를 폐기했습니다.`)}
-function reissueInvitation(invite){const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'});notify(`${invite.code} 대신 새 초대코드를 발급했습니다.`)}
-function generateInvitation(){const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;generatedCode.value=code;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}
+function isUnused(invite){return invite.status==='UNUSED'||invite.status==='미사용'}
+function invitationStatusLabel(status){return ({UNUSED:'미사용',USED:'사용됨',EXPIRED:'만료',REVOKED:'폐기'})[status]||status}
+function formatDate(value){return value?value.slice(0,10).replaceAll('-','.'):'-'}
+function toInvitationRow(invite){return {invitationId:invite.invitationId,code:invite.code,codeMasked:invite.codeMasked,status:invite.status,created:formatDate(invite.createdAt),expires:formatDate(invite.expiresAt)}}
+async function loadInvitations(){if(!useLiveApi)return;try{invitationRows.value=(await companyApi.getInvitations()).data.data.map(toInvitationRow)}catch(error){notify(error.response?.data?.message||'초대코드 목록을 불러오지 못했습니다.')}}
+async function discardInvitation(invite){try{if(useLiveApi){await companyApi.revokeInvitation(invite.invitationId);await loadInvitations()}else invite.status='폐기';notify('초대코드를 폐기했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 폐기하지 못했습니다.')}}
+async function reissueInvitation(invite){try{if(useLiveApi){const created=toInvitationRow((await companyApi.reissueInvitation(invite.invitationId)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}notify('새 초대코드를 발급했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 재발급하지 못했습니다.')}}
+async function generateInvitation(){try{if(useLiveApi){const created=toInvitationRow((await companyApi.createInvitation(expiresInDays.value)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;generatedCode.value=code;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}}catch(error){notify(error.response?.data?.message||'초대코드를 생성하지 못했습니다.')}}
+onMounted(loadInvitations)
 </script>
 
 <style scoped>

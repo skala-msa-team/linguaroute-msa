@@ -4,6 +4,7 @@ import com.lecture.user.entity.EmailVerification;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -99,6 +100,41 @@ public class AuthDto {
     public static class OAuthCodeExchangeRequest {
         @NotBlank(message = "Authorization Code는 필수입니다")
         private String code;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EmployeeSignupRequest {
+        @NotBlank(message = "초대코드는 필수입니다")
+        private String invitationCode;
+
+        @NotBlank(message = "이메일은 필수입니다")
+        @Email(message = "올바른 이메일 형식이 아닙니다")
+        private String email;
+
+        @NotBlank(message = "비밀번호는 필수입니다")
+        @Size(min = 8, max = 72, message = "비밀번호는 8자 이상 72자 이하여야 합니다")
+        private String password;
+
+        @NotBlank(message = "이름은 필수입니다")
+        @Size(max = 100, message = "이름은 100자 이하여야 합니다")
+        private String name;
+
+        @NotBlank(message = "이메일 인증 토큰은 필수입니다")
+        private String emailVerificationToken;
+
+        @NotEmpty(message = "약관 동의는 필수입니다")
+        private java.util.List<Long> agreementIds;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class EmployeeSignupResponse {
+        private Long userId;
+        private Long companyId;
+        private String businessRole;
+        private String status;
     }
 
     @Getter

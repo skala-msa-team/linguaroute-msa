@@ -391,9 +391,39 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
   "data": {
     "invitationId": 501,
     "code": "A7K9-P2QM",
+    "codeMasked": "****-****",
     "status": "UNUSED",
     "expiresAt": "2026-08-17T23:59:59+09:00"
   },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+초대코드 원문은 해시만 저장하므로 `POST` 생성·재발급 응답의 `code`에서만 한 번 제공됩니다. 기업 관리자는 이 응답을 복사해 전달해야 하며, 이후 목록 조회에서는 `code`가 `null`이고 `codeMasked`만 제공됩니다.
+
+### INVITE-02 목록 조회와 INVITE-03 폐기, INVITE-04 재발급
+
+```http
+GET /api/companies/me/invitations
+DELETE /api/companies/me/invitations/{invitationId}
+POST /api/companies/me/invitations/{invitationId}/reissue
+```
+
+목록은 `UNUSED`, `USED`, `EXPIRED`, `REVOKED` 상태와 생성·만료·사용 시각을 반환합니다. 만료 시각이 지난 `UNUSED` 초대코드는 조회 시 `EXPIRED`로 반영됩니다. 폐기는 `UNUSED` 초대코드만 `REVOKED`로 변경합니다. 재발급은 기존 `UNUSED` 초대코드를 먼저 폐기하고 새 일회용 코드를 `7`일 유효 기간으로 발급합니다.
+
+```json
+{
+  "data": [
+    {
+      "invitationId": 501,
+      "code": null,
+      "codeMasked": "****-****",
+      "status": "UNUSED",
+      "expiresAt": "2026-08-17T23:59:59+09:00",
+      "createdAt": "2026-08-10T10:30:00+09:00",
+      "usedAt": null
+    }
+  ],
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
@@ -431,10 +461,12 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
 
 | HTTP | 오류 코드 | 조건 |
 | --- | --- | --- |
+| `404` | `INVITATION_NOT_FOUND` | 존재하지 않는 초대코드 |
 | `409` | `INVITATION_ALREADY_USED` | 이미 사용한 코드 |
 | `409` | `SEAT_LIMIT_EXCEEDED` | 잔여 좌석 없음 |
 | `422` | `INVITATION_EXPIRED` | 코드 만료 |
 | `422` | `SUBSCRIPTION_INACTIVE` | 구독 비활성 |
+| `422` | `INVITATION_REVOKED` | 폐기된 초대코드 |
 
 ### SEAT-01 좌석 조회 응답
 

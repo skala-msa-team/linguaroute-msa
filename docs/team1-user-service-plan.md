@@ -176,19 +176,21 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 ### PR 2 — 초대코드·직원 가입
 
-- [ ] `Invitation` Entity와 해시 코드 생성
-- [ ] 생성·목록·폐기·재발급 API
-- [ ] 만료·일회성·동시 사용 방지
-- [ ] 이메일 인증·필수 약관을 포함한 직원 가입
-- [ ] Auth 호환 `STUDENT`, 비즈니스 역할 `EMPLOYEE` 저장
+- [x] `Invitation` Entity와 SHA-256 해시 코드 생성
+- [x] 생성·목록·폐기·재발급 API
+- [x] 만료·일회성·동시 사용 방지
+- [x] 이메일 인증·필수 약관을 포함한 직원 가입 API
+- [x] Auth 호환 `STUDENT`, 비즈니스 역할 `EMPLOYEE` 저장
+
+초대코드 원문은 생성·재발급 응답에서만 한 번 반환한다. 목록은 `code=null`, `codeMasked`와 상태·시각만 반환하며, 원문 해시는 `invitations.code_hash`에만 저장한다. 직원 가입 화면의 실 API 연결은 다음 직원 계정 작업에서 완료한다.
 
 ### PR 3 — 구독 권한·좌석
 
 - [x] `CompanyEntitlement` 테이블과 `/internal/companies/{companyId}/entitlement` 조회 API
 - [x] `ProcessedEvent`
 - [x] 결제·구독 Kafka 이벤트 멱등 소비와 `CompanyEntitlement` 자동 갱신
-- [ ] 활성 직원 기준 좌석 사용량 계산
-- [ ] 직원 가입 시 구독 활성·잔여 좌석 검사
+- [x] 활성 직원 기준 좌석 사용량 계산
+- [x] 직원 가입 시 구독 활성·잔여 좌석 검사
 - [x] 내부 구독 권한 조회 API
 
 ### PR 4 — 회원·운영 기능

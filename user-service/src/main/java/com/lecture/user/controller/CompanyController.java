@@ -2,7 +2,9 @@ package com.lecture.user.controller;
 
 import com.lecture.user.dto.ApiResponse;
 import com.lecture.user.dto.CompanyDto;
+import com.lecture.user.dto.InvitationDto;
 import com.lecture.user.service.CompanyService;
+import com.lecture.user.service.InvitationService;
 import com.lecture.user.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,6 +27,7 @@ import org.springframework.http.HttpStatus;
 public class CompanyController {
 
     private final CompanyService companyService;
+    private final InvitationService invitationService;
     private final AuthenticatedUser authenticatedUser;
 
     @PostMapping
@@ -47,5 +52,36 @@ public class CompanyController {
         return ResponseEntity.ok(ApiResponse.success(
                 companyService.updateMyCompany(authenticatedUser.userId(jwt), request)
         ));
+    }
+
+    @PostMapping("/me/invitations")
+    public ResponseEntity<ApiResponse<InvitationDto.Response>> createInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody InvitationDto.CreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                invitationService.create(authenticatedUser.userId(jwt), request)));
+    }
+
+    @GetMapping("/me/invitations")
+    public ResponseEntity<ApiResponse<java.util.List<InvitationDto.Response>>> getInvitations(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+                invitationService.getAll(authenticatedUser.userId(jwt))));
+    }
+
+    @DeleteMapping("/me/invitations/{invitationId}")
+    public ResponseEntity<Void> revokeInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long invitationId) {
+        invitationService.revoke(authenticatedUser.userId(jwt), invitationId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/invitations/{invitationId}/reissue")
+    public ResponseEntity<ApiResponse<InvitationDto.Response>> reissueInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long invitationId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                invitationService.reissue(authenticatedUser.userId(jwt), invitationId)));
     }
 }
