@@ -9,15 +9,27 @@ export const courseApi = {
     return api.get('/api/courses', { params })
   },
 
+  getByLanguage(language) {
+    return api.get(`/api/courses/language/${language}`)
+  },
+
   getById(id) {
     return api.get(`/api/courses/${id}`)
   },
 
   create(data) {
-    return api.post('/api/courses', data)
+    return api.post('/api/admin/courses', data)
   },
 
   update(id, data) {
-    return api.put(`/api/courses/${id}`, data)
+    return api.patch(`/api/admin/courses/${id}`, data)
+  },
+
+  updateStatus(id, status) {
+    return api.patch(`/api/admin/courses/${id}/status`, { status })
+  },
+
+  createLesson(courseId, data) {
+    return api.post(`/api/admin/courses/${courseId}/lessons`, data)
   }
 }

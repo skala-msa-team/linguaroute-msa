@@ -3,19 +3,19 @@
     <!-- 썸네일 -->
     <div class="card-thumb" :class="thumbBg">
       <img v-if="thumbSrc" :src="thumbSrc" :alt="course.title" class="thumb-img" />
-      <div v-else class="thumb-placeholder">{{ course.category?.charAt(0) }}</div>
+      <div v-else class="thumb-placeholder">{{ languageLabel(course.language)?.charAt(0) }}</div>
     </div>
 
     <!-- 내용 -->
     <div class="card-body">
-      <span class="badge" :class="badgeClass">{{ course.category }}</span>
+      <span class="badge" :class="badgeClass">{{ languageLabel(course.language) }}</span>
       <h3 class="card-title">{{ course.title }}</h3>
       <div class="card-meta">
-        <span class="instructor">{{ course.instructorName }}</span>
-        <span class="price">₩{{ Number(course.price).toLocaleString() }}</span>
+        <span class="instructor">{{ situationLabel(course.situation) }}</span>
+        <span class="price">{{ levelLabel(course.level) }}</span>
       </div>
       <div class="card-footer">
-        <span class="enrolled">수강생 {{ course.enrollmentCount?.toLocaleString() }}명</span>
+        <span class="enrolled">상태 {{ course.status }}</span>
       </div>
     </div>
   </router-link>
@@ -23,20 +23,19 @@
 
 <script setup>
 import { computed } from 'vue'
+import { languageLabel, levelLabel, situationLabel } from '@/constants/domain.js'
 
 const props = defineProps({
   course: { type: Object, required: true }
 })
 
-const categoryConfig = {
-  '백엔드':    { bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'spring_boot' },
-  '프론트엔드':{ bg: 'thumb-teal',   badge: 'badge-teal',   thumb: 'vue_js' },
-  'DevOps':   { bg: 'thumb-blue',   badge: 'badge-blue',   thumb: 'docker' },
-  '데이터':   { bg: 'thumb-purple', badge: 'badge-purple', thumb: 'python' },
-  'AI':       { bg: 'thumb-pink',   badge: 'badge-pink',   thumb: 'generative_ai' },
+const languageConfig = {
+  ENGLISH: { bg: 'thumb-teal', badge: 'badge-teal', thumb: 'spring_boot' },
+  JAPANESE: { bg: 'thumb-amber', badge: 'badge-amber', thumb: 'vue_js' },
+  CHINESE: { bg: 'thumb-purple', badge: 'badge-purple', thumb: 'python' },
 }
 
-const config = computed(() => categoryConfig[props.course.category] || { bg: 'thumb-gray', badge: 'badge-gray' })
+const config = computed(() => languageConfig[props.course.language] || { bg: 'thumb-gray', badge: 'badge-gray' })
 const thumbBg = computed(() => config.value.bg)
 const badgeClass = computed(() => config.value.badge)
 

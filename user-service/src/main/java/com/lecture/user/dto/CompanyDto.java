@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class CompanyDto {
@@ -103,5 +104,16 @@ public class CompanyDto {
                     company.getStatus()
             );
         }
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class EntitlementResponse {
+        private Long companyId;
+        private Long subscriptionId;
+        private String subscriptionStatus;
+        private Integer seatLimit;
+        private LocalDateTime currentPeriodEnd;
+        private Boolean autoRenew;
     }
 }

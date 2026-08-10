@@ -16,7 +16,7 @@
 
 기존 API Gateway 서버는 유지합니다. 다만 현재 이미지의 라우트와 공개 경로가 JAR에 고정되어 있으므로 동일한 Gateway 한 대의 라우팅·보안 설정을 수정하여 아래 외부 경로를 연결합니다. Gateway 서버를 추가하지 않습니다.
 
-OAuth2 표준 경로인 `/oauth2/**`와 `/logout`은 기본 경로 `/api`의 예외입니다.
+로그인을 포함한 모든 외부 API는 기본 경로 `/api`를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 구현하지 않습니다.
 
 ---
 
@@ -65,46 +65,64 @@ OAuth2 표준 경로인 `/oauth2/**`와 `/logout`은 기본 경로 `/api`의 예
 | `422 Unprocessable Entity` | 상태상 처리할 수 없는 요청 |
 | `503 Service Unavailable` | 외부 AI 또는 결제 시스템 장애 |
 
+### 2.5 내부 API 보안
+
+외부 클라이언트가 호출하는 API는 API Gateway의 `/api/**` 경로만 사용합니다. 서비스 간 내부 API는 Gateway에 노출하지 않고 대상 서비스를 직접 호출하는 `/internal/**` 경로로 분리합니다.
+
+- Gateway는 외부 요청의 `/api/**/internal/**` 접근을 차단합니다.
+- 내부 API 제공 서비스는 `X-Internal-Api-Key` 값을 실행 환경의 `INTERNAL_API_KEY`와 비교하여 검증합니다.
+- 내부 API 호출 서비스는 동일한 `INTERNAL_API_KEY` 값을 `X-Internal-Api-Key` 헤더로 전달합니다.
+- 각 실행 환경에는 동일한 `INTERNAL_API_KEY`를 주입합니다. 로컬 개발 기본값을 쓰더라도 운영·공유 환경의 실제 키는 문서나 저장소에 기록하지 않습니다.
+- 신규 내부 API는 `/api/{service}/internal/**` 형태로 만들지 않습니다. 기존 코드에 남아 있는 `/api/**/internal/**` 경로는 담당 범위에서 `/internal/**`로 이전하고 호출 코드를 함께 수정합니다.
+
 ---
 
 ## 3. 인증 API
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | `GET` | `/oauth2/authorize` | 공개 | OAuth2 로그인 시작 | 필수 |
-| AUTH-02 | `POST` | `/logout` | 로그인 | OAuth2 세션 로그아웃 | 필수 |
+| AUTH-01 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
 | AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
 | AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
 | AUTH-05 | `POST` | `/api/auth/email-verifications` | 공개 | 이메일 인증 요청 | 필수 |
 | AUTH-06 | `POST` | `/api/auth/email-verifications/confirm` | 공개 | 이메일 인증 확인 | 필수 |
 | AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
 | AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
-| AUTH-09 | `POST` | `/oauth2/token` | OAuth2 클라이언트 | 인증 코드로 Access Token 발급 | 필수 |
 
-기존 Auth Server는 `AUTH-01`, `AUTH-02`, `AUTH-09`와 Access Token 발급만 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 `/api/auth/**` 요청을 `user-service`로 전달합니다. 서버를 새로 추가하지 않습니다.
+Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 각 `/api/auth/**` 요청을 소유 서비스로 전달합니다. 서버를 새로 추가하지 않습니다.
 
 이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
 
 ### AUTH-01 로그인
 
-현재 프론트엔드의 OAuth2 Authorization Code 흐름을 유지합니다.
+프론트엔드는 이메일과 비밀번호를 API Gateway의 로그인 API로 전송합니다.
 
 ```http
-GET /oauth2/authorize?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=openid%20profile%20read%20write
+POST /api/auth/login
+Content-Type: application/json
 ```
-
-로그인 완료 후 전달받은 인증 코드는 기존 `/oauth2/token`에서 Access Token으로 교환합니다. 토큰 응답은 기존 Auth Server의 OAuth2 형식을 유지합니다.
 
 ```json
 {
-  "access_token": "access-token",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "scope": "openid profile read write"
+  "email": "employee@company.com",
+  "password": "Password123!"
 }
 ```
 
-MVP에서는 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃 시에는 클라이언트가 저장한 Access Token을 삭제합니다.
+인증 서버가 이메일과 BCrypt 비밀번호 해시를 검증하고 JWT Access Token을 직접 반환합니다.
+
+```json
+{
+  "data": {
+    "accessToken": "jwt-access-token",
+    "tokenType": "Bearer",
+    "expiresIn": 3600
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+MVP에서는 OAuth2 Authorization Code와 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 별도 서버 세션 없이 클라이언트가 저장한 Access Token을 삭제합니다.
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
 
@@ -403,14 +421,16 @@ X-Internal-Api-Key: {internalApiKey}
 
 ```json
 {
-  "data": {
-    "companyId": 10,
-    "subscriptionStatus": "ACTIVE",
-    "seatLimit": 50,
-    "currentPeriodEnd": "2026-09-10T10:30:00+09:00"
-  },
-  "timestamp": "2026-08-10T10:30:00+09:00"
-}
+    "data": {
+      "companyId": 10,
+      "subscriptionId": 7001,
+      "subscriptionStatus": "ACTIVE",
+      "seatLimit": 50,
+      "currentPeriodEnd": "2026-09-10T10:30:00+09:00",
+      "autoRenew": true
+    },
+    "timestamp": "2026-08-10T10:30:00+09:00"
+  }
 ```
 
 내부 API 키가 잘못되면 `403 Forbidden`, 기업 또는 권한 정보가 없으면 `404 Not Found`를 반환합니다. `enrollment-service`는 호출 실패나 `ACTIVE`가 아닌 상태에서 수강신청을 허용하지 않고 `503 Service Unavailable` 또는 `422 SUBSCRIPTION_INACTIVE`를 반환합니다.
@@ -500,7 +520,34 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 }
 ```
 
+- `keyword`는 강의명 부분 검색입니다.
+- `language`, `situation`, `level`은 enum 값과 정확히 일치해야 합니다.
+- 직원용 목록과 상세 조회에는 `ACTIVE` 강의만 노출됩니다. 비활성 강의 상세 조회는 `422 COURSE_INACTIVE`를 반환합니다.
+
+### COURSE-02 강의 상세 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "id": 12,
+    "title": "해외 고객 미팅 영어",
+    "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+    "language": "ENGLISH",
+    "situation": "CUSTOMER_MEETING",
+    "level": "INTERMEDIATE",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-10T10:30:00",
+    "updatedAt": "2026-08-10T10:30:00"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
 ### ADMIN-COURSE-01 강의 등록
+
+API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. `course-service`는 내부 사용자 권한 조회 API로 활성 상태의 `PLATFORM_ADMIN`인지 다시 확인합니다.
 
 ```json
 {
@@ -511,6 +558,78 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
   "level": "INTERMEDIATE"
 }
 ```
+
+등록 성공 시 `201 Created`, 수정 및 상태 변경 성공 시 `200 OK`를 반환합니다.
+
+### ADMIN-COURSE-02 강의 수정
+
+```json
+{
+  "title": "해외 고객 미팅 영어 실전",
+  "description": "실전 중심으로 수정된 과정",
+  "language": "ENGLISH",
+  "situation": "CUSTOMER_MEETING",
+  "level": "ADVANCED"
+}
+```
+
+### ADMIN-COURSE-03 강의 활성·비활성
+
+```json
+{
+  "status": "INACTIVE"
+}
+```
+
+플랫폼 관리자 권한이 아니면 `403 PLATFORM_ADMIN_REQUIRED`, 사용자 권한 서비스에 연결할 수 없으면 `503 USER_AUTHORIZATION_UNAVAILABLE`를 반환합니다.
+
+### course-service 내부 API
+
+`course-service`의 내부 API는 Gateway에 노출하지 않고 서비스 간 직접 호출에만 사용합니다. 모든 요청은 `X-Internal-Api-Key`를 포함해야 합니다.
+
+#### 추천 후보 조회
+
+```http
+GET /internal/courses/recommend?language=ENGLISH&excludeIds=1,2
+X-Internal-Api-Key: {internalApiKey}
+```
+
+응답 `200 OK`:
+
+```json
+[
+  {
+    "id": 12,
+    "title": "해외 고객 미팅 영어",
+    "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+    "language": "ENGLISH",
+    "situation": "CUSTOMER_MEETING",
+    "level": "INTERMEDIATE",
+    "status": "ACTIVE",
+    "createdAt": "2026-08-10T10:30:00",
+    "updatedAt": "2026-08-10T10:30:00"
+  }
+]
+```
+
+#### 수강 가능 여부 확인
+
+```http
+GET /internal/courses/{courseId}/enrollment-validation
+X-Internal-Api-Key: {internalApiKey}
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "courseId": 12,
+  "status": "ACTIVE",
+  "enrollable": true
+}
+```
+
+`enrollable=false`이면 `enrollment-service`는 수강신청을 생성하지 않습니다. 강의가 없으면 `404 COURSE_NOT_FOUND`, 내부 API 키가 없거나 다르면 `401 INVALID_INTERNAL_API_KEY`를 반환합니다.
 
 ---
 
@@ -562,6 +681,28 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 
 중복 신청은 `409 DUPLICATE_ENROLLMENT`를 반환합니다.
 
+현재 구현은 개별 강의 결제를 요청하지 않습니다. `payment-service`의 구독 결제 결과가 `user-service`의 기업 구독 권한에 반영되어 있고, 해당 권한이 `ACTIVE`인 경우에만 수강신청을 허용합니다.
+
+### enrollment-service 내부 API
+
+추천 서비스는 이미 신청한 강의를 제외하기 위해 수강 이력을 내부 API로 조회합니다. 이 경로는 Gateway에 노출하지 않고 `X-Internal-Api-Key`를 검증합니다.
+
+```http
+GET /internal/enrollments/history/{userId}
+X-Internal-Api-Key: {internalApiKey}
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "userId": 101,
+  "activeCourseIds": [12, 15]
+}
+```
+
+`activeCourseIds` 필드명은 추천 서비스 호환을 위해 유지하지만, 실제 의미는 `ENROLLED`, `LEARNING`, `COMPLETED` 상태의 수강 강의 ID 전체입니다. 내부 API 키가 없거나 다르면 `401 INVALID_INTERNAL_API_KEY`를 반환합니다.
+
 ### LEARNING-02 차시 완료 응답
 
 ```json
@@ -591,6 +732,8 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 | SUB-02 | `GET` | `/api/subscriptions/me` | 기업 관리자 | 구독 상태·만료일·갱신일 조회 | 필수 |
 | SUB-03 | `POST` | `/api/subscriptions/me/cancel` | 기업 관리자 | 구독 해지 | 필수 |
 | PAY-01 | `GET` | `/api/payments` | 기업 관리자 | 결제 내역 조회 | 필수 |
+
+현재 `payment-service` 구현은 Gateway가 인증 사용자와 기업 소속을 검증한 뒤 `X-Company-Id`를 전달한다는 전제로 동작합니다. Gateway의 JWT claim 전달 방식이 확정되면 이 헤더 전제는 Gateway 계약에 맞춰 다시 정리합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
 
 ### PLAN-01 요금제 조회 응답
 
@@ -623,6 +766,7 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 헤더:
 
 ```http
+X-Company-Id: 10
 Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 ```
 
@@ -653,7 +797,19 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 }
 ```
 
-동일한 멱등성 키로 다시 요청하면 새 결제를 생성하지 않고 기존 결과를 반환합니다.
+같은 기업에서 동일한 멱등성 키로 다시 요청하면 새 결제를 생성하지 않고 기존 결과를 반환합니다.
+
+실패 응답 `422 Unprocessable Entity`:
+
+```json
+{
+  "code": "PAYMENT_FAILED",
+  "message": "결제가 승인되지 않았습니다.",
+  "timestamp": "2026-08-10T10:31:00+09:00"
+}
+```
+
+`mock-failure`도 결제 실패 이력과 `PaymentFailed` Outbox 이벤트를 저장합니다. 같은 `Idempotency-Key`로 실패 요청을 반복하면 새 결제 이력을 만들지 않고 기존 실패 결과를 기준으로 응답합니다.
 
 ### SUB-03 구독 해지
 
@@ -665,7 +821,44 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 
 해지는 즉시 이용 권한을 제거하지 않고 현재 이용 기간 종료 후 `EXPIRED`가 되도록 설계합니다.
 
+현재 구현은 해지 요청 시 구독 `status=ACTIVE`를 유지하고 `autoRenew=false`, `canceledAt`을 저장합니다. 따라서 현재 이용 기간 종료 전까지 직원 권한을 유지할 수 있고, 만료 처리 시점에 `SubscriptionExpired` 이벤트를 발행합니다.
+
+### PAY-01 결제 내역
+
+Gateway가 전달한 `X-Company-Id` 기준으로 해당 기업의 결제 이력을 최신 요청순으로 반환합니다.
+
+```http
+GET /api/payments
+Authorization: Bearer {accessToken}
+X-Company-Id: 10
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "paymentId": 8001,
+      "subscriptionId": 7001,
+      "companyId": 10,
+      "amount": 299000,
+      "currency": "KRW",
+      "status": "SUCCESS",
+      "providerPaymentId": "mock-0c7f...",
+      "failureReason": null,
+      "requestedAt": "2026-08-10T10:30:00+09:00",
+      "paidAt": "2026-08-10T10:30:00+09:00",
+      "failedAt": null
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
 ### 구독 상태 Kafka 이벤트
+
+`payment-service`는 결제·구독 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 스케줄러가 단일 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다. `user-service`는 같은 토픽을 소비해 `company_entitlements`를 갱신하고 `processed_events.event_id`로 중복 이벤트를 무시합니다.
 
 | 이벤트 | 발행 조건 | `user-service` 처리 | MVP |
 | --- | --- | --- | --- |
@@ -741,6 +934,17 @@ AI 장애 시 대체 응답:
 
 AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언어와 다시 대조합니다.
 
+### recommend-service 내부 의존 API
+
+`recommend-service`는 추천 후보와 기존 수강 이력을 조회할 때 Gateway를 거치지 않고 대상 서비스를 직접 호출합니다. 모든 내부 호출에는 `X-Internal-Api-Key`가 필요합니다.
+
+| 대상 서비스 | 이전 경로 | 현재 경로 | 비고 |
+| --- | --- | --- | --- |
+| `course-service` | `/api/courses/internal/recommend` | `/internal/courses/recommend` | `language`, `excludeIds` 파라미터 사용 |
+| `enrollment-service` | `/api/enrollments/internal/history/{userId}` | `/internal/enrollments/history/{userId}` | 응답 필드명 `activeCourseIds` 유지 |
+
+`course-service` 추천 후보 응답은 `id`, `title`, `description`, `language`, `situation`, `level`, `status`, `createdAt`, `updatedAt` 구조입니다. 추천 서비스가 과거 강의 도메인의 `category`, `price`, `instructorId`, `enrollmentCount` 필드를 전제로 파싱한다면 새 강의 도메인 구조에 맞춰 조정해야 합니다.
+
 ---
 
 ## 10. 약관 API
@@ -810,7 +1014,7 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `VERIFICATION_CODE_EXPIRED` | `422` | 이메일 인증 코드 만료 |
 | `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
 | `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
-| `INVALID_INTERNAL_API_KEY` | `403` | 서비스 간 내부 API 키 불일치 |
+| `INVALID_INTERNAL_API_KEY` | `401` 또는 `403` | 서비스 간 내부 API 키 누락·불일치. 신규 내부 API는 `401`을 우선 사용하며, 기존 user-service 내부 API는 현재 구현상 `403`을 반환 |
 | `INVALID_EMAIL_VERIFICATION` | `422` | 이메일 인증 토큰이 유효하지 않거나 이미 사용됨 |
 | `USER_INACTIVE` | `403` | 비활성 또는 탈퇴 사용자의 보호 API 요청 |
 | `DUPLICATE_BUSINESS_NUMBER` | `409` | 이미 등록된 사업자번호 |

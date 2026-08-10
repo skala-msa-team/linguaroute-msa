@@ -173,12 +173,15 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       mariadb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
       auth-server:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - lecture-net
@@ -199,6 +202,7 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
       mariadb:
         condition: service_healthy
@@ -227,6 +231,8 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       # recommend-service와 동일한 값을 주입해야 내부 수강 이력 요청을 검증할 수 있다.
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SERVICE_COURSE_SERVICE_URL=http://course-service:8082
+      - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
       mariadb:
         condition: service_healthy

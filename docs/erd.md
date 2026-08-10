@@ -18,7 +18,7 @@
 
 ```mermaid
 flowchart LR
-    AUTH_SERVER["Auth Server<br/>OAuth2/JWT"] -. "users 로그인 필드 읽기" .-> USER
+    AUTH_SERVER["Auth Server<br/>Email Login/JWT"] -. "users 로그인 필드 읽기" .-> USER
     COMPANY["Company<br/>user-service"] --> USER["User<br/>user-service"]
     COMPANY --> INVITATION["Invitation<br/>user-service"]
     COMPANY -. "논리 참조" .-> SUBSCRIPTION["Subscription<br/>payment-service"]
@@ -39,7 +39,7 @@ flowchart LR
 
 ## 3. 기존 Auth Server 호환
 
-Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 OAuth2 로그인과 Access Token 발급을 수행합니다. Refresh Token은 추가하지 않습니다.
+Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 이메일·비밀번호 로그인과 JWT Access Token 발급을 수행합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 사용하지 않습니다.
 
 제공 JAR의 역할 enum이 `STUDENT`, `INSTRUCTOR`로 고정되어 있으므로 `users.role`은 로그인 호환 필드로 유지합니다. `EMPLOYEE`는 `STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `INSTRUCTOR`로 매핑합니다. LinguaRoute의 실제 권한은 `users.business_role`에 저장하고 각 보호 API가 `user-service`의 사용자 상태·기업 소속과 함께 확인합니다.
 
@@ -99,6 +99,7 @@ erDiagram
         int seat_limit
         boolean auto_renew
         datetime current_period_end
+        datetime created_at
         datetime updated_at
     }
 
@@ -154,20 +155,22 @@ erDiagram
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `company` | `business_number` 유일 |
+| `companies` | `business_number` 유일 |
 | `users` | `email` 유일, `password`에는 BCrypt 해시만 저장 |
 | `users.role` | 기존 Auth Server 호환용 `STUDENT`, `INSTRUCTOR`만 저장 |
 | `users.business_role` | 실제 권한 `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` 저장 |
 | `users.company_id` | `PLATFORM_ADMIN`은 `NULL`, 기업 관리자와 직원은 필수 |
-| `invitation` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
-| `invitation` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
-| `company_entitlement` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
-| `processed_event` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
-| `user_agreement` | `(user_id, term_id)` 유일 |
-| `email_verification` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
-| `password_reset_token` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `invitations` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
+| `invitations` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
+| `company_entitlements` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
+| `processed_events` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
+| `user_agreements` | `(user_id, term_id)` 유일 |
+| `email_verifications` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `password_reset_tokens` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
 
-`user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 Kafka 이벤트로 받은 최신 이용 권한을 `company_entitlement`에 저장하여 직원 가입 시 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
+`user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 최신 이용 권한을 `company_entitlements`에 저장하여 직원 가입과 수강신청 권한 조회에 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
+
+현재 구현은 `company_entitlements` 테이블, `/internal/companies/{companyId}/entitlement` 조회 API, `subscription.events` Kafka 소비와 `processed_events` 기반 중복 처리를 포함합니다.
 
 ---
 
@@ -308,14 +311,16 @@ erDiagram
 
 ## 8. payment-service ERD
 
+`payment-service`의 실제 물리 테이블명은 JPA 구현 기준으로 복수형을 사용합니다. 논리 엔티티는 `Plan`, `PlanPrice`, `Subscription`, `Payment`, `OutboxEvent`입니다.
+
 ```mermaid
 erDiagram
-    PLAN ||--|{ PLAN_PRICE : priced_as
-    PLAN_PRICE ||--o{ SUBSCRIPTION : selected_by
-    SUBSCRIPTION ||--o{ PAYMENT : paid_by
-    SUBSCRIPTION ||--o{ OUTBOX_EVENT : emits
+    PLANS ||--|{ PLAN_PRICES : priced_as
+    PLAN_PRICES ||--o{ SUBSCRIPTIONS : selected_by
+    SUBSCRIPTIONS ||--o{ PAYMENTS : paid_by
+    SUBSCRIPTIONS ||--o{ OUTBOX_EVENTS : emits
 
-    PLAN {
+    PLANS {
         bigint id PK
         varchar name
         varchar description
@@ -323,7 +328,7 @@ erDiagram
         datetime created_at
     }
 
-    PLAN_PRICE {
+    PLAN_PRICES {
         bigint id PK
         bigint plan_id FK
         varchar billing_cycle
@@ -334,11 +339,12 @@ erDiagram
         datetime created_at
     }
 
-    SUBSCRIPTION {
+    SUBSCRIPTIONS {
         bigint id PK
         bigint company_id
         bigint plan_price_id FK
         varchar status
+        boolean auto_renew
         datetime current_period_start
         datetime current_period_end
         datetime next_billing_at
@@ -347,11 +353,11 @@ erDiagram
         datetime updated_at
     }
 
-    PAYMENT {
+    PAYMENTS {
         bigint id PK
         bigint subscription_id FK
         bigint company_id
-        varchar idempotency_key UK
+        varchar idempotency_key
         bigint amount
         varchar currency
         varchar status
@@ -362,7 +368,7 @@ erDiagram
         datetime failed_at
     }
 
-    OUTBOX_EVENT {
+    OUTBOX_EVENTS {
         bigint id PK
         varchar event_id UK
         varchar aggregate_type
@@ -380,13 +386,14 @@ erDiagram
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `plan_price` | `(plan_id, billing_cycle)` 유일 |
-| `subscription` | 기업별 활성 구독은 최대 1개 |
-| `payment` | `idempotency_key` 유일로 중복 결제 방지 |
-| `payment` | 금액은 요청값이 아니라 `plan_price`에서 서버가 결정 |
-| `outbox_event` | 결제·구독 상태 변경과 같은 트랜잭션으로 저장하고 `event_id` 유일 처리 |
+| `plan_prices` | `(plan_id, billing_cycle)` 유일 |
+| `subscriptions` | 기업별 활성 구독은 최대 1개 |
+| `subscriptions.auto_renew` | 해지 시 `false`로 변경하고 현재 이용 기간까지 `ACTIVE` 유지 |
+| `payments` | `(company_id, idempotency_key)` 유일로 기업별 중복 결제 방지 |
+| `payments` | 금액은 요청값이 아니라 `plan_prices.price`에서 서버가 결정 |
+| `outbox_events` | 결제·구독 상태 변경과 같은 트랜잭션으로 저장하고 `event_id` 유일 처리 |
 
-`subscription.company_id`와 `payment.company_id`는 `user-service`에 대한 논리 참조입니다.
+`subscriptions.company_id`와 `payments.company_id`는 `user-service`에 대한 논리 참조입니다. `payment-service`는 Gateway가 전달한 `companyId`를 저장하며 `user-service` 소유 테이블을 직접 조회하지 않습니다.
 
 ---
 
@@ -443,7 +450,7 @@ erDiagram
 
 ## 11. Kafka 이벤트
 
-이벤트 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다.
+이벤트 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다. `payment-service`는 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 단일 Kafka 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다.
 
 ### 11.1 PaymentCompleted
 

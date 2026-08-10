@@ -2,8 +2,13 @@ package com.lecture.course.service;
 
 import com.lecture.course.dto.CourseDto;
 import com.lecture.course.entity.Course;
+import com.lecture.course.exception.CourseErrorCode;
+import com.lecture.course.exception.CourseException;
 import com.lecture.course.repository.CourseRepository;
+import com.lecture.course.repository.CourseSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,42 @@ public class CourseService {
      */
     public CourseDto.CourseResponse getCourse(Long id) {
         Course course = findCourseById(id);
+        if (course.getStatus() != Course.Status.ACTIVE) {
+            throw new CourseException(CourseErrorCode.COURSE_INACTIVE);
+        }
+        return CourseDto.CourseResponse.from(course);
+    }
+
+    public CourseDto.CoursePageResponse searchCourses(
+            String keyword,
+            Course.Language language,
+            Course.Situation situation,
+            Course.Level level,
+            Pageable pageable) {
+        Page<CourseDto.CourseSummaryResponse> result = courseRepository
+                .findAll(CourseSpecification.catalogSearch(keyword, language, situation, level), pageable)
+                .map(CourseDto.CourseSummaryResponse::from);
+
+        return CourseDto.CoursePageResponse.builder()
+                .content(result.getContent())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .build();
+    }
+
+    @Transactional
+    public CourseDto.CourseResponse updateCourse(Long id, CourseDto.UpdateRequest request) {
+        Course course = findCourseById(id);
+        course.update(request.getTitle(), request.getDescription(), request.getLanguage(),
+                request.getSituation(), request.getLevel());
+        return CourseDto.CourseResponse.from(course);
+    }
+
+    @Transactional
+    public CourseDto.CourseResponse changeCourseStatus(Long id, CourseDto.StatusRequest request) {
+        Course course = findCourseById(id);
+        course.changeStatus(request.getStatus());
         return CourseDto.CourseResponse.from(course);
     }
 
@@ -59,11 +100,18 @@ public class CourseService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 강의 존재 여부 확인 (Enrollment Service → Course Service REST 호출용)
-     */
-    public boolean existsCourse(Long id) {
-        return courseRepository.existsById(id);
+    public CourseDto.CourseResponse getInternalCourse(Long id) {
+        return CourseDto.CourseResponse.from(findCourseById(id));
+    }
+
+    public CourseDto.EnrollmentValidationResponse getEnrollmentValidation(Long id) {
+        Course course = findCourseById(id);
+        boolean enrollable = course.getStatus() == Course.Status.ACTIVE;
+        return CourseDto.EnrollmentValidationResponse.builder()
+                .courseId(course.getId())
+                .status(course.getStatus())
+                .enrollable(enrollable)
+                .build();
     }
 
     /**
@@ -85,6 +133,6 @@ public class CourseService {
 
     private Course findCourseById(Long id) {
         return courseRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("강의를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new CourseException(CourseErrorCode.COURSE_NOT_FOUND));
     }
 }
