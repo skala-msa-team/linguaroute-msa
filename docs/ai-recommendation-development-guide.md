@@ -198,7 +198,7 @@ X-Internal-Api-Key: {internalApiKey}
 목표 계약:
 
 ```http
-GET /internal/courses/recommend?language=ENGLISH
+GET /internal/courses/recommend?language=ENGLISH&excludeIds=3&excludeIds=5
 X-Internal-Api-Key: {internalApiKey}
 ```
 
@@ -217,14 +217,16 @@ Course 담당자의 신규 경로와 키 검증이 준비되기 전에 소비자
 
 ### 5.2 Enrollment 이력 호출 정리
 
-`recommend-service/app/client/enrollment_client.py`에는 기존 Enrollment 내부 API 호출이
-남아 있습니다. 다음 순서로 처리합니다.
+recommend-service 쪽 계약 반영은 완료했습니다.
 
-1. 현재 추천 요청 흐름에서 이 클라이언트가 실제 사용되는지 확인합니다.
-2. 미수강 강의 제외에 필요하면 `/internal/enrollments/history/{userId}`로 변경합니다.
-3. `X-Internal-Api-Key` 헤더를 추가합니다.
-4. Enrollment 담당자의 신규 경로와 키 검증 테스트가 준비됐는지 확인합니다.
-5. 더 이상 사용하지 않는 코드라면 팀 합의 후 제거합니다.
+1. `/internal/enrollments/history/{userId}`를 직접 호출합니다.
+2. `X-Internal-Api-Key` 헤더를 전달합니다.
+3. 응답의 `activeCourseIds`를 Course API의 `excludeIds`로 전달합니다.
+
+`activeCourseIds`는 호환성을 위해 유지된 필드명이며 실제 의미는 `ENROLLED`,
+`LEARNING`, `COMPLETED` 상태의 강의 ID 전체입니다. 변수명만 보고 현재 수강 중인
+강의로 한정하지 말고, 이미 수강 이력이 있는 강의를 모두 제외해야 합니다.
+다음 환경에서는 제공 서비스가 같은 계약으로 실행되는지만 통합 테스트합니다.
 
 ### 5.3 Payment 변경 영향
 
@@ -381,8 +383,8 @@ API 키, Access Token, Authorization 헤더, 전체 개인정보는 캡처 전�
 
 - 팀 프로젝트 키로 Luna 실제 호출 성공
 - 구조화 출력과 서버 재검증 성공
-- `/internal/courses/recommend` 전환과 내부 키 검증 성공·실패 케이스 확인
-- Enrollment 이력 클라이언트의 사용 여부와 `/internal/enrollments/**` 전환 결정 완료
+- `/internal/courses/recommend` 제공 서비스의 내부 키 검증 성공·실패 케이스 확인
+- Enrollment 이력의 `activeCourseIds`가 Course 조회의 `excludeIds`로 전달되는지 통합 확인
 - Gateway 외부 내부 경로 차단 확인
 - Gateway 인증 헤더 위조 방지 확인
 - 권한별 `200/401/403/422` 확인

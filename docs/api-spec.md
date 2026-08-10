@@ -461,13 +461,14 @@ X-Internal-Api-Key: {internalApiKey}
 > 도메인의 `courseId`로 변환합니다.
 
 ```http
-GET /api/courses/internal/recommend?language=ENGLISH
+GET /internal/courses/recommend?language=ENGLISH&excludeIds=3&excludeIds=5
 X-Internal-Api-Key: {internalApiKey}
 ```
 
-이 내부 API는 지정 언어의 `ACTIVE` 강의를 배열로 반환합니다. 서비스 간 계약이므로
-API Gateway의 외부 강의 경로로 공개하지 않습니다. Gateway는
-`/api/courses/internal/**` 요청을 `404`로 차단하고, recommend-service는 Gateway를
+이 내부 API는 지정 언어의 `ACTIVE` 강의 중 `excludeIds`에 없는 강의를 배열로 반환합니다.
+서비스 간 계약이므로 API Gateway의 외부 강의 경로로 공개하지 않습니다. Gateway는
+`/internal/**`와 전환 기간의 `/api/courses/internal/**` 요청을 `404`로 차단하고,
+recommend-service는 Gateway를
 거치지 않고 course-service를 직접 호출하면서 내부 API 키를 전달합니다.
 
 요청 예시:
