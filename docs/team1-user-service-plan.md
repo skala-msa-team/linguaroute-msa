@@ -25,8 +25,8 @@
 - [x] `feature/user-company` 브랜치 생성
 - [x] 최신 `origin/main`의 인증 서버 유지 방침 반영
 - [x] 기존 작업 복원 후 충돌 없음 확인
-- [ ] 변경사항 커밋
-- [ ] 원격 기능 브랜치 푸시
+- [x] 변경사항 커밋
+- [x] 원격 기능 브랜치 푸시
 - [ ] Base `dev`, Compare `feature/user-company` Pull Request 생성
 
 ### 이번 구현 범위
