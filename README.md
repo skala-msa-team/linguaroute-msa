@@ -7,6 +7,7 @@
 - [에이전트 작업 지침](./AGENTS.md)
 - [서비스 기획서](./docs/product-spec.md)
 - [MVP 체크리스트](./docs/mvp-checklist.md)
+- [팀원 1 user-service 구현 계획](./docs/team1-user-service-plan.md)
 - [API 명세서](./docs/api-spec.md)
 - [ERD](./docs/erd.md)
 
@@ -170,7 +171,9 @@ git commit -m "fix: 중복 수강 신청 문제 수정" \
 - Docker Desktop
 - `infra-images.tar`
 
-`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함되지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+
+Auth Server 이미지는 LinguaRoute에서도 그대로 사용하고 추가 인증 기능은 `user-service`에 구현합니다. API Gateway 서버는 추가하지 않지만, 현재 이미지의 경로가 고정되어 있으므로 동일한 Gateway 한 대를 목표 라우팅·보안 설정이 반영된 이미지로 다시 빌드해야 합니다.
 
 ```text
 linguaroute-msa/

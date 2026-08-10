@@ -19,15 +19,13 @@ public class CourseController {
     private final CourseService courseService;
 
     /**
-     * POST /courses - 강의 등록 (강사만)
-     * Gateway에서 전달한 X-User-Id 헤더로 강사 ID 추출
+     * POST /courses - 강의 등록
      */
     @PostMapping
     public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> createCourse(
-            @Valid @RequestBody CourseDto.CreateRequest request,
-            @RequestHeader("X-User-Id") Long instructorId) {
+            @Valid @RequestBody CourseDto.CreateRequest request) {
 
-        CourseDto.CourseResponse response = courseService.createCourse(request, instructorId);
+        CourseDto.CourseResponse response = courseService.createCourse(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CourseDto.ApiResponse.success(response));
     }
@@ -54,13 +52,13 @@ public class CourseController {
     }
 
     /**
-     * GET /courses/category/{category} - 카테고리별 강의
+     * GET /courses/language/{language} - 언어별 강의
      */
-    @GetMapping("/category/{category}")
-    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getCoursesByCategory(
-            @PathVariable Course.Category category) {
+    @GetMapping("/language/{language}")
+    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getCoursesByLanguage(
+            @PathVariable Course.Language language) {
         return ResponseEntity.ok(
-                CourseDto.ApiResponse.success(courseService.getCoursesByCategory(category))
+                CourseDto.ApiResponse.success(courseService.getCoursesByLanguage(language))
         );
     }
 
@@ -83,22 +81,13 @@ public class CourseController {
     }
 
     /**
-     * POST /courses/internal/{id}/enrollment-count - 수강생 수 증가 (Enrollment Service 호출)
-     */
-    @PostMapping("/internal/{id}/enrollment-count")
-    public ResponseEntity<Void> increaseEnrollmentCount(@PathVariable Long id) {
-        courseService.increaseEnrollmentCount(id);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
      * GET /courses/internal/recommend - 추천 서비스용 미수강 강의 조회
-     * category: 카테고리, excludeIds: 이미 수강한 강의 ID 목록
+     * language: 언어, excludeIds: 이미 수강한 강의 ID 목록
      */
     @GetMapping("/internal/recommend")
     public ResponseEntity<List<CourseDto.CourseResponse>> getRecommendCourses(
-            @RequestParam Course.Category category,
+            @RequestParam Course.Language language,
             @RequestParam(defaultValue = "") List<Long> excludeIds) {
-        return ResponseEntity.ok(courseService.getRecommendCourses(category, excludeIds));
+        return ResponseEntity.ok(courseService.getRecommendCourses(language, excludeIds));
     }
 }

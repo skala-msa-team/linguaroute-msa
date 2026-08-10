@@ -14,6 +14,10 @@
 
 이 문서의 URL은 기능 설계를 위한 초안입니다. 구현 후에는 Swagger UI에서 실제 Method, URL, Request 및 Response를 호출하여 최종 명세와 일치시켜야 합니다.
 
+기존 API Gateway 서버는 유지합니다. 다만 현재 이미지의 라우트와 공개 경로가 JAR에 고정되어 있으므로 동일한 Gateway 한 대의 라우팅·보안 설정을 수정하여 아래 외부 경로를 연결합니다. Gateway 서버를 추가하지 않습니다.
+
+OAuth2 표준 경로인 `/oauth2/**`와 `/logout`은 기본 경로 `/api`의 예외입니다.
+
 ---
 
 ## 2. 공통 규칙
@@ -51,6 +55,7 @@
 | --- | --- |
 | `200 OK` | 조회·수정·취소 성공 |
 | `201 Created` | 회원·초대코드·강의·수강신청·결제 생성 성공 |
+| `202 Accepted` | 이메일 발송 요청 접수 |
 | `204 No Content` | 응답 본문이 필요 없는 삭제·폐기 성공 |
 | `400 Bad Request` | 형식 오류 또는 필수값 누락 |
 | `401 Unauthorized` | 로그인 또는 토큰 필요 |
@@ -66,37 +71,131 @@
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | `POST` | `/api/auth/login` | 공개 | 로그인 | 필수 |
-| AUTH-02 | `POST` | `/api/auth/logout` | 로그인 | 로그아웃 | 필수 |
+| AUTH-01 | `GET` | `/oauth2/authorize` | 공개 | OAuth2 로그인 시작 | 필수 |
+| AUTH-02 | `POST` | `/logout` | 로그인 | OAuth2 세션 로그아웃 | 필수 |
 | AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
 | AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
+| AUTH-05 | `POST` | `/api/auth/email-verifications` | 공개 | 이메일 인증 요청 | 필수 |
+| AUTH-06 | `POST` | `/api/auth/email-verifications/confirm` | 공개 | 이메일 인증 확인 | 필수 |
+| AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
+| AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
+| AUTH-09 | `POST` | `/oauth2/token` | OAuth2 클라이언트 | 인증 코드로 Access Token 발급 | 필수 |
+
+기존 Auth Server는 `AUTH-01`, `AUTH-02`, `AUTH-09`와 Access Token 발급만 담당합니다. `AUTH-03`부터 `AUTH-08`까지는 `user-service`가 구현하며 Gateway가 `/api/auth/**` 요청을 `user-service`로 전달합니다. 서버를 새로 추가하지 않습니다.
+
+이메일 인증은 SMTP로 6자리 코드를 보내고, 아이디 찾기는 안내 메일, 비밀번호 재설정은 토큰 링크를 발송합니다. 로컬 개발에서는 MailHog를 사용하며 SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 토큰은 해시로 저장하고 15분 동안 한 번만 사용할 수 있습니다. 이메일 기반 요청은 이메일별 1분에 1회, 1시간에 5회로 제한하고 계정 존재 여부를 응답에 노출하지 않습니다.
 
 ### AUTH-01 로그인
 
-요청:
+현재 프론트엔드의 OAuth2 Authorization Code 흐름을 유지합니다.
+
+```http
+GET /oauth2/authorize?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope=openid%20profile%20read%20write
+```
+
+로그인 완료 후 전달받은 인증 코드는 기존 `/oauth2/token`에서 Access Token으로 교환합니다. 토큰 응답은 기존 Auth Server의 OAuth2 형식을 유지합니다.
+
+```json
+{
+  "access_token": "access-token",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "openid profile read write"
+}
+```
+
+MVP에서는 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃 시에는 클라이언트가 저장한 Access Token을 삭제합니다.
+
+Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
+
+### AUTH-03·04 비밀번호 재설정
+
+재설정 요청:
+
+```json
+{
+  "email": "admin@company.com"
+}
+```
+
+계정 존재 여부와 관계없이 `202 Accepted`와 공통 성공 형식을 반환합니다. 계정이 존재하면 등록된 이메일로 15분 동안 한 번만 사용할 수 있는 재설정 링크를 발송합니다.
+
+재설정 확인:
+
+```json
+{
+  "resetToken": "password-reset-token",
+  "newPassword": "NewPassword123!"
+}
+```
+
+토큰이 유효하면 비밀번호를 변경하고 `200 OK`를 반환합니다. 사용되었거나 만료된 토큰은 `422 Unprocessable Entity`로 처리합니다.
+
+### AUTH-05 이메일 인증 요청
 
 ```json
 {
   "email": "admin@company.com",
-  "password": "Password123!"
+  "purpose": "SIGNUP"
 }
 ```
+
+### AUTH-06 이메일 인증 확인
+
+```json
+{
+  "email": "admin@company.com",
+  "verificationCode": "123456"
+}
+```
+
+성공 시 회원가입 요청에 사용할 일회용 `emailVerificationToken`을 반환합니다. 인증 코드와 토큰에는 만료시간을 적용하고 재사용을 금지합니다.
 
 응답 `200 OK`:
 
 ```json
 {
   "data": {
-    "accessToken": "access-token",
-    "refreshToken": "refresh-token",
-    "expiresIn": 3600,
-    "role": "COMPANY_ADMIN"
+    "emailVerificationToken": "email-verification-token"
   },
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
 
-비밀번호 재설정 토큰을 어떤 채널로 전달할지는 별도로 확정해야 합니다. 이메일 인증을 보류하는 경우에도 재설정 링크 전송을 위한 이메일 소유 확인 정책이 필요합니다.
+### AUTH-07 아이디 찾기
+
+요청:
+
+```json
+{
+  "name": "이직원",
+  "businessNumber": "123-45-67890"
+}
+```
+
+응답 `202 Accepted`:
+
+```json
+{
+  "data": {
+    "accepted": true
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+`user-service`는 이름과 기업 사업자번호가 일치하는 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다. 요청 횟수 제한을 적용합니다.
+
+### AUTH-08 로그인 사용자 비밀번호 변경
+
+```json
+{
+  "currentPassword": "Password123!",
+  "newPassword": "NewPassword123!"
+}
+```
+
+현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `401 INVALID_CREDENTIALS`로 처리합니다.
 
 ---
 
@@ -109,8 +208,11 @@
 | COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
 | USER-02 | `PATCH` | `/api/users/me` | 로그인 | 내 정보 수정 | 필수 |
-| USER-03 | `PUT` | `/api/users/me/password` | 로그인 | 비밀번호 변경 | 필수 |
-| USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 선택 |
+| USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 필수 |
+
+회원 탈퇴 시 `user-service`가 사용자를 `WITHDRAWN` 처리하고 비밀번호 해시를 로그인할 수 없는 임의 값으로 교체합니다. 이미 발급된 Access Token은 만료 전까지 남을 수 있으므로 보호 API는 사용자 상태를 확인해 탈퇴 사용자의 요청을 거부합니다.
+
+로그인 이메일과 비밀번호 해시의 원본은 공용 `users` 테이블이며 `user-service`가 관리합니다. MVP에서는 `USER-02`로 로그인 이메일을 변경하지 않습니다.
 
 ### COMPANY-01 기업 대표계정 회원가입
 
@@ -127,6 +229,7 @@
     "password": "Password123!",
     "name": "김관리"
   },
+  "emailVerificationToken": "email-verification-token",
   "agreementIds": [1, 2]
 }
 ```
@@ -142,6 +245,58 @@
     "status": "ACTIVE"
   },
   "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-service`가 이메일 인증 토큰과 필수 약관을 확인하고, 기업·사용자·약관 동의를 한 트랜잭션에서 생성합니다. 비밀번호는 BCrypt 해시로 `users.password`에 저장하고 원문은 저장하지 않습니다.
+
+오류 코드:
+
+| HTTP | 오류 코드 | 조건 |
+| --- | --- | --- |
+| `409` | `DUPLICATE_BUSINESS_NUMBER` | 이미 등록된 사업자번호 |
+| `409` | `DUPLICATE_EMAIL` | 이미 가입한 이메일 |
+| `400` | `INVALID_AGREEMENT` | 현재 활성 약관이 아닌 ID가 포함됨 |
+| `422` | `REQUIRED_AGREEMENT_MISSING` | 현재 필수 약관 동의 누락 |
+| `422` | `INVALID_EMAIL_VERIFICATION` | 인증 토큰이 없거나 이메일 불일치·만료·사용됨 |
+
+### COMPANY-02 기업 정보 조회
+
+검증된 Access Token의 `userId`에 해당하는 사용자가 `COMPANY_ADMIN`인지 확인하고, 해당 사용자의 소속 기업만 반환합니다.
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "id": 10,
+    "name": "스칼라테크",
+    "businessNumber": "1234567890",
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+### COMPANY-03 기업 정보 수정
+
+요청:
+
+```json
+{
+  "name": "스칼라글로벌"
+}
+```
+
+사업자번호는 이 API에서 변경하지 않습니다.
+
+### USER-02 내 정보 수정
+
+요청:
+
+```json
+{
+  "name": "김수정"
 }
 ```
 
@@ -193,7 +348,9 @@
   "invitationCode": "A7K9-P2QM",
   "email": "employee@company.com",
   "password": "Password123!",
-  "name": "이직원"
+  "name": "이직원",
+  "emailVerificationToken": "email-verification-token",
+  "agreementIds": [1, 2]
 }
 ```
 
@@ -201,12 +358,15 @@
 
 ```text
 초대코드 존재·만료·사용 여부 검사
+→ 이메일 인증 토큰과 필수 약관 동의 검사
 → 기업 구독 ACTIVE 검사
 → 잔여 좌석 검사
 → 직원 계정 생성
 → 좌석 배정
 → 초대코드 USED 처리
 ```
+
+비밀번호와 `emailVerificationToken`은 `user-service`가 처리합니다. 직원 가입은 사용자·좌석·초대코드 상태를 한 트랜잭션에서 처리하고 실패하면 모두 롤백합니다. 비밀번호 원문은 저장하지 않습니다.
 
 오류 코드:
 
@@ -229,6 +389,56 @@
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
+
+### 내부 구독 권한 조회
+
+`enrollment-service`는 수강신청 전에 다음 내부 API로 기업의 최신 구독 권한을 확인합니다. 이 경로는 API Gateway의 외부 공개 경로에 노출하지 않습니다.
+
+```http
+GET /internal/companies/{companyId}/entitlement
+X-Internal-Api-Key: {internalApiKey}
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "companyId": 10,
+    "subscriptionStatus": "ACTIVE",
+    "seatLimit": 50,
+    "currentPeriodEnd": "2026-09-10T10:30:00+09:00"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+내부 API 키가 잘못되면 `403 Forbidden`, 기업 또는 권한 정보가 없으면 `404 Not Found`를 반환합니다. `enrollment-service`는 호출 실패나 `ACTIVE`가 아닌 상태에서 수강신청을 허용하지 않고 `503 Service Unavailable` 또는 `422 SUBSCRIPTION_INACTIVE`를 반환합니다.
+
+### 내부 사용자 권한 조회
+
+Auth Server의 기존 `users.role`은 로그인 호환용이므로 각 보호 API는 다음 내부 API로 실제 비즈니스 권한을 확인합니다. 이 경로는 API Gateway에 공개하지 않습니다.
+
+```http
+GET /internal/users/{userId}/authorization-context
+X-Internal-Api-Key: {internalApiKey}
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "data": {
+    "userId": 101,
+    "companyId": 10,
+    "businessRole": "COMPANY_ADMIN",
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+호출 서비스는 `status=ACTIVE`인지 확인하고 필요한 `businessRole`과 `companyId` 범위를 검증합니다. 조회 실패 시 권한을 허용하지 않습니다.
 
 ---
 
@@ -299,7 +509,7 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 | LEARNING-01 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start` | 직원 | 차시 학습 시작 | 필수 |
 | LEARNING-02 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/complete` | 직원 | 차시 완료 | 필수 |
 | COMPANY-ENROLL-01 | `GET` | `/api/companies/me/enrollments` | 기업 관리자 | 직원별 수강 상태 조회 | 필수 |
-| COMPANY-ENROLL-02 | `GET` | `/api/companies/me/enrollments/progress` | 기업 관리자 | 직원별 진도율 조회 | 선택 |
+| COMPANY-ENROLL-02 | `GET` | `/api/companies/me/enrollments/progress` | 기업 관리자 | 직원별 진도율 조회 | 필수 |
 
 ### ENROLL-01 수강신청
 
@@ -366,7 +576,6 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 | SUB-02 | `GET` | `/api/subscriptions/me` | 기업 관리자 | 구독 상태·만료일·갱신일 조회 | 필수 |
 | SUB-03 | `POST` | `/api/subscriptions/me/cancel` | 기업 관리자 | 구독 해지 | 필수 |
 | PAY-01 | `GET` | `/api/payments` | 기업 관리자 | 결제 내역 조회 | 필수 |
-| REFUND-01 | `POST` | `/api/payments/{paymentId}/refund-requests` | 기업 관리자 | 환불 요청 | 선택 |
 
 ### PLAN-01 요금제 조회 응답
 
@@ -411,6 +620,8 @@ Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 }
 ```
 
+MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `paymentMethodToken` 값 `mock-success`는 성공, `mock-failure`는 실패 결과를 생성하며 그 외 값은 `400 Bad Request`로 처리합니다.
+
 성공 응답 `201 Created`:
 
 ```json
@@ -439,6 +650,18 @@ Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 
 해지는 즉시 이용 권한을 제거하지 않고 현재 이용 기간 종료 후 `EXPIRED`가 되도록 설계합니다.
 
+### 구독 상태 Kafka 이벤트
+
+| 이벤트 | 발행 조건 | `user-service` 처리 | MVP |
+| --- | --- | --- | --- |
+| `PaymentCompleted` | 결제 성공 | 이용 권한 활성화 및 좌석·기간 반영 | 필수 |
+| `PaymentFailed` | 초기 또는 갱신 결제 실패 | 초기 권한 미부여, 기존 권한은 현재 기간까지 유지 | 필수 |
+| `SubscriptionCanceled` | 구독 해지 요청 완료 | 자동 갱신 중지, 현재 기간까지 권한 유지 | 필수 |
+| `SubscriptionExpired` | 현재 이용 기간 종료 | 이용 권한 만료 및 신규 가입·수강신청 차단 | 필수 |
+| `SubscriptionRenewed` | 갱신 결제 성공 | 새 이용 기간과 좌석 한도 반영 | 필수 |
+
+모든 이벤트는 고유한 `eventId`를 포함하고 소비자는 중복 수신을 안전하게 무시해야 합니다. 상세 payload와 권한 상태 변경 규칙은 [ERD의 Kafka 이벤트](./erd.md#11-kafka-이벤트)를 따릅니다.
+
 ---
 
 ## 9. AI 강의 추천 API
@@ -446,7 +669,6 @@ Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
 | AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수 |
-| AI-02 | `POST` | `/api/courses/recommendations/{recommendationId}/reject` | 직원 | 추천 거부 | 선택 |
 
 추천 요청과 결과 데이터는 `recommend-service`가 소유합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
 
@@ -511,7 +733,41 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
 | TERM-01 | `GET` | `/api/terms/active` | 공개 | 현재 필수·선택 약관 조회 | 필수 |
-| TERM-02 | `POST` | `/api/users/me/agreements` | 로그인 | 약관 동의 저장 | 필수 |
+| TERM-02 | `POST` | `/api/users/me/agreements` | 로그인 | 가입 후 선택 약관 동의 변경 | 필수 |
+
+기업 관리자와 직원 회원가입 요청은 현재 필수 약관의 `agreementIds`를 포함해야 하며, 서버는 누락된 필수 약관이 있으면 가입을 거부합니다.
+
+### TERM-01 활성 약관 조회
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "type": "SERVICE_TERMS",
+      "version": "1.0",
+      "content": "LinguaRoute 서비스 이용약관",
+      "required": true,
+      "effectiveAt": "2026-08-10T00:00:00"
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+### TERM-02 약관 동의 저장
+
+요청:
+
+```json
+{
+  "agreementIds": [3]
+}
+```
+
+이미 동의한 약관 ID는 중복 저장하지 않으며 정상 처리합니다.
 
 ---
 
@@ -523,7 +779,7 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | OPS-02 | `GET` | `/api/admin/companies` | 플랫폼 관리자 | 기업 상태 조회 | 필수 |
 | OPS-03 | `GET` | `/api/admin/payments` | 플랫폼 관리자 | 결제 상태 조회 | 필수 |
 | OPS-04 | `GET` | `/api/admin/enrollments` | 플랫폼 관리자 | 수강 상태 조회 | 필수 |
-| OPS-05 | `GET` | `/api/admin/audit-logs` | 플랫폼 관리자 | 주요 감사 로그 조회 | 필수 |
+| OPS-05 | `GET` | `/api/admin/audit-logs` | 플랫폼 관리자 | 주요 감사 로그 조회 | 추후 확장 |
 
 운영 화면이 데이터를 한 번에 조회하더라도 각 데이터의 소유 서비스는 유지합니다. 별도 운영 DB를 추가하지 않고 API Gateway 또는 프론트엔드가 각 서비스의 관리자 조회 API를 조합합니다.
 
@@ -534,6 +790,18 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | 오류 코드 | HTTP | 설명 |
 | --- | --- | --- |
 | `INVALID_CREDENTIALS` | `401` | 이메일 또는 비밀번호 불일치 |
+| `EMAIL_NOT_VERIFIED` | `422` | 이메일 인증 미완료 |
+| `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치 |
+| `VERIFICATION_CODE_EXPIRED` | `422` | 이메일 인증 코드 만료 |
+| `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
+| `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
+| `INVALID_INTERNAL_API_KEY` | `403` | 서비스 간 내부 API 키 불일치 |
+| `INVALID_EMAIL_VERIFICATION` | `422` | 이메일 인증 토큰이 유효하지 않거나 이미 사용됨 |
+| `USER_INACTIVE` | `403` | 비활성 또는 탈퇴 사용자의 보호 API 요청 |
+| `DUPLICATE_BUSINESS_NUMBER` | `409` | 이미 등록된 사업자번호 |
+| `DUPLICATE_EMAIL` | `409` | 이미 가입한 이메일 |
+| `INVALID_AGREEMENT` | `400` | 현재 활성 약관이 아닌 ID |
+| `REQUIRED_AGREEMENT_MISSING` | `422` | 필수 약관 동의 누락 |
 | `COMPANY_NOT_FOUND` | `404` | 기업 없음 |
 | `INVITATION_NOT_FOUND` | `404` | 초대코드 없음 |
 | `INVITATION_ALREADY_USED` | `409` | 사용된 초대코드 |
@@ -561,4 +829,5 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | 상태 코드 | 정상·예외 상태 코드가 실제 응답과 일치함 |
 | 권한 | 기업 관리자·직원·플랫폼 관리자 권한이 분리됨 |
 | 결제 이벤트 | 결제 전후 구독 권한 상태 변화 확인 |
+| 구독 이벤트 | 실패·해지·만료·갱신 이벤트와 중복 소비 검증 |
 | AI 추천 | 실제 활성 강의 ID만 반환되는지 확인 |
