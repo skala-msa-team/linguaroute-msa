@@ -308,14 +308,16 @@ erDiagram
 
 ## 8. payment-service ERD
 
+`payment-service`의 실제 물리 테이블명은 JPA 구현 기준으로 복수형을 사용합니다. 논리 엔티티는 `Plan`, `PlanPrice`, `Subscription`, `Payment`, `OutboxEvent`입니다.
+
 ```mermaid
 erDiagram
-    PLAN ||--|{ PLAN_PRICE : priced_as
-    PLAN_PRICE ||--o{ SUBSCRIPTION : selected_by
-    SUBSCRIPTION ||--o{ PAYMENT : paid_by
-    SUBSCRIPTION ||--o{ OUTBOX_EVENT : emits
+    PLANS ||--|{ PLAN_PRICES : priced_as
+    PLAN_PRICES ||--o{ SUBSCRIPTIONS : selected_by
+    SUBSCRIPTIONS ||--o{ PAYMENTS : paid_by
+    SUBSCRIPTIONS ||--o{ OUTBOX_EVENTS : emits
 
-    PLAN {
+    PLANS {
         bigint id PK
         varchar name
         varchar description
@@ -323,7 +325,7 @@ erDiagram
         datetime created_at
     }
 
-    PLAN_PRICE {
+    PLAN_PRICES {
         bigint id PK
         bigint plan_id FK
         varchar billing_cycle
@@ -334,11 +336,12 @@ erDiagram
         datetime created_at
     }
 
-    SUBSCRIPTION {
+    SUBSCRIPTIONS {
         bigint id PK
         bigint company_id
         bigint plan_price_id FK
         varchar status
+        boolean auto_renew
         datetime current_period_start
         datetime current_period_end
         datetime next_billing_at
@@ -347,11 +350,11 @@ erDiagram
         datetime updated_at
     }
 
-    PAYMENT {
+    PAYMENTS {
         bigint id PK
         bigint subscription_id FK
         bigint company_id
-        varchar idempotency_key UK
+        varchar idempotency_key
         bigint amount
         varchar currency
         varchar status
@@ -362,7 +365,7 @@ erDiagram
         datetime failed_at
     }
 
-    OUTBOX_EVENT {
+    OUTBOX_EVENTS {
         bigint id PK
         varchar event_id UK
         varchar aggregate_type
@@ -380,13 +383,14 @@ erDiagram
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `plan_price` | `(plan_id, billing_cycle)` 유일 |
-| `subscription` | 기업별 활성 구독은 최대 1개 |
-| `payment` | `idempotency_key` 유일로 중복 결제 방지 |
-| `payment` | 금액은 요청값이 아니라 `plan_price`에서 서버가 결정 |
-| `outbox_event` | 결제·구독 상태 변경과 같은 트랜잭션으로 저장하고 `event_id` 유일 처리 |
+| `plan_prices` | `(plan_id, billing_cycle)` 유일 |
+| `subscriptions` | 기업별 활성 구독은 최대 1개 |
+| `subscriptions.auto_renew` | 해지 시 `false`로 변경하고 현재 이용 기간까지 `ACTIVE` 유지 |
+| `payments` | `(company_id, idempotency_key)` 유일로 기업별 중복 결제 방지 |
+| `payments` | 금액은 요청값이 아니라 `plan_prices.price`에서 서버가 결정 |
+| `outbox_events` | 결제·구독 상태 변경과 같은 트랜잭션으로 저장하고 `event_id` 유일 처리 |
 
-`subscription.company_id`와 `payment.company_id`는 `user-service`에 대한 논리 참조입니다.
+`subscriptions.company_id`와 `payments.company_id`는 `user-service`에 대한 논리 참조입니다. `payment-service`는 Gateway가 전달한 `companyId`를 저장하며 `user-service` 소유 테이블을 직접 조회하지 않습니다.
 
 ---
 
@@ -443,7 +447,7 @@ erDiagram
 
 ## 11. Kafka 이벤트
 
-이벤트 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다.
+이벤트 발행자는 `payment-service`, 이용 권한 소비자는 `user-service`입니다. 모든 이벤트는 `eventId`를 가지며 소비자는 `processed_event.event_id`로 중복 처리를 방지합니다. `payment-service`는 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 단일 Kafka 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다.
 
 ### 11.1 PaymentCompleted
 

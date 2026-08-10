@@ -222,6 +222,11 @@ git diff --cached
 ## 8. API 규칙
 
 - 외부 요청은 API Gateway와 `/api` 경로를 기준으로 설계합니다.
+- 내부 API는 Gateway 외부 공개 경로에 노출하지 않고 `/internal/**` 경로로 분리합니다.
+- Gateway는 외부 요청의 `/api/**/internal/**` 접근을 차단합니다.
+- 서비스 간 내부 호출은 Gateway를 거치지 않고 대상 서비스를 직접 호출하며, 호출자는 `X-Internal-Api-Key` 헤더를 전달합니다.
+- 내부 API 제공 서비스는 `X-Internal-Api-Key`를 실행 환경의 `INTERNAL_API_KEY`와 비교하여 검증합니다.
+- 신규 내부 API를 `/api/{service}/internal/**` 형태로 만들지 않습니다. 기존 코드에 남은 `/api/**/internal/**` 경로는 담당 범위에서 `/internal/**`로 이전하고 호출 코드를 함께 수정합니다.
 - 보호 API는 Bearer Token과 역할·기업 소속 권한을 모두 검증합니다.
 - MVP에서는 Refresh Token을 구현하지 않습니다. Access Token 만료 시 재로그인하며, 로그아웃 시 클라이언트가 저장한 Access Token을 삭제합니다.
 - Access Token의 기존 로그인 역할은 비즈니스 권한으로 사용하지 않습니다. 보호 API는 `user-service`의 내부 권한 조회로 최신 `businessRole`, `companyId`, `status`를 확인합니다.

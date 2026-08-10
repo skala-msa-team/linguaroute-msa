@@ -65,6 +65,16 @@
 | `422 Unprocessable Entity` | 상태상 처리할 수 없는 요청 |
 | `503 Service Unavailable` | 외부 AI 또는 결제 시스템 장애 |
 
+### 2.5 내부 API 보안
+
+외부 클라이언트가 호출하는 API는 API Gateway의 `/api/**` 경로만 사용합니다. 서비스 간 내부 API는 Gateway에 노출하지 않고 대상 서비스를 직접 호출하는 `/internal/**` 경로로 분리합니다.
+
+- Gateway는 외부 요청의 `/api/**/internal/**` 접근을 차단합니다.
+- 내부 API 제공 서비스는 `X-Internal-Api-Key` 값을 실행 환경의 `INTERNAL_API_KEY`와 비교하여 검증합니다.
+- 내부 API 호출 서비스는 동일한 `INTERNAL_API_KEY` 값을 `X-Internal-Api-Key` 헤더로 전달합니다.
+- 각 실행 환경에는 동일한 `INTERNAL_API_KEY`를 주입합니다. 로컬 개발 기본값을 쓰더라도 운영·공유 환경의 실제 키는 문서나 저장소에 기록하지 않습니다.
+- 신규 내부 API는 `/api/{service}/internal/**` 형태로 만들지 않습니다. 기존 코드에 남아 있는 `/api/**/internal/**` 경로는 담당 범위에서 `/internal/**`로 이전하고 호출 코드를 함께 수정합니다.
+
 ---
 
 ## 3. 인증 API
@@ -636,6 +646,8 @@ API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. 
 | SUB-03 | `POST` | `/api/subscriptions/me/cancel` | 기업 관리자 | 구독 해지 | 필수 |
 | PAY-01 | `GET` | `/api/payments` | 기업 관리자 | 결제 내역 조회 | 필수 |
 
+현재 `payment-service` 구현은 Gateway가 인증 사용자와 기업 소속을 검증한 뒤 `X-Company-Id`를 전달한다는 전제로 동작합니다. Gateway의 JWT claim 전달 방식이 확정되면 이 헤더 전제는 Gateway 계약에 맞춰 다시 정리합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
+
 ### PLAN-01 요금제 조회 응답
 
 ```json
@@ -667,6 +679,7 @@ API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. 
 헤더:
 
 ```http
+X-Company-Id: 10
 Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 ```
 
@@ -697,7 +710,19 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 }
 ```
 
-동일한 멱등성 키로 다시 요청하면 새 결제를 생성하지 않고 기존 결과를 반환합니다.
+같은 기업에서 동일한 멱등성 키로 다시 요청하면 새 결제를 생성하지 않고 기존 결과를 반환합니다.
+
+실패 응답 `422 Unprocessable Entity`:
+
+```json
+{
+  "code": "PAYMENT_FAILED",
+  "message": "결제가 승인되지 않았습니다.",
+  "timestamp": "2026-08-10T10:31:00+09:00"
+}
+```
+
+`mock-failure`도 결제 실패 이력과 `PaymentFailed` Outbox 이벤트를 저장합니다. 같은 `Idempotency-Key`로 실패 요청을 반복하면 새 결제 이력을 만들지 않고 기존 실패 결과를 기준으로 응답합니다.
 
 ### SUB-03 구독 해지
 
@@ -709,7 +734,44 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 
 해지는 즉시 이용 권한을 제거하지 않고 현재 이용 기간 종료 후 `EXPIRED`가 되도록 설계합니다.
 
+현재 구현은 해지 요청 시 구독 `status=ACTIVE`를 유지하고 `autoRenew=false`, `canceledAt`을 저장합니다. 따라서 현재 이용 기간 종료 전까지 직원 권한을 유지할 수 있고, 만료 처리 시점에 `SubscriptionExpired` 이벤트를 발행합니다.
+
+### PAY-01 결제 내역
+
+Gateway가 전달한 `X-Company-Id` 기준으로 해당 기업의 결제 이력을 최신 요청순으로 반환합니다.
+
+```http
+GET /api/payments
+Authorization: Bearer {accessToken}
+X-Company-Id: 10
+```
+
+응답 `200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "paymentId": 8001,
+      "subscriptionId": 7001,
+      "companyId": 10,
+      "amount": 299000,
+      "currency": "KRW",
+      "status": "SUCCESS",
+      "providerPaymentId": "mock-0c7f...",
+      "failureReason": null,
+      "requestedAt": "2026-08-10T10:30:00+09:00",
+      "paidAt": "2026-08-10T10:30:00+09:00",
+      "failedAt": null
+    }
+  ],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
 ### 구독 상태 Kafka 이벤트
+
+`payment-service`는 결제·구독 상태 변경과 같은 트랜잭션에서 `outbox_events`에 이벤트를 저장하고, 스케줄러가 단일 토픽 `subscription.events`로 발행합니다. 이벤트 key는 `companyId`입니다. 현재 구현 범위는 이벤트 발행까지이며, `user-service` 소비와 `company_entitlement` 반영은 별도 작업입니다.
 
 | 이벤트 | 발행 조건 | `user-service` 처리 | MVP |
 | --- | --- | --- | --- |
