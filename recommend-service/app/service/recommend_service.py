@@ -3,6 +3,7 @@ import logging
 from app.client.course_client import CourseServiceClient, course_client
 from app.model.schemas import (
     CourseCandidate,
+    CourseStatus,
     ProviderRecommendation,
     RecommendedCourse,
     RecommendationData,
@@ -10,7 +11,8 @@ from app.model.schemas import (
     RecommendationSource,
     RecommendationStatus,
 )
-from app.provider.local_ai_provider import LocalAiRecommendationProvider, RecommendationProvider
+from app.provider.factory import build_recommendation_provider
+from app.provider.local_ai_provider import RecommendationProvider
 from app.repository.recommendation_repository import (
     RecommendationRepository,
     SqlAlchemyRecommendationRepository,
@@ -36,10 +38,16 @@ class RecommendationService:
         self, *, user_id: int, company_id: int, request: RecommendationRequest
     ) -> RecommendationData:
         candidates = await self.course_client.get_candidates(request.language)
+        # [방어적 재검증]
+        # course-service가 ACTIVE와 언어 필터를 적용하지만, AI 추천 결과의 신뢰성과
+        # 저장 데이터의 무결성은 recommend-service의 책임이기도 하다. 상대 서비스의
+        # 버그나 계약 변경이 있어도 비활성·타 언어 강의가 추천/저장되지 않도록
+        # 서비스 경계 안에서 같은 핵심 조건을 한 번 더 검사한다.
         valid_candidates = [
             course
             for course in candidates
-            if course.status == "ACTIVE" and course.language == request.language
+            if course.status is CourseStatus.ACTIVE
+            and course.language == request.language
         ]
 
         try:
@@ -123,6 +131,6 @@ class RecommendationService:
 
 recommend_service = RecommendationService(
     course_client=course_client,
-    provider=LocalAiRecommendationProvider(),
+    provider=build_recommendation_provider(),
     repository=SqlAlchemyRecommendationRepository(),
 )
