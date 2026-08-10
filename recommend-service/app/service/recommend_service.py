@@ -1,105 +1,128 @@
 import logging
-from collections import Counter
-from typing import List, Optional
 
-from app.client.course_client import course_client
-from app.client.enrollment_client import enrollment_client
-from app.model.schemas import CourseCategory, CourseResponse, RecommendResponse
+from app.client.course_client import CourseServiceClient, course_client
+from app.model.schemas import (
+    CourseCandidate,
+    ProviderRecommendation,
+    RecommendedCourse,
+    RecommendationData,
+    RecommendationRequest,
+    RecommendationSource,
+    RecommendationStatus,
+)
+from app.provider.local_ai_provider import LocalAiRecommendationProvider, RecommendationProvider
+from app.repository.recommendation_repository import (
+    RecommendationRepository,
+    SqlAlchemyRecommendationRepository,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class RecommendService:
-    """
-    규칙 기반 강의 추천 서비스
+class RecommendationService:
+    MAX_RECOMMEND_COUNT = 3
 
-    추천 규칙:
-    1. 사용자의 수강 중인 강의 카테고리 분석
-    2. 가장 많이 수강한 카테고리 선택 (최빈 카테고리)
-    3. 해당 카테고리에서 미수강 강의 조회
-    4. 수강생 수 기준 내림차순 정렬하여 반환
-    5. 수강 이력 없으면 전체 강의 중 인기순 반환
-    """
+    def __init__(
+        self,
+        course_client: CourseServiceClient,
+        provider: RecommendationProvider,
+        repository: RecommendationRepository,
+    ):
+        self.course_client = course_client
+        self.provider = provider
+        self.repository = repository
 
-    MAX_RECOMMEND_COUNT = 5  # 최대 추천 강의 수
-
-    async def get_recommendations(self, user_id: int) -> RecommendResponse:
-        logger.info(f"[RecommendService] 추천 시작 - userId: {user_id}")
-
-        # 1. 수강 이력 조회
-        history = await enrollment_client.get_enrollment_history(user_id)
-        active_course_ids = history.activeCourseIds
-
-        # 2. 수강 이력 없는 신규 사용자 처리
-        if not active_course_ids:
-            return await self._recommend_for_new_user(user_id)
-
-        # 3. 수강한 강의의 카테고리 분석 → 최빈 카테고리 선택
-        dominant_category = await self._find_dominant_category(active_course_ids)
-        if not dominant_category:
-            return await self._recommend_for_new_user(user_id)
-
-        # 4. 최빈 카테고리 기반 미수강 강의 조회
-        recommended = await course_client.get_recommend_courses(
-            category=dominant_category,
-            exclude_ids=active_course_ids
-        )
-
-        # 5. 최대 추천 수 제한
-        recommended = recommended[:self.MAX_RECOMMEND_COUNT]
-
-        logger.info(f"[RecommendService] 추천 완료 - userId: {user_id}, "
-                    f"category: {dominant_category}, count: {len(recommended)}")
-
-        return RecommendResponse(
-            userId=user_id,
-            recommendedCourses=recommended,
-            basedOnCategory=dominant_category,
-            message=f"{dominant_category.value} 카테고리 기반 추천 강의입니다"
-        )
-
-    async def _find_dominant_category(
-        self, course_ids: List[int]
-    ) -> Optional[CourseCategory]:
-        """
-        수강한 강의들의 카테고리 분석 → 최빈 카테고리 반환
-        Course Service에서 각 강의 정보를 조회하여 카테고리 집계
-        """
-        all_courses = await course_client.get_all_courses()
-        course_map = {c.id: c for c in all_courses}
-
-        categories = [
-            course_map[cid].category
-            for cid in course_ids
-            if cid in course_map
+    async def recommend(
+        self, *, user_id: int, company_id: int, request: RecommendationRequest
+    ) -> RecommendationData:
+        candidates = await self.course_client.get_candidates(request.language)
+        valid_candidates = [
+            course
+            for course in candidates
+            if course.status == "ACTIVE" and course.language == request.language
         ]
 
-        if not categories:
-            return None
+        try:
+            provider_results = await self.provider.recommend(request, valid_candidates)
+            courses = self._validate_results(provider_results, valid_candidates)
+            if not courses:
+                raise ValueError("유효한 추천 결과가 없습니다")
+            source = RecommendationSource.AI
+            status = RecommendationStatus.SUCCESS
+        except Exception as error:
+            logger.warning("추천 제공자 호출 실패, 규칙 기반 추천으로 전환: %s", error)
+            courses = self._fallback(request, valid_candidates)
+            source = RecommendationSource.RULE_BASED_FALLBACK
+            status = RecommendationStatus.FALLBACK
 
-        # Counter로 최빈 카테고리 선택
-        most_common = Counter(categories).most_common(1)
-        return most_common[0][0] if most_common else None
+        recommendation_id = await self.repository.save(
+            user_id=user_id,
+            company_id=company_id,
+            request=request,
+            source=source,
+            status=status,
+            courses=courses,
+        )
+        return RecommendationData(
+            recommendationId=recommendation_id,
+            source=source,
+            courses=courses,
+        )
 
-    async def _recommend_for_new_user(self, user_id: int) -> RecommendResponse:
-        """
-        신규 사용자: 수강생 수 기준 전체 인기 강의 추천
-        """
-        logger.info(f"[RecommendService] 신규 사용자 추천 - userId: {user_id}")
+    def _validate_results(
+        self,
+        results: list[ProviderRecommendation] | list[dict],
+        candidates: list[CourseCandidate],
+    ) -> list[RecommendedCourse]:
+        candidates_by_id = {course.courseId: course for course in candidates}
+        selected: list[RecommendedCourse] = []
+        seen: set[int] = set()
+        for raw_result in results:
+            result = (
+                raw_result
+                if isinstance(raw_result, ProviderRecommendation)
+                else ProviderRecommendation.model_validate(raw_result)
+            )
+            course = candidates_by_id.get(result.courseId)
+            if course is None or result.courseId in seen:
+                continue
+            seen.add(result.courseId)
+            selected.append(self._to_recommended_course(course, result.reason))
+            if len(selected) == self.MAX_RECOMMEND_COUNT:
+                break
+        return selected
 
-        all_courses = await course_client.get_all_courses()
-        popular = sorted(
-            all_courses,
-            key=lambda c: c.enrollmentCount,
-            reverse=True
-        )[:self.MAX_RECOMMEND_COUNT]
+    def _fallback(
+        self, request: RecommendationRequest, candidates: list[CourseCandidate]
+    ) -> list[RecommendedCourse]:
+        ranked = sorted(
+            candidates,
+            key=lambda course: (
+                course.level == request.level,
+                course.situation == request.situation,
+            ),
+            reverse=True,
+        )
+        return [
+            self._to_recommended_course(
+                course, "선택한 언어, 수준과 상황을 기준으로 추천한 강의입니다."
+            )
+            for course in ranked[: self.MAX_RECOMMEND_COUNT]
+        ]
 
-        return RecommendResponse(
-            userId=user_id,
-            recommendedCourses=popular,
-            basedOnCategory=None,
-            message="인기 강의 추천입니다"
+    @staticmethod
+    def _to_recommended_course(course: CourseCandidate, reason: str) -> RecommendedCourse:
+        return RecommendedCourse(
+            courseId=course.courseId,
+            title=course.title,
+            language=course.language,
+            level=course.level,
+            reason=reason,
         )
 
 
-recommend_service = RecommendService()
+recommend_service = RecommendationService(
+    course_client=course_client,
+    provider=LocalAiRecommendationProvider(),
+    repository=SqlAlchemyRecommendationRepository(),
+)

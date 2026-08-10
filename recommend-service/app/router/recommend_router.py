@@ -1,28 +1,38 @@
-import logging
-from fastapi import APIRouter, Depends
-from app.config.security import verify_token
-from app.model.schemas import RecommendResponse
+from fastapi import APIRouter, Header, HTTPException, status
+
+from app.client.user_client import UserServiceUnavailable, user_client
+from app.model.schemas import RecommendationRequest, RecommendationResponse
 from app.service.recommend_service import recommend_service
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/recommend", tags=["recommend"])
+router = APIRouter(prefix="/api/courses/recommendations", tags=["recommendation"])
 
 
-@router.get("/{user_id}", response_model=RecommendResponse)
-async def get_recommendations(
-    user_id: int,
-    token_payload: dict = Depends(verify_token)
+@router.post("", response_model=RecommendationResponse)
+async def create_recommendation(
+    request: RecommendationRequest,
+    x_user_id: int = Header(alias="X-User-Id"),
+    x_user_role: str = Header(alias="X-User-Role"),
+    authorization: str = Header(alias="Authorization"),
 ):
-    """
-    GET /recommend/{userId} - 사용자 기반 강의 추천
+    if x_user_role != "EMPLOYEE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="직원만 강의 추천을 요청할 수 있습니다",
+        )
+    try:
+        company_id = await user_client.get_company_id(x_user_id, authorization)
+    except UserServiceUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
 
-    추천 규칙:
-    - 수강 이력 있음: 최빈 카테고리 기반 미수강 강의 추천 (수강생 수 기준 정렬)
-    - 수강 이력 없음: 전체 인기 강의 추천
-    """
-    logger.info(f"[Router] 추천 요청 - userId: {user_id}")
-    return await recommend_service.get_recommendations(user_id)
+    data = await recommend_service.recommend(
+        user_id=x_user_id,
+        company_id=company_id,
+        request=request,
+    )
+    return RecommendationResponse(data=data)
 
 
 @router.get("/health", include_in_schema=False)

@@ -1,46 +1,57 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from datetime import datetime, timezone
 from enum import Enum
-from decimal import Decimal
-from datetime import datetime
+from typing import List
+
+from pydantic import BaseModel, Field
 
 
-class CourseCategory(str, Enum):
-    BACKEND = "BACKEND"
-    FRONTEND = "FRONTEND"
-    DEVOPS = "DEVOPS"
-    DATA_SCIENCE = "DATA_SCIENCE"
-    MOBILE = "MOBILE"
-    SECURITY = "SECURITY"
-    DATABASE = "DATABASE"
-    OTHER = "OTHER"
+class RecommendationSource(str, Enum):
+    AI = "AI"
+    RULE_BASED_FALLBACK = "RULE_BASED_FALLBACK"
 
 
-class CourseResponse(BaseModel):
-    id: int
+class RecommendationStatus(str, Enum):
+    SUCCESS = "SUCCESS"
+    FALLBACK = "FALLBACK"
+    FAILED = "FAILED"
+
+
+class RecommendationRequest(BaseModel):
+    language: str = Field(min_length=1, max_length=30)
+    level: str = Field(min_length=1, max_length=30)
+    job: str = Field(min_length=1, max_length=50)
+    situation: str = Field(min_length=1, max_length=50)
+    goal: str = Field(min_length=1, max_length=500)
+
+
+class CourseCandidate(BaseModel):
+    courseId: int
     title: str
-    description: Optional[str] = None
-    category: CourseCategory
-    price: Decimal
-    instructorId: int
-    enrollmentCount: int
+    language: str
+    level: str
+    situation: str | None = None
     status: str
-    createdAt: Optional[datetime] = None
 
 
-class EnrollmentHistoryResponse(BaseModel):
-    userId: int
-    activeCourseIds: List[int]
+class ProviderRecommendation(BaseModel):
+    courseId: int
+    reason: str = Field(min_length=1, max_length=500)
 
 
-class RecommendResponse(BaseModel):
-    userId: int
-    recommendedCourses: List[CourseResponse]
-    basedOnCategory: Optional[CourseCategory] = None
-    message: str
+class RecommendedCourse(BaseModel):
+    courseId: int
+    title: str
+    language: str
+    level: str
+    reason: str
 
 
-class ApiResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
+class RecommendationData(BaseModel):
+    recommendationId: int
+    source: RecommendationSource
+    courses: List[RecommendedCourse]
+
+
+class RecommendationResponse(BaseModel):
+    data: RecommendationData
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
