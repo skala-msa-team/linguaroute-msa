@@ -133,7 +133,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [x] 발급된 토큰이 있어도 비활성 사용자는 `403 USER_INACTIVE` 확인
 - [ ] Gateway 경유 외부 경로 확인
 
-기존 Auth Server는 현재 Access Token과 함께 Refresh Token도 반환한다. 확정 MVP 문서는 Refresh Token을 사용하지 않는다고 정의하므로 프론트엔드는 이를 저장·사용하지 않아야 하며, 기존 Auth 이미지를 수정하지 않는 방침과의 차이는 팀에 공유해야 한다.
+기존 Auth Server는 현재 Access Token과 함께 Refresh Token도 반환한다. 확정 MVP 문서는 Refresh Token을 사용하지 않는다고 정의하므로 프론트엔드와 각 서비스는 Refresh Token을 저장·사용하지 않는다. 기존 Auth 이미지를 수정하지 않는 방침 때문에 응답 필드가 남아 있는 차이는 팀 공유 사항으로 유지한다.
 
 ## 6. `dev` 병합 후 필수 주의사항
 
@@ -181,11 +181,12 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 ### PR 3 — 구독 권한·좌석
 
-- [ ] `CompanyEntitlement`, `ProcessedEvent`
-- [ ] 결제·구독 Kafka 이벤트 멱등 소비
+- [x] `CompanyEntitlement` 테이블과 `/internal/companies/{companyId}/entitlement` 조회 API
+- [x] `ProcessedEvent`
+- [x] 결제·구독 Kafka 이벤트 멱등 소비와 `CompanyEntitlement` 자동 갱신
 - [ ] 활성 직원 기준 좌석 사용량 계산
 - [ ] 직원 가입 시 구독 활성·잔여 좌석 검사
-- [ ] 내부 구독 권한 조회 API
+- [x] 내부 구독 권한 조회 API
 
 ### PR 4 — 회원·운영 기능
 

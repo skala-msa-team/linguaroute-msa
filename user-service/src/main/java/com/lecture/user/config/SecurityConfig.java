@@ -37,7 +37,7 @@ public class SecurityConfig {
                     "/actuator/health"
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/companies").permitAll()
-                .requestMatchers("/internal/users/**").permitAll()
+                .requestMatchers("/internal/users/**", "/internal/companies/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));

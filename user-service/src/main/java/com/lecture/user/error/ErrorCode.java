@@ -13,6 +13,7 @@ public enum ErrorCode {
     INVALID_INTERNAL_API_KEY(HttpStatus.FORBIDDEN, "내부 API 키가 올바르지 않습니다"),
     INVALID_EMAIL_VERIFICATION(HttpStatus.UNPROCESSABLE_ENTITY, "이메일 인증 토큰이 유효하지 않습니다"),
     COMPANY_NOT_FOUND(HttpStatus.NOT_FOUND, "기업을 찾을 수 없습니다"),
+    COMPANY_ENTITLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "기업 구독 권한 정보를 찾을 수 없습니다"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
     USER_INACTIVE(HttpStatus.FORBIDDEN, "활성 상태의 사용자만 요청할 수 있습니다"),
     COMPANY_ADMIN_REQUIRED(HttpStatus.FORBIDDEN, "기업 관리자 권한이 필요합니다"),

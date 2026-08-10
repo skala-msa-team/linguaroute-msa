@@ -145,12 +145,16 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       mariadb:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
       auth-server:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - lecture-net
@@ -170,6 +174,8 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
       mariadb:
         condition: service_healthy
@@ -196,6 +202,9 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SERVICE_COURSE_SERVICE_URL=http://course-service:8082
+      - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
       mariadb:
         condition: service_healthy
@@ -250,6 +259,7 @@ services:
       - JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       eureka-server:

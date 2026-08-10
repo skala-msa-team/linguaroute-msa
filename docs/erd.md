@@ -99,6 +99,7 @@ erDiagram
         int seat_limit
         boolean auto_renew
         datetime current_period_end
+        datetime created_at
         datetime updated_at
     }
 
@@ -154,20 +155,22 @@ erDiagram
 
 | 테이블 | 제약조건 |
 | --- | --- |
-| `company` | `business_number` 유일 |
+| `companies` | `business_number` 유일 |
 | `users` | `email` 유일, `password`에는 BCrypt 해시만 저장 |
 | `users.role` | 기존 Auth Server 호환용 `STUDENT`, `INSTRUCTOR`만 저장 |
 | `users.business_role` | 실제 권한 `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` 저장 |
 | `users.company_id` | `PLATFORM_ADMIN`은 `NULL`, 기업 관리자와 직원은 필수 |
-| `invitation` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
-| `invitation` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
-| `company_entitlement` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
-| `processed_event` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
-| `user_agreement` | `(user_id, term_id)` 유일 |
-| `email_verification` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
-| `password_reset_token` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `invitations` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
+| `invitations` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
+| `company_entitlements` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
+| `processed_events` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
+| `user_agreements` | `(user_id, term_id)` 유일 |
+| `email_verifications` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `password_reset_tokens` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
 
-`user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 Kafka 이벤트로 받은 최신 이용 권한을 `company_entitlement`에 저장하여 직원 가입 시 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
+`user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 최신 이용 권한을 `company_entitlements`에 저장하여 직원 가입과 수강신청 권한 조회에 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
+
+현재 구현은 `company_entitlements` 테이블, `/internal/companies/{companyId}/entitlement` 조회 API, `subscription.events` Kafka 소비와 `processed_events` 기반 중복 처리를 포함합니다.
 
 ---
 

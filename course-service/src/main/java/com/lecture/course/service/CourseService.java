@@ -100,11 +100,18 @@ public class CourseService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 강의 존재 여부 확인 (Enrollment Service → Course Service REST 호출용)
-     */
-    public boolean existsCourse(Long id) {
-        return courseRepository.existsById(id);
+    public CourseDto.CourseResponse getInternalCourse(Long id) {
+        return CourseDto.CourseResponse.from(findCourseById(id));
+    }
+
+    public CourseDto.EnrollmentValidationResponse getEnrollmentValidation(Long id) {
+        Course course = findCourseById(id);
+        boolean enrollable = course.getStatus() == Course.Status.ACTIVE;
+        return CourseDto.EnrollmentValidationResponse.builder()
+                .courseId(course.getId())
+                .status(course.getStatus())
+                .enrollable(enrollable)
+                .build();
     }
 
     /**

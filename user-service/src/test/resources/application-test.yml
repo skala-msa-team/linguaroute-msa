@@ -17,6 +17,12 @@ spring:
         jwt:
           jwk-set-uri: http://localhost:9000/oauth2/jwks
           issuer-uri: http://localhost:9000
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: user-service-test
+    listener:
+      auto-startup: false
 
 eureka:
   client:
@@ -25,3 +31,11 @@ eureka:
 logging:
   level:
     root: WARN
+
+app:
+  security:
+    internal-api-key: local-internal-api-key
+
+kafka:
+  topic:
+    subscription-events: subscription.events

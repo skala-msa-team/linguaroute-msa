@@ -131,6 +131,16 @@ public class CourseDto {
         private long totalElements;
     }
 
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class EnrollmentValidationResponse {
+        private Long courseId;
+        private Course.Status status;
+        private boolean enrollable;
+    }
+
     // 공통 API 응답 래퍼
     @Getter
     @NoArgsConstructor

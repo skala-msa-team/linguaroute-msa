@@ -30,6 +30,11 @@ public enum ErrorCode {
             "현재 수강할 수 없는 강의입니다."
     ),
 
+    INVALID_INTERNAL_API_KEY(
+            HttpStatus.UNAUTHORIZED,
+            "내부 API 키가 올바르지 않습니다."
+    ),
+
     LESSON_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "차시를 찾을 수 없습니다."

@@ -602,11 +602,12 @@ Content-Type: application/json
 
 #### Swagger 검증 상태
 
-2026-08-11 Java 21로 로컬 실행한 `course-service` Swagger에서 `GET /api/courses/internal/recommend?language=ENGLISH`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다. 보호 API인 `GET /api/courses`는 인증 토큰 없이 직접 호출하면 `401 Unauthorized`가 반환됩니다. 따라서 다음처럼 구분합니다.
+2026-08-11 Java 21로 로컬 실행한 `course-service` Swagger에서 기존 내부 경로인 `GET /api/courses/internal/recommend?language=ENGLISH`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다. 이후 내부 API 보안 기준을 반영하여 목표 내부 경로는 `GET /internal/courses/recommend?language=ENGLISH`로 변경되었습니다. 보호 API인 `GET /api/courses`는 인증 토큰 없이 직접 호출하면 `401 Unauthorized`가 반환됩니다. 따라서 다음처럼 구분합니다.
 
 | 구분 | 상태 |
 | --- | --- |
-| 실제 실행 확인 | `GET http://localhost:8082/api/courses/internal/recommend?language=ENGLISH` → `200 OK` |
+| 과거 실행 확인 | `GET http://localhost:8082/api/courses/internal/recommend?language=ENGLISH` → `200 OK` |
+| 현재 목표 내부 경로 | `GET http://localhost:8082/internal/courses/recommend?language=ENGLISH` + `X-Internal-Api-Key` |
 | 확인된 실행 응답 | LinguaRoute 강의의 `language`, `situation`, `level`, `status` 구조 |
 | 목표 발표 계약 | 이 장과 [API 명세서](./api-spec.md)의 LinguaRoute B2B 구독·학습 구조 |
 | 남은 통합 확인 | Auth Server와 Gateway 이미지 준비 → 보호 API 인증 흐름 실행 → 프론트 `VITE_USE_LIVE_API=true` 연결 → 요청·응답 재캡처 |

@@ -29,6 +29,20 @@ spring:
           jwk-set-uri: http://localhost:9000/oauth2/jwks
           issuer-uri: http://localhost:9000
 
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: user-service
+      auto-offset-reset: earliest
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: java.util.HashMap
+
 eureka:
   client:
     service-url:
@@ -57,3 +71,7 @@ management:
 app:
   security:
     internal-api-key: ${INTERNAL_API_KEY:local-internal-api-key}
+
+kafka:
+  topic:
+    subscription-events: subscription.events

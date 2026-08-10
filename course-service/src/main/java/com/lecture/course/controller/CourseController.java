@@ -10,8 +10,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/courses")
 @RequiredArgsConstructor
@@ -48,32 +46,4 @@ public class CourseController {
         );
     }
 
-    /**
-     * GET /courses/internal/exists/{id} - 강의 존재 여부 (Enrollment Service 호출)
-     */
-    @GetMapping("/internal/exists/{id}")
-    public ResponseEntity<Boolean> existsCourse(@PathVariable Long id) {
-        return ResponseEntity.ok(courseService.existsCourse(id));
-    }
-
-    /**
-     * GET /courses/internal/{id} - 강의 상세 조회 (Enrollment Service 내부 호출용)
-     * - 내 수강 목록 응답 조립 시 사용
-     * - 래퍼 없이 CourseResponse만 직접 반환
-     */
-    @GetMapping("/internal/{id}")
-    public ResponseEntity<CourseDto.CourseResponse> getCourseInternal(@PathVariable Long id) {
-        return ResponseEntity.ok(courseService.getCourse(id));
-    }
-
-    /**
-     * GET /courses/internal/recommend - 추천 서비스용 미수강 강의 조회
-     * language: 언어, excludeIds: 이미 수강한 강의 ID 목록
-     */
-    @GetMapping("/internal/recommend")
-    public ResponseEntity<List<CourseDto.CourseResponse>> getRecommendCourses(
-            @RequestParam Course.Language language,
-            @RequestParam(defaultValue = "") List<Long> excludeIds) {
-        return ResponseEntity.ok(courseService.getRecommendCourses(language, excludeIds));
-    }
 }
