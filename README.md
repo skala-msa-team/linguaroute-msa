@@ -358,7 +358,7 @@ sequenceDiagram
 
     Admin->>GW: 초대코드 생성 요청
     GW->>US: 초대코드 생성
-    US->>DB: 기업 구독 권한·잔여 좌석 확인 후 초대 저장
+    US->>DB: 초대코드 해시·만료 시각 저장
     US-->>Admin: 일회용 초대코드 반환
     Employee->>GW: 초대코드 포함 회원가입
     GW->>US: 직원 가입 요청
