@@ -182,7 +182,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [x] 이메일 인증·필수 약관을 포함한 직원 가입 API
 - [x] Auth 호환 `STUDENT`, 비즈니스 역할 `EMPLOYEE` 저장
 
-초대코드 원문은 생성·재발급 응답에서만 한 번 반환한다. 목록은 `code=null`, `codeMasked`와 상태·시각만 반환하며, 원문 해시는 `invitations.code_hash`에만 저장한다. 직원 가입 화면의 실 API 연결은 다음 직원 계정 작업에서 완료한다.
+초대코드 원문은 생성·재발급 응답에서만 한 번 반환한다. 목록은 `code=null`, `codeMasked`와 상태·시각만 반환하며, 원문 해시는 `invitations.code_hash`에만 저장한다. 직원 가입 화면은 이메일 인증·필수 약관 동의 후 `POST /api/employees/signup`을 호출한다.
 
 ### PR 3 — 구독 권한·좌석
 
@@ -195,11 +195,13 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 
 ### PR 4 — 회원·운영 기능
 
-- [ ] 직원 목록과 상태 변경
+- [x] 직원 목록과 상태 변경
+- [x] 구매·사용·잔여 좌석 조회
+- [x] 비활성화·소속 해제 시 좌석 회수, 재활성화 시 좌석 재검증
 - [x] 비밀번호 재설정 링크 발송·단회 확인
 - [x] 아이디 찾기 등록 이메일 안내
 - [x] 회원 탈퇴와 로그인 불가 비밀번호 교체 서버 구현
-- [ ] 실제 Bearer Token Gateway 통합 검증
+- [x] 실제 Bearer Token Gateway 통합 검증
 - [ ] 플랫폼 관리자용 기업·사용자 상태 조회
 
 ## 8. 커밋·PR 전 체크

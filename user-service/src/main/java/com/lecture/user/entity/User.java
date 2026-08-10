@@ -69,6 +69,11 @@ public class User {
         this.password = password;
     }
 
+    public void releaseFromCompany() {
+        this.company = null;
+        this.status = Status.INACTIVE;
+    }
+
     public enum AuthRole {
         STUDENT,
         INSTRUCTOR

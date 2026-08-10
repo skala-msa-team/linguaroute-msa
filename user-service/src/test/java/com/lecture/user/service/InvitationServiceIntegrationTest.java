@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InvitationServiceIntegrationTest {
 
     @Autowired private InvitationService invitationService;
+    @Autowired private EmployeeManagementService employeeManagementService;
     @Autowired private CompanyRepository companyRepository;
     @Autowired private CompanyEntitlementRepository companyEntitlementRepository;
     @Autowired private InvitationRepository invitationRepository;
@@ -162,6 +163,30 @@ class InvitationServiceIntegrationTest {
                 .isInstanceOf(ApiException.class)
                 .extracting("errorCode")
                 .isEqualTo(com.lecture.user.error.ErrorCode.SUBSCRIPTION_INACTIVE);
+    }
+
+    @Test
+    void 기업관리자는_직원상태와_좌석을_함께관리한다() {
+        InvitationDto.Response first = invitationService.create(admin.getId(), new InvitationDto.CreateRequest(7));
+        invitationService.signupEmployee(employeeRequest(first.getCode(), "first@example.com", verifiedSignupToken("first@example.com")));
+        InvitationDto.Response second = invitationService.create(admin.getId(), new InvitationDto.CreateRequest(7));
+        invitationService.signupEmployee(employeeRequest(second.getCode(), "second@example.com", verifiedSignupToken("second@example.com")));
+        User firstEmployee = userRepository.findByEmail("first@example.com").orElseThrow();
+
+        assertThat(employeeManagementService.getEmployees(admin.getId())).hasSize(2);
+        assertThat(employeeManagementService.getSeats(admin.getId()).getUsed()).isEqualTo(2);
+        assertThat(employeeManagementService.getSeats(admin.getId()).getRemaining()).isZero();
+
+        employeeManagementService.updateEmployeeStatus(admin.getId(), firstEmployee.getId(),
+                new com.lecture.user.dto.CompanyDto.UpdateEmployeeStatusRequest(
+                        com.lecture.user.dto.CompanyDto.EmployeeStatusAction.INACTIVE));
+        assertThat(employeeManagementService.getSeats(admin.getId()).getUsed()).isEqualTo(1);
+
+        employeeManagementService.updateEmployeeStatus(admin.getId(), firstEmployee.getId(),
+                new com.lecture.user.dto.CompanyDto.UpdateEmployeeStatusRequest(
+                        com.lecture.user.dto.CompanyDto.EmployeeStatusAction.RELEASED));
+        assertThat(userRepository.findById(firstEmployee.getId()).orElseThrow().getCompany()).isNull();
+        assertThat(employeeManagementService.getEmployees(admin.getId())).hasSize(1);
     }
 
     private AuthDto.EmployeeSignupRequest employeeRequest(String code, String email, String token) {
