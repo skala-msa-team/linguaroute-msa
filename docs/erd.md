@@ -159,7 +159,7 @@ erDiagram
 | `users` | `email` 유일, `password`에는 BCrypt 해시만 저장 |
 | `users.role` | 기존 Auth Server 호환용 `STUDENT`, `INSTRUCTOR`만 저장 |
 | `users.business_role` | 실제 권한 `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` 저장 |
-| `users.company_id` | `PLATFORM_ADMIN`은 `NULL`, 기업 관리자와 직원은 필수 |
+| `users.company_id` | `PLATFORM_ADMIN`은 `NULL`, 기업 관리자와 활성·비활성 직원은 필수, `RELEASED` 처리된 직원은 `NULL` |
 | `invitations` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
 | `invitations` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
 | `company_entitlements` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
@@ -170,7 +170,7 @@ erDiagram
 
 `user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 최신 이용 권한을 `company_entitlements`에 저장하여 직원 가입과 수강신청 권한 조회에 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
 
-현재 구현은 `invitations` 테이블의 초대코드 SHA-256 해시 저장, 초대 생성·목록·폐기·재발급, 초대 기반 직원 가입의 단회 사용·만료·구독·좌석 검증을 포함합니다. 또한 `company_entitlements` 테이블, `/internal/companies/{companyId}/entitlement` 조회 API, `subscription.events` Kafka 소비와 `processed_events` 기반 중복 처리를 포함합니다.
+현재 구현은 `invitations` 테이블의 초대코드 SHA-256 해시 저장, 초대 생성·목록·폐기·재발급, 초대 기반 직원 가입의 단회 사용·만료·구독·좌석 검증을 포함합니다. 사용 좌석은 별도 테이블이 아니라 같은 기업의 `ACTIVE` 직원 수로 계산하며, 직원 비활성화·소속 해제는 즉시 좌석을 회수합니다. 재활성화는 `company_entitlements` 잠금 조회 후 잔여 좌석을 다시 검증합니다. 또한 `company_entitlements` 테이블, `/internal/companies/{companyId}/entitlement` 조회 API, `subscription.events` Kafka 소비와 `processed_events` 기반 중복 처리를 포함합니다.
 
 ---
 

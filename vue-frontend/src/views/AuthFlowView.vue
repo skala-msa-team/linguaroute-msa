@@ -22,20 +22,20 @@
             <template v-if="step===1">
               <div class="invite-check"><TicketCheck :size="24" /><div><strong>초대코드를 먼저 확인할게요</strong><p>기업 관리자가 전달한 8자리 코드를 입력하세요.</p></div></div>
               <div class="field"><label>초대코드</label><div class="verify-row"><input v-model="invitationCode" class="input invite-input" /><button type="button" class="button small accent" @click="validateInvitation">코드 확인</button></div></div>
-              <div v-if="inviteStatus==='valid'" class="notice success"><CircleCheck :size="18" /><span><strong>스칼라테크의 초대가 확인되었습니다</strong>활성 구독 · 잔여 좌석 8개 · 2026.08.17까지 유효</span></div>
+              <div v-if="inviteStatus==='valid'" class="notice success"><CircleCheck :size="18" /><span><strong>초대코드를 입력했습니다</strong>가입 요청 시 코드의 유효 기간, 사용 여부와 잔여 좌석을 다시 확인합니다.</span></div>
               <div v-else-if="inviteStatus" class="notice error"><AlertTriangle :size="18" /><span><strong>{{ inviteError.title }}</strong>{{ inviteError.description }}</span></div>
-              <div class="state-hint"><Info :size="14" /> 상태 확인용 코드: EXPIRED, USED, NO-SEAT, INACTIVE</div>
             </template>
             <template v-else-if="step===2">
-              <div class="form-grid"><div class="field"><label>이름</label><input class="input" placeholder="이름" /></div><div class="field"><label>업무용 이메일</label><div class="verify-row"><input class="input" type="email" placeholder="name@company.com" /><button type="button" class="button small" @click="verificationSent=true">인증번호 발송</button></div></div></div>
+              <div class="form-grid"><div class="field"><label>이름</label><input v-model.trim="employeeForm.name" class="input" required maxlength="100" placeholder="이름" /></div><div class="field"><label>업무용 이메일</label><div class="verify-row"><input v-model.trim="employeeForm.email" class="input" type="email" required placeholder="name@company.com" /><button type="button" class="button small" @click="requestEmployeeVerification">인증번호 발송</button></div></div></div>
               <div v-if="verificationSent" class="notice"><MailCheck :size="18" /><span><strong>인증번호를 발송했습니다</strong>15분 안에 아래 6자리 인증번호를 입력해 주세요.</span></div>
-              <div class="field"><label>이메일 인증번호</label><div class="code-inputs"><input v-for="n in 6" :key="n" maxlength="1" :value="verificationSent && n<5?n:''" /></div><small class="timer">남은 시간 14:32 · 재발송 42초 후</small></div>
+              <div class="field"><label>이메일 인증번호</label><div class="verify-row"><input v-model.trim="employeeVerificationCode" class="input verification-code" maxlength="6" inputmode="numeric" required placeholder="6자리 숫자" /><button type="button" class="button small" :disabled="!verificationSent" @click="confirmEmployeeVerification">인증 확인</button></div><small v-if="employeeForm.emailVerificationToken" class="success-text"><CircleCheck :size="14" /> 이메일 인증이 완료되었습니다.</small></div>
             </template>
             <template v-else>
-              <div class="form-grid"><div class="field"><label>비밀번호</label><input class="input" type="password" placeholder="영문, 숫자, 특수문자 포함 8자 이상" /></div><div class="field"><label>비밀번호 확인</label><input class="input" type="password" placeholder="비밀번호를 다시 입력하세요" /></div></div>
-              <div class="agreement-box"><label v-for="item in agreements" :key="item.label" class="agreement"><input type="checkbox" :checked="item.required" /><span><strong>{{ item.required?'[필수]':'[선택]' }} {{ item.label }}</strong><small>{{ item.description }}</small></span><ChevronRight :size="17" /></label></div>
+              <div class="form-grid"><div class="field"><label>비밀번호</label><input v-model="employeeForm.password" class="input" type="password" minlength="8" maxlength="72" required placeholder="8자 이상" /></div><div class="field"><label>비밀번호 확인</label><input v-model="employeePasswordConfirm" class="input" type="password" minlength="8" maxlength="72" required placeholder="비밀번호를 다시 입력하세요" /></div></div>
+              <div class="agreement-box"><label v-for="item in agreements" :key="item.id" class="agreement"><input v-model="employeeForm.agreementIds" type="checkbox" :value="item.id" /><span><strong>{{ item.required?'[필수]':'[선택]' }} {{ item.label }}</strong><small>약관 ID {{ item.id }} · 버전 {{ item.version }}</small></span><ChevronRight :size="17" /></label></div>
+              <p v-if="formError" class="form-error"><AlertTriangle :size="15" />{{ formError }}</p>
             </template>
-            <div class="form-actions"><button v-if="step>1" class="button" type="button" @click="previousStep"><ArrowLeft :size="16" /> 이전</button><button class="button primary" type="submit" :disabled="step===1 && inviteStatus!=='valid'">{{ step===3?'가입하고 학습 시작하기':'다음 단계' }} <ArrowRight :size="16" /></button></div>
+            <div class="form-actions"><button v-if="step>1" class="button" type="button" @click="previousStep"><ArrowLeft :size="16" /> 이전</button><button class="button primary" type="submit" :disabled="step===1 && inviteStatus!=='valid'">{{ step===3?'가입 완료':'다음 단계' }} <ArrowRight :size="16" /></button></div>
           </form>
         </template>
 
@@ -66,9 +66,10 @@ import { ArrowLeft, ArrowRight, MailCheck, ChevronRight, TicketCheck, CircleChec
 import BrandLogo from '@/components/BrandLogo.vue'
 import { authApi } from '@/api/auth.js'
 const props=defineProps({ mode:{type:String,default:'company-signup'} })
-const route=useRoute(); const step=ref(1); const submitted=ref(false); const recoveryTab=ref(route.query.tab==='id'?'id':'password'); const invitationCode=ref('A7K9-P2QM'); const inviteStatus=ref('valid'); const verificationSent=ref(false); const resetDone=ref(false)
+const route=useRoute(); const step=ref(1); const submitted=ref(false); const recoveryTab=ref(route.query.tab==='id'?'id':'password'); const invitationCode=ref(''); const inviteStatus=ref(''); const verificationSent=ref(false); const resetDone=ref(false)
 const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'; const verificationCode=ref('123456'); const passwordConfirm=ref('Password123!'); const formError=ref('')
 const companyForm=reactive({company:{name:'스칼라테크',businessNumber:'123-45-67890'},admin:{email:'admin@scalatech.co.kr',password:'Password123!',name:'김관리'},emailVerificationToken:'prototype-email-verification-token',agreementIds:[1,2]})
+const employeeForm=reactive({invitationCode:'',email:'',password:'',name:'',emailVerificationToken:'',agreementIds:[]}); const employeeVerificationCode=ref(''); const employeePasswordConfirm=ref('')
 const recoveryEmail=ref(''); const recoveryName=ref(''); const recoveryBusinessNumber=ref(''); const resetPassword=ref(''); const resetPasswordConfirm=ref('')
 const configs={
   'company-signup':{eyebrow:'Company onboarding',title:'기업 학습 공간 만들기',description:'기업 정보와 관리자 계정을 등록하면 바로 요금제를 선택하고 직원을 초대할 수 있습니다.',steps:['기업 정보','이메일 인증','약관 동의']},
@@ -82,8 +83,10 @@ async function handleCompanyNext(){ formError.value=''; if(step.value===2){if(co
 function previousStep(){ if(step.value>1) step.value-=1 }
 const inviteErrors={expired:{title:'초대코드가 만료되었습니다',description:'기업 관리자에게 새로운 초대코드를 요청해 주세요.'},used:{title:'이미 사용된 초대코드입니다',description:'일회용 코드는 한 명만 사용할 수 있습니다.'},seat:{title:'사용 가능한 좌석이 없습니다',description:'기업 관리자가 구독 좌석을 확보한 후 다시 시도해 주세요.'},inactive:{title:'기업 구독이 활성 상태가 아닙니다',description:'구독 상태가 복구된 후 직원 가입을 진행할 수 있습니다.'}}
 const inviteError=computed(()=>inviteErrors[inviteStatus.value]||inviteErrors.expired)
-function validateInvitation(){ const code=invitationCode.value.trim().toUpperCase(); inviteStatus.value=code==='EXPIRED'?'expired':code==='USED'?'used':code==='NO-SEAT'?'seat':code==='INACTIVE'?'inactive':'valid' }
-function handleEmployeeNext(){ if(step.value===1&&inviteStatus.value!=='valid')return; if(step.value<3)step.value+=1; else window.location.href='/app' }
+function validateInvitation(){ if(!invitationCode.value.trim()){inviteStatus.value='expired';return} employeeForm.invitationCode=invitationCode.value.trim().toUpperCase(); inviteStatus.value='valid' }
+async function requestEmployeeVerification(){formError.value='';try{if(!employeeForm.email){formError.value='이메일을 입력해 주세요.';return}if(useLiveApi)await authApi.requestEmailVerification(employeeForm.email);verificationSent.value=true}catch(error){formError.value=error.response?.data?.message||'인증번호를 발송하지 못했습니다.'}}
+async function confirmEmployeeVerification(){formError.value='';try{if(!employeeVerificationCode.value){formError.value='인증번호를 입력해 주세요.';return}if(useLiveApi){const response=await authApi.confirmEmailVerification(employeeForm.email,employeeVerificationCode.value);employeeForm.emailVerificationToken=response.data.data.emailVerificationToken}else employeeForm.emailVerificationToken='prototype-email-verification-token'}catch(error){formError.value=error.response?.data?.message||'이메일 인증에 실패했습니다.'}}
+async function handleEmployeeNext(){formError.value='';if(step.value===1&&inviteStatus.value!=='valid')return;if(step.value===2&&!employeeForm.emailVerificationToken){formError.value='이메일 인증을 완료해 주세요.';return}if(step.value<3){step.value+=1;return}if(employeeForm.password!==employeePasswordConfirm.value){formError.value='비밀번호가 일치하지 않습니다.';return}if(!agreements.filter(item=>item.required).every(item=>employeeForm.agreementIds.includes(item.id))){formError.value='필수 약관에 모두 동의해 주세요.';return}try{if(useLiveApi)await authApi.registerEmployee(employeeForm);window.location.href='/login'}catch(error){formError.value=error.response?.data?.message||'직원 계정을 만들지 못했습니다.'}}
 async function requestRecovery(){ formError.value=''; try{if(useLiveApi){if(recoveryTab.value==='password')await authApi.requestPasswordReset(recoveryEmail.value);else await authApi.requestIdFind(recoveryName.value,recoveryBusinessNumber.value)}submitted.value=true}catch(error){formError.value=error.response?.data?.message||'요청을 처리하지 못했습니다.'} }
 async function confirmPasswordReset(){ formError.value=''; if(resetPassword.value!==resetPasswordConfirm.value){formError.value='비밀번호가 일치하지 않습니다.';return} if(!route.query.token){formError.value='재설정 토큰이 없습니다.';return} try{if(useLiveApi)await authApi.confirmPasswordReset(route.query.token,resetPassword.value);resetDone.value=true}catch(error){formError.value=error.response?.data?.message||'비밀번호를 변경하지 못했습니다.'} }
 </script>

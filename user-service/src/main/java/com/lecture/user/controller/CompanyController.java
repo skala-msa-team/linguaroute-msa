@@ -28,6 +28,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final InvitationService invitationService;
+    private final com.lecture.user.service.EmployeeManagementService employeeManagementService;
     private final AuthenticatedUser authenticatedUser;
 
     @PostMapping
@@ -67,6 +68,29 @@ public class CompanyController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
                 invitationService.getAll(authenticatedUser.userId(jwt))));
+    }
+
+    @GetMapping("/me/employees")
+    public ResponseEntity<ApiResponse<java.util.List<CompanyDto.EmployeeResponse>>> getEmployees(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+                employeeManagementService.getEmployees(authenticatedUser.userId(jwt))));
+    }
+
+    @PatchMapping("/me/employees/{employeeId}/status")
+    public ResponseEntity<ApiResponse<CompanyDto.EmployeeResponse>> updateEmployeeStatus(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long employeeId,
+            @Valid @RequestBody CompanyDto.UpdateEmployeeStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(employeeManagementService.updateEmployeeStatus(
+                authenticatedUser.userId(jwt), employeeId, request)));
+    }
+
+    @GetMapping("/me/seats")
+    public ResponseEntity<ApiResponse<CompanyDto.SeatResponse>> getSeats(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+                employeeManagementService.getSeats(authenticatedUser.userId(jwt))));
     }
 
     @DeleteMapping("/me/invitations/{invitationId}")

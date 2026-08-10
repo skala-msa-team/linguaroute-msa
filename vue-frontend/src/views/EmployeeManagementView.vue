@@ -7,8 +7,8 @@
     <div v-if="toast" class="toast" role="status"><CircleCheck :size="16"/> {{ toast }}</div>
 
     <section class="seat-card">
-      <div><span class="seat-icon"><Armchair :size="21"/></span><span><strong>{{ activeSeatCount }} / 50</strong><small>사용 중인 좌석</small></span></div>
-      <div class="seat-track"><div class="progress"><span :style="`width:${activeSeatCount/50*100}%`"></span></div><p><span>사용 {{ activeSeatCount }}석</span><span>잔여 {{ 50-activeSeatCount }}석</span></p></div>
+      <div><span class="seat-icon"><Armchair :size="21"/></span><span><strong>{{ seats.used }} / {{ seats.purchased }}</strong><small>사용 중인 좌석</small></span></div>
+      <div class="seat-track"><div class="progress"><span :style="`width:${seatUsagePercent}%`"></span></div><p><span>사용 {{ seats.used }}석</span><span>잔여 {{ seats.remaining }}석</span></p></div>
       <router-link to="/company/subscription">좌석 늘리기 <ArrowUpRight :size="15"/></router-link>
     </section>
 
@@ -20,19 +20,15 @@
     <section v-if="tab==='employees'" class="panel data-panel">
       <div class="table-toolbar">
         <div class="table-search"><Search :size="16"/><input v-model="keyword" placeholder="이름 또는 이메일 검색"/></div>
-        <select v-model="statusFilter" class="select"><option>전체 상태</option><option>활성</option><option>비활성</option><option>소속 해제</option></select>
-        <select class="select"><option>전체 부서</option><option>글로벌사업팀</option><option>개발플랫폼팀</option></select>
-        <button class="button small"><Download :size="15"/> 내보내기</button>
+        <select v-model="statusFilter" class="select"><option>전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>
       </div>
       <div v-if="filteredEmployees.length" class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>직원</th><th>부서</th><th>수강 강의</th><th>평균 진도</th><th>가입일</th><th>상태</th><th>관리</th></tr></thead>
-          <tbody><tr v-for="employee in filteredEmployees" :key="employee.email">
+          <thead><tr><th>직원</th><th>가입일</th><th>상태</th><th>관리</th></tr></thead>
+          <tbody><tr v-for="employee in filteredEmployees" :key="employee.userId || employee.email">
             <td><div class="person"><span class="avatar">{{ employee.name[0] }}</span><span><strong>{{ employee.name }}</strong><span>{{ employee.email }}</span></span></div></td>
-            <td>{{ employee.team }}</td><td>{{ employee.courses }}개</td>
-            <td><div class="table-progress"><div class="progress"><span :style="`width:${employee.progress}%`"></span></div><b>{{ employee.progress }}%</b></div></td>
-            <td>{{ employee.joined }}</td><td><span class="tag" :class="employee.status==='활성'?'':employee.status==='비활성'?'amber':'gray'">{{ employee.status }}</span></td>
-            <td><div class="row-actions"><button class="button small" @click="toggleEmployee(employee)">{{ employee.status==='활성'?'비활성화':'활성화' }}</button><button class="icon-action danger" aria-label="소속 해제" @click="openEmployeeDialog(employee)"><UserRoundMinus :size="15"/></button></div></td>
+            <td>{{ employee.joined }}</td><td><span class="tag" :class="employee.status==='ACTIVE'||employee.status==='활성'?'':'amber'">{{ employee.status==='ACTIVE'||employee.status==='활성'?'활성':'비활성' }}</span></td>
+            <td><div class="row-actions"><button class="button small" @click="toggleEmployee(employee)">{{ employee.status==='ACTIVE'||employee.status==='활성'?'비활성화':'활성화' }}</button><button class="icon-action danger" aria-label="소속 해제" @click="openEmployeeDialog(employee)"><UserRoundMinus :size="15"/></button></div></td>
           </tr></tbody>
         </table>
       </div>
@@ -72,7 +68,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { UserPlus, Armchair, ArrowUpRight, Search, Download, Plus, TicketCheck, Copy, X, TicketPlus, ShieldCheck, CircleCheck, UserRoundMinus, SearchX, Trash2, RefreshCw } from '@lucide/vue'
+import { UserPlus, Armchair, ArrowUpRight, Search, Plus, TicketCheck, Copy, X, TicketPlus, ShieldCheck, CircleCheck, UserRoundMinus, SearchX, Trash2, RefreshCw } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { employees, invitations } from '@/data/mockData.js'
@@ -82,23 +78,26 @@ const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
 const tab=ref('employees'), inviteModal=ref(false), copied=ref(''), generatedCode=ref(''), toast=ref(''), keyword=ref(''), statusFilter=ref('전체 상태'), employeeDialog=ref(null), expiresInDays=ref(7)
 const employeeRows=ref(employees.map(item=>({...item})))
 const invitationRows=ref(invitations.map(item=>({...item})))
-const activeSeatCount=computed(()=>employeeRows.value.filter(item=>item.status==='활성').length+38)
+const seats=ref({purchased:50,used:employees.filter(item=>item.status==='활성').length+38,remaining:50-(employees.filter(item=>item.status==='활성').length+38)})
+const seatUsagePercent=computed(()=>seats.value.purchased?Math.min(100,seats.value.used/seats.value.purchased*100):0)
 const filteredEmployees=computed(()=>employeeRows.value.filter(item=>(!keyword.value||item.name.includes(keyword.value)||item.email.includes(keyword.value))&&(statusFilter.value==='전체 상태'||item.status===statusFilter.value)))
 
 function notify(message){toast.value=message;window.setTimeout(()=>toast.value='',2200)}
 function copyCode(code){copied.value=code;navigator.clipboard?.writeText(code);notify('초대코드를 클립보드에 복사했습니다.')}
-function toggleEmployee(employee){employee.status=employee.status==='활성'?'비활성':'활성';notify(`${employee.name}님의 계정을 ${employee.status} 상태로 변경했습니다.`)}
+async function toggleEmployee(employee){const next=employee.status==='ACTIVE'||employee.status==='활성'?'INACTIVE':'ACTIVE';try{if(useLiveApi){await companyApi.updateEmployeeStatus(employee.userId,next);await loadEmployees()}else{employee.status=next==='ACTIVE'?'활성':'비활성'}notify(`${employee.name}님의 계정을 ${next==='ACTIVE'?'활성':'비활성'} 상태로 변경했습니다.`)}catch(error){notify(error.response?.data?.message||'직원 상태를 변경하지 못했습니다.')}}
 function openEmployeeDialog(employee){employeeDialog.value=employee}
-function releaseEmployee(){employeeDialog.value.status='소속 해제';notify(`${employeeDialog.value.name}님의 소속을 해제하고 좌석을 회수했습니다.`);employeeDialog.value=null}
+async function releaseEmployee(){try{if(useLiveApi){await companyApi.updateEmployeeStatus(employeeDialog.value.userId,'RELEASED');await loadEmployees()}else employeeDialog.value.status='소속 해제';notify(`${employeeDialog.value.name}님의 소속을 해제하고 좌석을 회수했습니다.`);employeeDialog.value=null}catch(error){notify(error.response?.data?.message||'직원 소속을 해제하지 못했습니다.')}}
 function isUnused(invite){return invite.status==='UNUSED'||invite.status==='미사용'}
 function invitationStatusLabel(status){return ({UNUSED:'미사용',USED:'사용됨',EXPIRED:'만료',REVOKED:'폐기'})[status]||status}
 function formatDate(value){return value?value.slice(0,10).replaceAll('-','.'):'-'}
 function toInvitationRow(invite){return {invitationId:invite.invitationId,code:invite.code,codeMasked:invite.codeMasked,status:invite.status,created:formatDate(invite.createdAt),expires:formatDate(invite.expiresAt)}}
 async function loadInvitations(){if(!useLiveApi)return;try{invitationRows.value=(await companyApi.getInvitations()).data.data.map(toInvitationRow)}catch(error){notify(error.response?.data?.message||'초대코드 목록을 불러오지 못했습니다.')}}
+function toEmployeeRow(employee){return {...employee,joined:formatDate(employee.joinedAt)}}
+async function loadEmployees(){if(!useLiveApi)return;try{const [employeeResponse,seatResponse]=await Promise.all([companyApi.getEmployees(),companyApi.getSeats()]);employeeRows.value=employeeResponse.data.data.map(toEmployeeRow);seats.value=seatResponse.data.data}catch(error){notify(error.response?.data?.message||'직원 또는 좌석 정보를 불러오지 못했습니다.')}}
 async function discardInvitation(invite){try{if(useLiveApi){await companyApi.revokeInvitation(invite.invitationId);await loadInvitations()}else invite.status='폐기';notify('초대코드를 폐기했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 폐기하지 못했습니다.')}}
 async function reissueInvitation(invite){try{if(useLiveApi){const created=toInvitationRow((await companyApi.reissueInvitation(invite.invitationId)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}notify('새 초대코드를 발급했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 재발급하지 못했습니다.')}}
 async function generateInvitation(){try{if(useLiveApi){const created=toInvitationRow((await companyApi.createInvitation(expiresInDays.value)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;generatedCode.value=code;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}}catch(error){notify(error.response?.data?.message||'초대코드를 생성하지 못했습니다.')}}
-onMounted(loadInvitations)
+onMounted(()=>{loadInvitations();loadEmployees()})
 </script>
 
 <style scoped>

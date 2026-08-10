@@ -116,4 +116,40 @@ public class CompanyDto {
         private LocalDateTime currentPeriodEnd;
         private Boolean autoRenew;
     }
+
+    @Getter
+    @AllArgsConstructor
+    public static class EmployeeResponse {
+        private Long userId;
+        private String email;
+        private String name;
+        private User.Status status;
+        private LocalDateTime joinedAt;
+
+        public static EmployeeResponse from(User user) {
+            return new EmployeeResponse(user.getId(), user.getEmail(), user.getName(), user.getStatus(), user.getCreatedAt());
+        }
+    }
+
+    public enum EmployeeStatusAction {
+        ACTIVE,
+        INACTIVE,
+        RELEASED
+    }
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateEmployeeStatusRequest {
+        @NotNull(message = "직원 상태는 필수입니다")
+        private EmployeeStatusAction status;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class SeatResponse {
+        private Integer purchased;
+        private long used;
+        private long remaining;
+    }
 }

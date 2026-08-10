@@ -481,6 +481,35 @@ POST /api/companies/me/invitations/{invitationId}/reissue
 }
 ```
 
+### EMPLOYEE-02 직원 목록, EMPLOYEE-03 상태 변경
+
+`GET /api/companies/me/employees`는 요청한 기업 관리자의 소속 직원만 반환합니다. 수강 강의·진도는 `enrollment-service` 소유 데이터이므로 이 API에 포함하지 않습니다.
+
+```json
+{
+  "data": [{
+    "userId": 101,
+    "email": "employee@company.com",
+    "name": "이직원",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-10T10:30:00"
+  }],
+  "timestamp": "2026-08-10T10:30:00+09:00"
+}
+```
+
+`PATCH /api/companies/me/employees/{userId}/status` 요청은 아래 상태 중 하나를 사용합니다.
+
+```json
+{ "status": "INACTIVE" }
+```
+
+- `ACTIVE`: 비활성 직원을 다시 활성화하며, 활성 구독과 잔여 좌석을 확인한 뒤 좌석을 배정합니다.
+- `INACTIVE`: 기업 소속은 유지하고 계정을 비활성화하며, 활성 직원 수에서 제외해 좌석을 회수합니다.
+- `RELEASED`: 계정은 삭제하지 않고 기업 소속을 해제하며 계정을 비활성화합니다. 이후 해당 기업의 직원 목록에서는 조회되지 않습니다.
+
+`SEAT-01`의 `purchased`는 현재 활성 구독의 좌석 한도이고, `used`는 해당 기업의 `ACTIVE` 직원 수, `remaining`은 `purchased - used`입니다. 활성 구독이 없거나 만료되었으면 직원 활성화·좌석 조회는 `422 SUBSCRIPTION_INACTIVE`를 반환합니다.
+
 ### 내부 구독 권한 조회
 
 `enrollment-service`는 수강신청 전에 다음 내부 API로 기업의 최신 구독 권한을 확인합니다. 이 경로는 API Gateway의 외부 공개 경로에 노출하지 않습니다.

@@ -367,6 +367,8 @@ sequenceDiagram
     US-->>Employee: 가입 결과 반환
 ```
 
+직원 목록과 좌석 조회는 기업 관리자가 `GET /api/companies/me/employees`, `GET /api/companies/me/seats`로 조회합니다. 사용 좌석은 `ACTIVE` 직원 수이며, 직원 비활성화 또는 `RELEASED` 소속 해제는 좌석을 즉시 회수합니다. 재활성화는 활성 구독과 잔여 좌석을 다시 검증합니다.
+
 #### 4. 구독 결제와 기업 이용 권한 갱신
 
 ```mermaid
