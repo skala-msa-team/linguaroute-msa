@@ -18,6 +18,16 @@
 # Python caches
 **/__pycache__/
 *.py[cod]
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Logs and temporary runtime files
+*.log
+*.pid
+**/logs/
 
 # IDE files
 **/.idea/
