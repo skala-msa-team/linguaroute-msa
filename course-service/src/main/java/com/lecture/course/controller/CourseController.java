@@ -5,7 +5,8 @@ import com.lecture.course.entity.Course;
 import com.lecture.course.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,24 +20,20 @@ public class CourseController {
     private final CourseService courseService;
 
     /**
-     * POST /courses - 강의 등록
-     */
-    @PostMapping
-    public ResponseEntity<CourseDto.ApiResponse<CourseDto.CourseResponse>> createCourse(
-            @Valid @RequestBody CourseDto.CreateRequest request) {
-
-        CourseDto.CourseResponse response = courseService.createCourse(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(CourseDto.ApiResponse.success(response));
-    }
-
-    /**
      * GET /courses - 전체 강의 목록
      */
     @GetMapping
-    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getAllCourses() {
+    public ResponseEntity<CourseDto.ApiResponse<CourseDto.CoursePageResponse>> getAllCourses(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Course.Language language,
+            @RequestParam(required = false) Course.Situation situation,
+            @RequestParam(required = false) Course.Level level,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
-                CourseDto.ApiResponse.success(courseService.getAllCourses())
+                CourseDto.ApiResponse.success(courseService.searchCourses(
+                        keyword, language, situation, level,
+                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"))))
         );
     }
 
@@ -48,17 +45,6 @@ public class CourseController {
             @PathVariable Long id) {
         return ResponseEntity.ok(
                 CourseDto.ApiResponse.success(courseService.getCourse(id))
-        );
-    }
-
-    /**
-     * GET /courses/language/{language} - 언어별 강의
-     */
-    @GetMapping("/language/{language}")
-    public ResponseEntity<CourseDto.ApiResponse<List<CourseDto.CourseResponse>>> getCoursesByLanguage(
-            @PathVariable Course.Language language) {
-        return ResponseEntity.ok(
-                CourseDto.ApiResponse.success(courseService.getCoursesByLanguage(language))
         );
     }
 
