@@ -339,9 +339,9 @@ Content-Type: application/json
 
 ### Swagger 실행 검증
 
-2026-08-10 실행 중인 `course-service` Swagger에서 `GET /api/courses`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다.
+2026-08-11 Java 21로 로컬 실행한 `course-service` Swagger에서 `GET /api/courses/internal/recommend?language=ENGLISH`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다.
 
-현재 실행 컨테이너의 응답은 기존 실습 코드의 `category`, `price`, `instructorId`, `enrollmentCount` 구조입니다. LinguaRoute 목표 계약의 언어·상황·난이도 구조와 차이가 있으므로 전체 API 통합 완료로 표시하지 않습니다.
+보호 API인 `GET /api/courses`는 인증 토큰 없이 직접 호출하면 `401 Unauthorized`가 반환됩니다. 따라서 Swagger 캡처는 course-service의 실제 기동과 공개 내부 추천 API 응답 확인 증거이며, 전체 API Gateway 인증 흐름 완료로 표시하지 않습니다.
 
 발표 전에는 최신 백엔드를 재빌드한 뒤 각 Swagger에서 목표 API를 실행하고 프론트를 `VITE_USE_LIVE_API=true`로 연결하여 최종 요청·응답을 다시 캡처해야 합니다.
 

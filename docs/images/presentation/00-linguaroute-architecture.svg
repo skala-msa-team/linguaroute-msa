@@ -16,13 +16,13 @@
       <path d="M0 0 L10 5 L0 10 Z" fill="#6d5cad"/>
     </marker>
     <style>
-      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; fill: #172019; }
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
       .lane { fill: #f4f8f1; stroke: #d8e4d4; stroke-width: 2; rx: 22; }
       .label { font-size: 18px; font-weight: 800; fill: #598448; letter-spacing: 1.4px; }
-      .node-title { font-size: 23px; font-weight: 800; }
+      .node-title { font-size: 23px; font-weight: 800; fill: #172019; }
       .node-sub { font-size: 16px; fill: #607066; }
       .edge-label { font-size: 15px; font-weight: 700; fill: #526158; }
-      .service-title { font-size: 20px; font-weight: 800; }
+      .service-title { font-size: 20px; font-weight: 800; fill: #172019; }
       .service-sub { font-size: 14px; fill: #617168; }
     </style>
   </defs>

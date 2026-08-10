@@ -602,14 +602,14 @@ Content-Type: application/json
 
 #### Swagger 검증 상태
 
-2026-08-10 현재 실행 중인 `course-service` Swagger에서 `GET /api/courses`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다. 다만 실행 컨테이너는 13시간 전에 생성된 코드이며 현재 목표 명세의 언어·상황·난이도 필터 구조와 다릅니다. 따라서 다음처럼 구분합니다.
+2026-08-11 Java 21로 로컬 실행한 `course-service` Swagger에서 `GET /api/courses/internal/recommend?language=ENGLISH`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다. 보호 API인 `GET /api/courses`는 인증 토큰 없이 직접 호출하면 `401 Unauthorized`가 반환됩니다. 따라서 다음처럼 구분합니다.
 
 | 구분 | 상태 |
 | --- | --- |
-| 실제 실행 확인 | `GET http://127.0.0.1:8082/api/courses` → `200 OK` |
-| 확인된 실행 응답 | 기존 `category`, `price`, `instructorId`, `enrollmentCount` 구조 |
+| 실제 실행 확인 | `GET http://localhost:8082/api/courses/internal/recommend?language=ENGLISH` → `200 OK` |
+| 확인된 실행 응답 | LinguaRoute 강의의 `language`, `situation`, `level`, `status` 구조 |
 | 목표 발표 계약 | 이 장과 [API 명세서](./api-spec.md)의 LinguaRoute B2B 구독·학습 구조 |
-| 발표 전 필수 작업 | 최신 백엔드 재빌드 → 각 Swagger에서 목표 API 실행 → 프론트 `VITE_USE_LIVE_API=true` 연결 → 요청·응답 재캡처 |
+| 남은 통합 확인 | Auth Server와 Gateway 이미지 준비 → 보호 API 인증 흐름 실행 → 프론트 `VITE_USE_LIVE_API=true` 연결 → 요청·응답 재캡처 |
 
 ![course-service Swagger 실제 200 응답](./images/presentation/12-swagger-course-response.jpg)
 

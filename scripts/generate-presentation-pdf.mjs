@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(scriptDir, '..')
@@ -8,6 +9,8 @@ const sourcePath = path.join(repoRoot, 'docs', 'team6-presentation-plan.md')
 const outputDir = path.join(repoRoot, 'output', 'pdf')
 const tempDir = path.join(repoRoot, 'tmp', 'pdfs')
 const htmlPath = path.join(tempDir, 'team6-presentation-plan.html')
+const pdfPath = path.join(outputDir, '광주3반_6조_LinguaRoute_발표기획서.pdf')
+const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 const source = await fs.readFile(sourcePath, 'utf8')
 
@@ -81,7 +84,14 @@ function markdownToHtml(markdown) {
         index += 1
       }
       index += 1
-      output.push(language === 'mermaid' ? architectureHtml() : `<pre class="code-block"><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`)
+      if (language === 'mermaid') {
+        output.push(architectureHtml())
+      } else if (language === 'text') {
+        const flowText = codeLines.map((codeLine) => codeLine.trim()).filter(Boolean).join(' ')
+        output.push(`<div class="flow-block">${inlineMarkdown(flowText)}</div>`)
+      } else {
+        output.push(`<pre class="code-block"><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`)
+      }
       continue
     }
 
@@ -168,6 +178,51 @@ function markdownToHtml(markdown) {
   return output.join('\n')
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForStableFile(filePath, timeoutMs = 120000) {
+  const startedAt = Date.now()
+  let previousSize = -1
+  let stableChecks = 0
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const stat = await fs.stat(filePath)
+      if (stat.size > 0 && stat.size === previousSize) {
+        stableChecks += 1
+        if (stableChecks >= 2) return
+      } else {
+        stableChecks = 0
+      }
+      previousSize = stat.size
+    } catch {
+      stableChecks = 0
+    }
+    await delay(1000)
+  }
+
+  throw new Error(`PDF output was not created within ${timeoutMs}ms`)
+}
+
+async function printPdf() {
+  const child = spawn(chromePath, [
+    '--headless=new',
+    '--disable-gpu',
+    '--disable-extensions',
+    '--no-pdf-header-footer',
+    `--user-data-dir=${path.join(tempDir, 'chrome-profile')}`,
+    `--print-to-pdf=${pdfPath}`,
+    `file://${htmlPath}`,
+  ], { stdio: 'ignore' })
+
+  const exitPromise = new Promise((resolve) => child.once('exit', resolve))
+  await waitForStableFile(pdfPath)
+  if (child.exitCode === null) child.kill('SIGTERM')
+  await Promise.race([exitPromise, delay(3000)])
+}
+
 const content = markdownToHtml(source)
 const html = `<!doctype html>
 <html lang="ko">
@@ -175,39 +230,40 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <title>LinguaRoute 조별 발표 기획서</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm 18mm; }
+  @page { size: A4 landscape; margin: 10mm 11mm; }
   * { box-sizing: border-box; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { margin: 0; color: #172019; font-family: "Apple SD Gothic Neo", "AppleGothic", sans-serif; font-size: 10.3pt; line-height: 1.58; }
-  body::after { content: "광주 3반 6조  |  LinguaRoute  |  Agile & MSA 실습 팀과제"; position: fixed; left: 0; right: 0; bottom: -11mm; padding-top: 2mm; border-top: 1px solid #dce4d8; color: #6b756d; font-size: 8pt; text-align: center; }
-  h1, h2, h3, h4 { margin: 0; color: #173c2c; line-height: 1.24; break-after: avoid; }
-  .cover-title { margin-top: 46mm; font-size: 34pt; letter-spacing: -1.6px; text-align: center; }
+  body { margin: 0; color: #172019; font-family: "Apple SD Gothic Neo", "AppleGothic", sans-serif; font-size: 9.6pt; line-height: 1.55; word-break: keep-all; overflow-wrap: break-word; widows: 2; orphans: 2; }
+  h1, h2, h3, h4 { margin: 0; color: #173c2c; line-height: 1.24; break-after: auto; }
+  .cover-title { margin-top: 30mm; font-size: 34pt; letter-spacing: 0; text-align: center; }
   .cover-title::before { content: "LINGUAROUTE"; display: block; margin-bottom: 12px; color: #679c35; font-size: 10pt; letter-spacing: 4px; }
-  .section-title { break-before: page; margin: 0 0 9mm; padding: 6mm 7mm; color: white; background: linear-gradient(135deg, #123d2c, #2f704b); border-radius: 4mm; font-size: 23pt; letter-spacing: -0.7px; }
-  .section-title::before { content: "SECTION"; display: block; margin-bottom: 2mm; color: #c6f26a; font-size: 8pt; letter-spacing: 2px; }
-  .subsection-title { margin: 8mm 0 3mm; color: #255d40; font-size: 15pt; }
-  .example-start { break-before: page; }
+  .section-title { break-before: auto; break-after: avoid; break-inside: avoid; margin: 8mm 0 6mm; padding: 4.5mm 7mm; color: white; background: #184834; border-radius: 3mm; font-size: 20pt; letter-spacing: 0; box-shadow: inset 0 -0.6mm 0 rgba(255,255,255,.16); }
+  .section-4, .section-5, .section-6, .section-7, .section-8 { break-before: page; }
+  .subsection-title { margin: 6mm 0 2.5mm; color: #255d40; font-size: 15pt; }
+  .example-start { break-before: auto; }
   h4.subsection-title { font-size: 12pt; }
   p { margin: 0 0 4mm; }
   blockquote { margin: 9mm auto 12mm; padding: 7mm; max-width: 155mm; color: #173c2c; background: #eff7e7; border-left: 5px solid #a7d957; border-radius: 3mm; font-size: 14pt; font-weight: 700; text-align: center; }
-  table { width: 100%; margin: 3mm 0 7mm; border-collapse: collapse; table-layout: fixed; font-size: 8.25pt; break-inside: auto; }
+  table { width: 100%; margin: 2.5mm 0 4.5mm; border-collapse: collapse; table-layout: auto; font-size: 7.7pt; break-inside: auto; }
   thead { display: table-header-group; }
-  tr { break-inside: avoid; }
-  th { padding: 2.4mm; color: white; background: #24533b; border: 1px solid #24533b; text-align: left; }
-  td { padding: 2.25mm; border: 1px solid #d6dfd5; vertical-align: top; overflow-wrap: anywhere; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th { padding: 2.1mm; color: white; background: #24533b; border: 1px solid #24533b; text-align: left; }
+  td { padding: 1.8mm; border: 1px solid #d6dfd5; vertical-align: top; word-break: keep-all; overflow-wrap: break-word; }
   tbody tr:nth-child(even) td { background: #f7faf5; }
   code { padding: 0.25mm 1mm; color: #1d5f42; background: #eef6e9; border-radius: 1mm; font-family: Menlo, monospace; font-size: 0.9em; }
-  .code-block { margin: 3mm 0 7mm; padding: 4mm; color: #eaf5e6; background: #17352a; border-radius: 3mm; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; font-size: 8.3pt; line-height: 1.55; }
+  .flow-block { margin: 3mm 0 6mm; padding: 4mm 5mm; color: #173c2c; background: #eef6ec; border: 1px solid #cfe0d1; border-left: 4px solid #2f704b; border-radius: 3mm; break-inside: avoid; page-break-inside: avoid; font-size: 10.2pt; line-height: 1.65; font-weight: 700; }
+  .flow-block code { color: #14553b; background: rgba(255,255,255,.78); }
+  .code-block { margin: 3mm 0 6mm; padding: 4mm; color: #f3fbf5; background: #102a21; border: 1px solid #234d3a; border-radius: 3mm; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; page-break-inside: avoid; font-size: 8.4pt; line-height: 1.55; }
   .code-block code { padding: 0; color: inherit; background: transparent; }
   ul, ol { margin: 2mm 0 6mm; padding-left: 7mm; }
   li { margin-bottom: 1.5mm; }
-  .screenshot { margin: 5mm 0 8mm; padding: 3mm; background: #f3f6f1; border: 1px solid #dbe3d8; border-radius: 3mm; break-inside: avoid; text-align: center; }
-  .screenshot img { display: block; width: 100%; max-height: 172mm; object-fit: contain; border-radius: 2mm; }
+  .screenshot { margin: 4mm 0 6mm; padding: 3mm; background: #f3f6f1; border: 1px solid #dbe3d8; border-radius: 3mm; break-inside: avoid; page-break-inside: avoid; text-align: center; }
+  .screenshot img { display: block; width: 100%; max-height: 148mm; object-fit: contain; border-radius: 2mm; }
   .screenshot figcaption { margin-top: 2mm; color: #536058; font-size: 8.5pt; font-weight: 700; }
-  .screenshot + h3 { break-before: page; }
-  .architecture-figure { margin-top: 2mm; padding: 2mm; break-after: page; }
-  .architecture-figure img { max-height: none; }
-  .architecture { margin: 4mm 0 8mm; padding: 5mm; background: #f5f8f2; border: 1px solid #dbe5d6; border-radius: 4mm; break-inside: avoid; font-size: 7.4pt; }
+  .screenshot + h3 { break-before: auto; }
+  .architecture-figure { margin-top: 2mm; padding: 2mm; break-after: auto; break-inside: avoid; page-break-inside: avoid; }
+  .architecture-figure img { max-height: 132mm; object-fit: contain; }
+  .architecture { margin: 4mm 0 8mm; padding: 5mm; background: #f5f8f2; border: 1px solid #dbe5d6; border-radius: 4mm; break-inside: avoid; page-break-inside: avoid; font-size: 7.4pt; }
   .arch-row { display: grid; grid-template-columns: 1.05fr .72fr .9fr .72fr 2.2fr .72fr 1fr; align-items: stretch; gap: 2mm; }
   .arch-lane, .arch-services { padding: 3mm; border-radius: 2.5mm; text-align: center; }
   .arch-lane span, .arch-services>span { display: block; margin-bottom: 2mm; font-size: 6.5pt; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
@@ -238,4 +294,6 @@ const html = `<!doctype html>
 await fs.mkdir(outputDir, { recursive: true })
 await fs.mkdir(tempDir, { recursive: true })
 await fs.writeFile(htmlPath, html)
-console.log(htmlPath)
+await fs.rm(pdfPath, { force: true })
+await printPdf()
+console.log(pdfPath)
