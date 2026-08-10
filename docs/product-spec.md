@@ -313,7 +313,7 @@ MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습�
 - 서버를 추가하지 않고 현재 Docker Compose의 서비스 수와 MariaDB 한 개를 유지합니다.
 - 인증 서버는 이메일·비밀번호 로그인과 JWT Access Token 발급을 담당합니다. OAuth2 Authorization Code 흐름은 사용하지 않으며, 추가 인증 기능과 비밀번호 관리는 `user-service`에 구현합니다.
 - 기존 Auth Server 호환을 위해 `EMPLOYEE`는 `users.role=STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `users.role=INSTRUCTOR`로 저장합니다. 실제 서비스 권한은 새 `business_role` 컬럼으로 관리합니다.
-- 기존 API Gateway 서버는 유지하되 목표 API 경로와 공개 경로가 JAR에 고정되어 있으므로, 동일한 Gateway 한 대의 라우팅·보안 설정만 수정합니다. 새 Gateway 서버를 추가하지 않습니다.
+- 기존 API Gateway 서버는 유지합니다. 제공 Gateway 이미지는 수정하지 않고, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 그 경로를 외부 MVP 계약에 맞춰 사용합니다.
 - 이메일 인증은 SMTP로 6자리 코드를 보내고 비밀번호 재설정은 SMTP 링크로 처리하며, 세부 보안 정책은 API 명세를 따릅니다.
 - 수강신청 시 `enrollment-service`가 `user-service`의 내부 구독 권한 API를 동기 호출하며, 호출 실패 시 신청을 허용하지 않습니다.
 - 실제 PG 없이 모의 결제와 구독 기간·갱신·만료를 구현합니다.
@@ -322,7 +322,7 @@ MVP 인증은 Access Token만 사용하며 Refresh Token은 발급하지 않습�
 개발은 다음 순서로 시작합니다.
 
 1. 인증 서버의 이메일·비밀번호 로그인과 현재 `users` 테이블 호환성을 유지합니다.
-2. 기존 API Gateway 한 대에 목표 라우트와 공개·보호 경로를 반영합니다.
+2. 제공 API Gateway 이미지는 수정하지 않고 `docker-compose.yml` 환경변수로 가능한 라우팅만 보정하며, 이미지에 고정된 공개 경로와 충돌하는 API는 Gateway 허용 경로에 맞춰 외부 계약을 정리합니다.
 3. `user-service`에 인증 보조 기능과 비즈니스 역할을 추가하고 각 서비스 API를 구현합니다.
 4. 내부 구독 권한 조회와 Kafka 구독 이벤트를 연동합니다.
 5. 프론트엔드를 Gateway 경로에 연결하고 전체 사용자 흐름을 통합 테스트합니다.
@@ -493,7 +493,7 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
 | 로그인 | `POST` | `/api/auth/login` | 공개 | `email`, `password` | JWT `accessToken`, `expiresIn` |
-| 기업 회원가입 | `POST` | `/api/companies` | 공개 | 기업·관리자·이메일 인증·약관 | `companyId`, `userId`, `COMPANY_ADMIN` |
+| 기업 회원가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·이메일 인증·약관 | `companyId`, `userId`, `COMPANY_ADMIN` |
 | 직원 회원가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·이메일 인증·약관 | 직원 계정과 좌석 배정 결과 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정 시 이름 등 | 사용자·역할·기업 정보 |
 | 기업 정보 | `GET`, `PATCH` | `/api/companies/me` | 기업 관리자 | 수정 기업 정보 | 자신의 기업 정보 |

@@ -14,7 +14,7 @@
 
 이 문서의 URL은 기능 설계를 위한 초안입니다. 구현 후에는 Swagger UI에서 실제 Method, URL, Request 및 Response를 호출하여 최종 명세와 일치시켜야 합니다.
 
-기존 API Gateway 서버는 유지합니다. 다만 현재 이미지의 라우트와 공개 경로가 JAR에 고정되어 있으므로 동일한 Gateway 한 대의 라우팅·보안 설정을 수정하여 아래 외부 경로를 연결합니다. Gateway 서버를 추가하지 않습니다.
+기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
 로그인을 포함한 모든 외부 API는 기본 경로 `/api`를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 구현하지 않습니다.
 
@@ -221,7 +221,7 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| COMPANY-01 | `POST` | `/api/companies` | 공개 | 기업 대표계정 회원가입 | 필수 |
+| COMPANY-01 | `POST` | `/api/users/register` | 공개 | 기업 대표계정 회원가입 | 필수 |
 | COMPANY-02 | `GET` | `/api/companies/me` | 기업 관리자 | 기업 정보 조회 | 필수 |
 | COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
@@ -233,6 +233,8 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 로그인 이메일과 비밀번호 해시의 원본은 공용 `users` 테이블이며 `user-service`가 관리합니다. MVP에서는 `USER-02`로 로그인 이메일을 변경하지 않습니다.
 
 ### COMPANY-01 기업 대표계정 회원가입
+
+Gateway 제공 이미지가 공개 허용하는 가입 경로에 맞춰 외부 클라이언트는 `POST /api/users/register`를 사용합니다. `user-service`는 같은 요청 구조를 기존 `POST /api/companies`에서도 처리하지만, Gateway 경유 MVP 흐름의 기준 경로는 `/api/users/register`입니다.
 
 요청:
 
@@ -718,7 +720,7 @@ X-Internal-Api-Key: {internalApiKey}
 | SUB-03 | `POST` | `/api/subscriptions/me/cancel` | 기업 관리자 | 구독 해지 | 필수 |
 | PAY-01 | `GET` | `/api/payments` | 기업 관리자 | 결제 내역 조회 | 필수 |
 
-현재 `payment-service` 구현은 Gateway가 인증 사용자와 기업 소속을 검증한 뒤 `X-Company-Id`를 전달한다는 전제로 동작합니다. Gateway의 JWT claim 전달 방식이 확정되면 이 헤더 전제는 Gateway 계약에 맞춰 다시 정리합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
+Gateway는 인증된 사용자 ID를 `X-User-Id`로 전달합니다. `payment-service`는 클라이언트가 보낸 회사 식별값을 신뢰하지 않고, `user-service`의 내부 권한 조회 API로 활성 상태의 `COMPANY_ADMIN`인지 확인한 뒤 응답의 `companyId`를 구독·결제 범위로 사용합니다. `payment-service`는 다른 서비스 테이블을 직접 조회하지 않고 `companyId`를 논리 참조로만 저장합니다.
 
 ### PLAN-01 요금제 조회 응답
 
@@ -751,7 +753,7 @@ X-Internal-Api-Key: {internalApiKey}
 헤더:
 
 ```http
-X-Company-Id: 10
+Authorization: Bearer {accessToken}
 Idempotency-Key: 1e7f52d5-c0d5-4a86-aefe-3334f664ee65
 ```
 
@@ -810,12 +812,11 @@ MVP는 실제 PG나 카드 정보를 사용하지 않습니다. 테스트용 `pa
 
 ### PAY-01 결제 내역
 
-Gateway가 전달한 `X-Company-Id` 기준으로 해당 기업의 결제 이력을 최신 요청순으로 반환합니다.
+인증 사용자의 `user-service` 권한 컨텍스트에서 확인한 기업 기준으로 결제 이력을 최신 요청순으로 반환합니다.
 
 ```http
 GET /api/payments
 Authorization: Bearer {accessToken}
-X-Company-Id: 10
 ```
 
 응답 `200 OK`:
@@ -1013,6 +1014,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `SEAT_LIMIT_EXCEEDED` | `409` | 좌석 한도 초과 |
 | `SUBSCRIPTION_INACTIVE` | `422` | 활성 구독 없음 |
 | `DUPLICATE_PAYMENT` | `409` | 중복 결제 요청 |
+| `INVALID_USER_CONTEXT` | `401` | Gateway가 전달한 인증 사용자 정보가 없거나 올바르지 않음 |
+| `COMPANY_ADMIN_REQUIRED` | `403` | 기업 관리자 권한 필요 |
+| `USER_AUTHORIZATION_UNAVAILABLE` | `503` | 사용자 권한 정보를 확인할 수 없음 |
 | `PAYMENT_FAILED` | `422` | 결제 실패 |
 | `COURSE_NOT_FOUND` | `404` | 강의 없음 |
 | `COURSE_INACTIVE` | `422` | 비활성 강의 |

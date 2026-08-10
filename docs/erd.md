@@ -393,7 +393,7 @@ erDiagram
 | `payments` | 금액은 요청값이 아니라 `plan_prices.price`에서 서버가 결정 |
 | `outbox_events` | 결제·구독 상태 변경과 같은 트랜잭션으로 저장하고 `event_id` 유일 처리 |
 
-`subscriptions.company_id`와 `payments.company_id`는 `user-service`에 대한 논리 참조입니다. `payment-service`는 Gateway가 전달한 `companyId`를 저장하며 `user-service` 소유 테이블을 직접 조회하지 않습니다.
+`subscriptions.company_id`와 `payments.company_id`는 `user-service`에 대한 논리 참조입니다. `payment-service`는 클라이언트가 보낸 회사 식별값을 신뢰하지 않고, Gateway가 전달한 인증 사용자 ID로 `user-service` 내부 권한 조회 API를 호출해 활성 `COMPANY_ADMIN`의 `companyId`를 확인한 뒤 저장합니다. `payment-service`는 `user-service` 소유 테이블을 직접 조회하지 않습니다.
 
 ---
 

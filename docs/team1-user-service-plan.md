@@ -36,7 +36,8 @@
 - [x] `users.password` BCrypt 해시 저장
 - [x] 기업·관리자·약관 동의 트랜잭션 처리
 - [x] 일회용 이메일 인증 토큰 해시 검증·소비
-- [x] 공개 `POST /api/companies`
+- [x] 서비스 직접 호환 `POST /api/companies`
+- [x] Gateway 공개 가입 `POST /api/users/register`
 - [x] `GET/PATCH /api/companies/me`
 - [x] `GET/PATCH /api/users/me`
 - [x] `GET /api/terms/active`
@@ -52,8 +53,10 @@
 외부 계약:
 
 ```http
-POST /api/companies
+POST /api/users/register
 ```
+
+`POST /api/companies`는 user-service 직접 호출 호환 경로로 유지한다. 제공 Gateway 이미지가 공개 허용하는 MVP 외부 가입 경로는 `POST /api/users/register`이며, 요청·응답 구조는 동일하다.
 
 처리 순서:
 
@@ -131,7 +134,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [x] Authorization Code와 Access Token 발급 확인
 - [x] 기존 Auth 토큰으로 `/api/users/me`, `/api/companies/me` `200` 확인
 - [x] 발급된 토큰이 있어도 비활성 사용자는 `403 USER_INACTIVE` 확인
-- [ ] Gateway 경유 외부 경로 확인
+- [x] Gateway 경유 `POST /api/users/register` `201` 확인
 
 기존 Auth Server는 현재 Access Token과 함께 Refresh Token도 반환한다. 확정 MVP 문서는 Refresh Token을 사용하지 않는다고 정의하므로 프론트엔드와 각 서비스는 Refresh Token을 저장·사용하지 않는다. 기존 Auth 이미지를 수정하지 않는 방침 때문에 응답 필드가 남아 있는 차이는 팀 공유 사항으로 유지한다.
 
@@ -167,7 +170,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 ### PR 1 — 기업 계정 기반 마무리
 
 1. 이메일 인증 요청·확인 API와 MailHog SMTP 연동
-2. Gateway 공개·보호 라우팅 검증
+2. Gateway 보호 라우팅과 기업 관리자 실제 로그인 토큰 기반 보호 API 검증
 3. 기존 Auth Server의 Refresh Token 반환과 MVP 문서 차이 팀 합의
 4. 관련 API·ERD·MVP 체크리스트 갱신
 

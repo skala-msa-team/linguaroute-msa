@@ -119,6 +119,29 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=auth-server
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=http://auth-server:9000
+      - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/oauth2/**,/login,/login/**,/logout,/userinfo,/error,/default-ui.css,/favicon.ico,/.well-known/openid-configuration,/.well-known/oauth-authorization-server
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=block-internal-api
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_URI=no://op
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_FILTERS_0=SetStatus=403
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_ORDER=-100
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://user-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/users,/api/users/**,/api/companies,/api/companies/**,/api/terms,/api/terms/**,/api/auth,/api/auth/**,/api/employees,/api/employees/**,/api/admin/users,/api/admin/users/**,/api/admin/companies,/api/admin/companies/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses,/api/courses/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_ID=recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_URI=lb://recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/recommend,/api/recommend/**
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -144,7 +167,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=SqlDba-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
@@ -173,7 +196,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=SqlDba-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
@@ -200,7 +223,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=SqlDba-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - SERVICE_COURSE_SERVICE_URL=http://course-service:8082
@@ -231,8 +254,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=SqlDba-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://auth-server:9000
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
+      - SERVICE_USER_SERVICE_URL=http://user-service:8081
     depends_on:
       mariadb:
         condition: service_healthy

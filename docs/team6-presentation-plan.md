@@ -151,7 +151,7 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
 | 로그인 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 | JWT Access Token과 만료시간 |
-| 기업 가입 | `POST` | `/api/companies` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
+| 기업 가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
 | 직원 가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·인증·약관 | 직원 계정과 좌석 배정 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정할 사용자 정보 | 사용자·역할·기업 정보 |
 | 기업 정보 | `GET`, `PATCH` | `/api/companies/me` | 기업 관리자 | 수정할 기업 정보 | 자신의 기업 정보 |

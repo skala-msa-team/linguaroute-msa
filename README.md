@@ -169,16 +169,21 @@ git commit -m "fix: 중복 수강 신청 문제 수정" \
 다음 프로그램과 파일이 필요합니다.
 
 - Docker Desktop
-- `infra-images.tar`
+- 교수님이 배포한 Docker 이미지 분할 파일
+  - `msa-lecture-images.part.aa`
+  - `msa-lecture-images.part.ab`
+  - `msa-lecture-images.part.ac`
 
-`infra-images.tar`에는 API Gateway와 Auth Server 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+분할 파일에는 Auth Server, API Gateway와 수업용 기본 서비스 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
 
-Auth Server 이미지는 LinguaRoute에서도 그대로 사용하고 추가 인증 기능은 `user-service`에 구현합니다. API Gateway 서버는 추가하지 않지만, 현재 이미지의 경로가 고정되어 있으므로 동일한 Gateway 한 대를 목표 라우팅·보안 설정이 반영된 이미지로 다시 빌드해야 합니다.
+LinguaRoute 개발에서는 Auth Server와 API Gateway 이미지만 공통 실행 기반으로 사용합니다. `user-service`, `course-service`, `enrollment-service`, `payment-service`, `recommend-service`, `eureka-server`는 현재 저장소의 코드를 Docker로 빌드해서 실행합니다.
 
 ```text
 linguaroute-msa/
 ├── docker-compose.yml
-├── infra-images.tar
+├── msa-lecture-images.part.aa
+├── msa-lecture-images.part.ab
+├── msa-lecture-images.part.ac
 ├── course-service/
 ├── enrollment-service/
 └── ...
@@ -206,24 +211,25 @@ cd linguaroute-msa
 
 ```bash
 pwd
-ls docker-compose.yml infra-images.tar
+ls docker-compose.yml msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac
 ```
 
 ### 3. 공통 이미지 불러오기
 
-API Gateway와 Auth Server 이미지를 Docker에 불러옵니다. 처음 실행할 때 한 번만 하면 됩니다.
+분할 파일을 하나의 압축 이미지 파일로 합친 뒤 Docker에 불러옵니다. 처음 실행할 때 한 번만 하면 됩니다.
 
 ```bash
-docker load -i infra-images.tar
+cat msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac > msa-lecture-images.tar.gz
+docker load -i msa-lecture-images.tar.gz
 ```
 
-다음 명령으로 두 이미지가 있는지 확인합니다.
+다음 명령으로 이미지가 있는지 확인합니다.
 
 ```bash
 docker images
 ```
 
-이미지 목록에 아래 태그가 있어야 합니다.
+이미지 목록에 최소 아래 태그가 있어야 합니다.
 
 ```text
 msa-lecture/api-gateway:1.0
@@ -243,13 +249,13 @@ docker compose config --services
 
 ### 5. 전체 서비스 실행
 
-처음 실행하거나 소스 코드가 변경된 경우 이미지를 빌드하면서 컨테이너를 실행합니다.
+현재 저장소의 우리 서비스 코드를 빌드하면서 컨테이너를 실행합니다. 개발 중 코드 수정 사항을 Docker 실행에 반영하려면 이 명령을 사용합니다.
 
 ```bash
 docker compose up -d --build
 ```
 
-`-d`는 컨테이너를 백그라운드에서 실행한다는 의미이고, `--build`는 로컬 서비스 이미지를 다시 빌드한다는 의미입니다.
+`-d`는 컨테이너를 백그라운드에서 실행한다는 의미이고, `--build`는 현재 로컬 소스 코드로 서비스 이미지를 다시 빌드한다는 의미입니다.
 
 처음 실행할 때는 이미지 다운로드와 Gradle 빌드 때문에 시간이 걸릴 수 있습니다. 서비스는 다음 순서로 기동됩니다.
 
@@ -260,6 +266,10 @@ MariaDB / Kafka
       → API Gateway + 4개 서비스
         → Recommend Service
 ```
+
+교수님 안내의 `docker compose up -d --no-build --pull never`는 배포받은 이미지 그대로 실행하는 방식입니다. 이 프로젝트에서는 팀이 수정한 최신 코드가 실행되어야 하므로, 기능 개발과 검증에는 기본적으로 `docker compose up -d --build`를 사용합니다.
+
+다만 외부 다운로드 제한 때문에 빌드가 실패하면 테더링을 사용하거나, 필요한 의존성이 캐시된 팀원 환경에서 빌드합니다. Auth Server와 API Gateway 이미지를 못 받는 문제는 위의 `docker load` 절차로 해결합니다.
 
 ### 6. 실행 상태 확인
 
@@ -288,7 +298,54 @@ Kafka              localhost:9092
 
 Eureka 화면(<http://localhost:8761/>)에서 각 서비스가 등록되었는지도 확인합니다.
 
-### 7. 로그 확인
+Gateway와 대표 API가 실제로 연결되는지 확인하려면 다음 명령을 사용합니다.
+
+```bash
+curl -sS -u service-client:service-secret \
+  -X POST http://localhost:8080/oauth2/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=client_credentials&scope=service.read service.write'
+```
+
+응답의 `access_token` 값을 사용해 보호 API를 호출합니다.
+
+```bash
+TOKEN=응답의_access_token값
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/courses
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/plans
+```
+
+두 요청이 `200 OK`를 반환하면 Gateway, Auth Server, Course Service, Payment Service가 함께 동작하는 상태입니다.
+
+### 7. 데모 데이터
+
+`init-db/01_init.sql`에는 발표와 로컬 검증에 사용할 수 있는 최소 seed 데이터가 포함되어 있습니다. MariaDB 볼륨을 처음 만드는 환경에서는 컨테이너 기동 시 자동 적용됩니다.
+
+공통 비밀번호는 `Password123!`입니다.
+
+| 구분 | 이메일 | 설명 |
+| --- | --- | --- |
+| 플랫폼 관리자 | `platform-admin@linguaroute.local` | 플랫폼 운영자 계정 |
+| 기업 관리자 | `admin@scala-tech.local` | 스칼라테크 관리자, 활성 구독 보유 |
+| 직원 | `employee.lee@scala-tech.local` | 스칼라테크 직원, 영어 강의 학습·수료 데이터 보유 |
+| 직원 | `employee.kim@scala-tech.local` | 스칼라테크 직원, 일본어 강의 신청 데이터 보유 |
+| 기업 관리자 | `admin@global-link.local` | 글로벌링크 관리자 |
+
+대표 seed 데이터는 다음과 같습니다.
+
+- 기업: `스칼라테크`, `글로벌링크`
+- 요금제: `BUSINESS_50`, `STARTUP_20`
+- 활성 구독: 스칼라테크 월간 `BUSINESS_50`
+- 강의: 영어·일본어·중국어 과정 6개, 이 중 5개 활성
+- 수강: 스칼라테크 직원의 학습 중·수료·신청 상태 데이터
+
+기존 MariaDB 볼륨이 이미 있는 환경에서 seed만 다시 적용하려면 다음 명령을 사용합니다.
+
+```bash
+docker exec lecturedb mariadb -umanager -pSqlDba-1 lecture_db -e "source /docker-entrypoint-initdb.d/01_init.sql"
+```
+
+### 8. 로그 확인
 
 전체 서비스의 최근 로그를 확인합니다.
 
@@ -329,7 +386,7 @@ recommend-service
 docker compose logs -f --tail=100 course-service
 ```
 
-### 8. 변경된 서비스만 다시 빌드
+### 9. 변경된 서비스만 다시 빌드
 
 특정 서비스의 코드를 수정한 경우 전체를 다시 빌드하지 않고 해당 서비스만 재빌드할 수 있습니다.
 
@@ -350,7 +407,9 @@ docker compose build --no-cache course-service
 docker compose up -d course-service
 ```
 
-### 9. 전체 서비스 종료
+소스 코드 변경 후 `docker compose up -d`만 실행하면 이미 만들어진 이미지가 그대로 재사용될 수 있습니다. 코드 변경을 Docker 컨테이너에 반영하려면 `--build`를 붙입니다.
+
+### 10. 전체 서비스 종료
 
 컨테이너와 네트워크를 종료합니다. MariaDB와 Kafka 데이터 볼륨은 유지됩니다.
 
@@ -372,7 +431,7 @@ docker compose down -v
 
 `docker compose down -v`는 MariaDB와 Kafka의 저장 데이터를 삭제하므로 팀원과 확인한 뒤 사용합니다.
 
-### 10. 자주 발생하는 오류
+### 11. 자주 발생하는 오류
 
 #### Docker 서버에 연결할 수 없는 경우
 
@@ -389,10 +448,11 @@ pull access denied
 No such image
 ```
 
-`infra-images.tar`가 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
+`msa-lecture-images.part.*` 파일이 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
 
 ```bash
-docker load -i infra-images.tar
+cat msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac > msa-lecture-images.tar.gz
+docker load -i msa-lecture-images.tar.gz
 docker images
 ```
 
@@ -404,6 +464,27 @@ docker images
 docker compose ps
 docker compose logs --tail=200 서비스명
 ```
+
+#### 결제 생성 시 예전 컬럼 오류가 나는 경우
+
+이미 실행한 적 있는 MariaDB 볼륨에는 과거 테이블 구조가 남아 있을 수 있습니다. 예를 들어 `POST /api/subscriptions` 호출 중 `payments` 테이블의 `user_id`, `course_id`, `transaction_id`, `updated_at` 같은 현재 ERD에 없는 컬럼 때문에 오류가 나거나, 데모 seed 적용 중 `courses` 테이블의 `category`, `price`, `instructor_id`, `enrollment_count` 같은 예전 컬럼 때문에 오류가 나면 코드 문제가 아니라 로컬 DB 볼륨의 오래된 스키마 문제일 가능성이 큽니다.
+
+현재 코드와 `init-db/01_init.sql` 기준의 `payments` 테이블은 기업 구독 결제용 `company_id`, `subscription_id`, `plan_price_id`, `idempotency_key` 구조를 사용하고, `courses`와 `enrollments`는 LinguaRoute 강의·수강 도메인 컬럼만 사용합니다. 하지만 Docker의 기존 볼륨에는 `init-db`가 다시 적용되지 않습니다.
+
+상태 확인:
+
+```bash
+docker exec -it lecturedb mariadb -umanager -pSqlDba-1 lecture_db
+DESC payments;
+```
+
+팀 공용 데이터가 필요 없고 초기화해도 되는 개발 환경에서만 팀원과 확인한 뒤 `docker compose down -v`로 볼륨을 삭제하고 다시 실행합니다. 데이터를 유지해야 하면 별도 마이그레이션 SQL을 작성해서 오래된 컬럼을 정리합니다.
+
+#### Gateway 공개 가입 경로
+
+제공받은 API Gateway 이미지는 현재 보안 허용 목록에 `/api/users/register`, `/api/users/login`, OAuth2 경로 등을 가지고 있습니다. LinguaRoute 목표 API인 `POST /api/companies` 기업 관리자 가입은 user-service에 구현되어 있지만, 제공 Gateway 이미지의 보안 허용 목록에 없으면 Gateway 경유 호출이 `401 Unauthorized`를 반환합니다.
+
+Gateway 이미지는 수정하지 않는 전제이므로, 외부 기업 관리자 가입은 Gateway가 공개 허용하는 `POST /api/users/register`를 사용합니다. 요청과 응답 구조는 기존 `POST /api/companies` 기업 가입 API와 같습니다. `POST /api/companies`는 user-service 직접 호출에서는 유지되지만 Gateway 경유 MVP 기준 경로가 아닙니다.
 
 ### 프론트엔드 실행
 

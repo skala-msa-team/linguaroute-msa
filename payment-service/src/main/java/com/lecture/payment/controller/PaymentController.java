@@ -22,8 +22,8 @@ public class PaymentController {
 
     @GetMapping
     public ResponseEntity<PaymentDto.ApiResponse<List<PaymentDto.PaymentResponse>>> getPayments(
-            @RequestHeader(value = "X-Company-Id", required = false) String companyIdHeader) {
-        Long companyId = paymentRequestContext.companyId(companyIdHeader);
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
+        Long companyId = paymentRequestContext.companyId(userIdHeader);
         return ResponseEntity.ok(PaymentDto.ApiResponse.success(paymentService.getPayments(companyId)));
     }
 }
