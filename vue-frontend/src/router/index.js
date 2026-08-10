@@ -4,6 +4,7 @@ const routes = [
   { path: '/', name: 'Landing', component: () => import('@/views/LandingView.vue') },
   { path: '/pricing', name: 'Pricing', component: () => import('@/views/PricingView.vue') },
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue') },
+  { path: '/callback', name: 'OAuthCallback', component: () => import('@/views/OAuthCallbackView.vue') },
   { path: '/signup/company', name: 'CompanySignup', component: () => import('@/views/AuthFlowView.vue'), props: { mode: 'company-signup' } },
   { path: '/signup/employee', name: 'EmployeeSignup', component: () => import('@/views/AuthFlowView.vue'), props: { mode: 'employee-signup' } },
   { path: '/account/recovery', name: 'AccountRecovery', component: () => import('@/views/AuthFlowView.vue'), props: { mode: 'recovery' } },

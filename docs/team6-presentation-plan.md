@@ -144,13 +144,13 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 
 ## 5. 프론트엔드 API 명세
 
-모든 보호 API는 `Authorization: Bearer {accessToken}`을 사용합니다. 로그인과 모든 외부 요청은 API Gateway의 `/api` 경로를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 사용하지 않습니다.
+모든 보호 API는 `Authorization: Bearer {accessToken}`을 사용합니다. 로그인은 API Gateway가 Auth Server로 전달하는 OAuth2 Authorization Code 경로(`/oauth2/**`, `/login`)를 사용하고, 나머지 외부 API는 `/api` 경로를 사용합니다. 자체 이메일·비밀번호 로그인만 사용하며 소셜 로그인은 사용하지 않습니다. Refresh Token은 프론트에 저장·사용하지 않습니다.
 
 ### 핵심 엔드포인트 목록
 
 | 화면·기능 | Method | URL | 권한 | Request 핵심 | Response 핵심 |
 | --- | --- | --- | --- | --- | --- |
-| 로그인 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 | JWT Access Token과 만료시간 |
+| 로그인 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | 이메일·비밀번호 세션, Authorization Code | JWT Access Token과 만료시간 |
 | 기업 가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
 | 직원 가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·인증·약관 | 직원 계정과 좌석 배정 |
 | 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정할 사용자 정보 | 사용자·역할·기업 정보 |
@@ -181,16 +181,10 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 ### 예시 1. 이메일·비밀번호 로그인
 
 ```http
-POST /api/auth/login
-Content-Type: application/json
+GET /oauth2/authorize?response_type=code&client_id=web-client&redirect_uri=http://localhost:3000/callback
 ```
 
-```json
-{
-  "email": "employee@company.com",
-  "password": "Password123!"
-}
-```
+Auth Server 로그인 화면에서 이메일과 비밀번호를 검증한 뒤 콜백의 Authorization Code를 서버가 교환하면 다음 JWT 응답을 받습니다.
 
 ```json
 {
@@ -327,7 +321,7 @@ Content-Type: application/json
 
 | HTTP | 오류 코드 | 상황 |
 | --- | --- | --- |
-| 401 | `INVALID_CREDENTIALS` | 로그인 정보 불일치 |
+| 422 | `INVALID_PASSWORD` | 로그인 사용자 비밀번호 변경 시 현재 비밀번호 불일치 |
 | 403 | `USER_INACTIVE` | 비활성 또는 탈퇴 사용자 |
 | 409 | `DUPLICATE_PAYMENT` | 중복 결제 요청 |
 | 409 | `INVITATION_ALREADY_USED` | 이미 사용한 초대코드 |

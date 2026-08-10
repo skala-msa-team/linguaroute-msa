@@ -39,7 +39,7 @@ flowchart LR
 
 ## 3. 기존 Auth Server 호환
 
-Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 이메일·비밀번호 로그인과 JWT Access Token 발급을 수행합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 사용하지 않습니다.
+Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 자체 이메일·비밀번호 로그인과 OAuth2 Authorization Code 기반 JWT Access Token 발급을 수행합니다. 소셜 로그인은 사용하지 않습니다. Auth Server가 Refresh Token을 반환해도 MVP 프론트엔드는 저장·갱신에 사용하지 않습니다.
 
 제공 JAR의 역할 enum이 `STUDENT`, `INSTRUCTOR`로 고정되어 있으므로 `users.role`은 로그인 호환 필드로 유지합니다. `EMPLOYEE`는 `STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `INSTRUCTOR`로 매핑합니다. LinguaRoute의 실제 권한은 `users.business_role`에 저장하고 각 보호 API가 `user-service`의 사용자 상태·기업 소속과 함께 확인합니다.
 
@@ -166,7 +166,7 @@ erDiagram
 | `processed_events` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
 | `user_agreements` | `(user_id, term_id)` 유일 |
 | `email_verifications` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
-| `password_reset_tokens` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `password_reset_tokens` | `user_id`, 토큰 SHA-256 해시, 만료·사용 시각을 저장해 15분 만료·일회성 사용 처리 |
 
 `user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 최신 이용 권한을 `company_entitlements`에 저장하여 직원 가입과 수강신청 권한 조회에 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
 

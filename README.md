@@ -338,6 +338,16 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/plans
 
 두 요청이 `200 OK`를 반환하면 Gateway, Auth Server, Course Service, Payment Service가 함께 동작하는 상태입니다.
 
+### 브라우저 OAuth2 로그인
+
+LinguaRoute는 소셜 로그인이 아니라 자체 이메일·비밀번호 계정으로 Auth Server에 로그인합니다. 브라우저는 `http://localhost:3000`에서 시작한 뒤 Auth Server의 OAuth2 Authorization Code 흐름으로 JWT를 받습니다.
+
+- 프로젝트 루트에서 `cp .env.example .env`를 실행하고 `AUTH_WEB_CLIENT_SECRET`은 제공 Auth Server의 등록값으로 로컬에만 설정합니다.
+- Vite 개발 서버는 등록된 콜백 URI와 맞게 `3000` 포트로 실행됩니다.
+- `user-service`에는 `AUTH_WEB_CLIENT_SECRET` 환경변수가 필요합니다. 값은 제공 Auth Server에 등록된 브라우저 클라이언트 비밀값이며 저장소에 추가하지 않습니다.
+- 콜백은 `POST /api/users/register?action=exchange-oauth-code`로 코드를 전달합니다. user-service가 서버 간 통신으로 토큰을 교환하므로 프론트에 비밀값이 노출되지 않습니다.
+- 로그아웃은 `POST /logout`으로 Auth Server 세션을 종료하고, 프론트는 sessionStorage의 Access Token을 삭제합니다.
+
 ### 7. 데모 데이터
 
 `init-db/01_init.sql`에는 발표와 로컬 검증에 사용할 수 있는 최소 seed 데이터가 포함되어 있습니다. MariaDB 볼륨을 처음 만드는 환경에서는 컨테이너 기동 시 자동 적용됩니다.
@@ -503,7 +513,7 @@ DESC payments;
 
 #### Gateway 공개 가입 경로
 
-제공받은 API Gateway 이미지는 현재 보안 허용 목록에 `/api/users/register`, `/api/users/login`, OAuth2 경로 등을 가지고 있습니다. LinguaRoute 목표 API인 `POST /api/companies` 기업 관리자 가입은 user-service에 구현되어 있지만, 제공 Gateway 이미지의 보안 허용 목록에 없으면 Gateway 경유 호출이 `401 Unauthorized`를 반환합니다.
+제공받은 API Gateway 이미지는 `/api/users/register`와 OAuth2 경로를 공개 라우팅합니다. 수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 이미지와 다르며 `401 Unauthorized`를 반환합니다. 브라우저 로그인은 `/oauth2/authorize`와 `/login`을 사용합니다. LinguaRoute 목표 API인 `POST /api/companies` 기업 관리자 가입은 user-service에 구현되어 있지만, 제공 Gateway 이미지의 보안 허용 목록에 없으면 Gateway 경유 호출이 `401 Unauthorized`를 반환합니다.
 
 Gateway 이미지는 수정하지 않는 전제이므로, 외부 기업 관리자 가입은 Gateway가 공개 허용하는 `POST /api/users/register`를 사용합니다. 요청과 응답 구조는 기존 `POST /api/companies` 기업 가입 API와 같습니다. `POST /api/companies`는 user-service 직접 호출에서는 유지되지만 Gateway 경유 MVP 기준 경로가 아닙니다.
 

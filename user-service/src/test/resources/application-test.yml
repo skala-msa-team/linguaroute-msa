@@ -33,6 +33,13 @@ logging:
     root: WARN
 
 app:
+  auth:
+    token-url: http://localhost:9000/oauth2/token
+    web-client-id: web-client
+    web-client-secret: test-secret
+    redirect-uri: http://localhost:3000/callback
+  frontend:
+    base-url: http://localhost:5173
   security:
     internal-api-key: local-internal-api-key
 

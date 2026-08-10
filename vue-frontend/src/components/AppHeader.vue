@@ -32,14 +32,10 @@
 
 <script setup>
 import { useAuthStore } from '@/store/auth.js'
-import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
-const router = useRouter()
-
 function handleLogout() {
   auth.logout()
-  router.push('/')
 }
 </script>
 

@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS email_verifications (
     KEY idx_email_verifications_email_purpose (email, purpose)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id                  BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id             BIGINT      NOT NULL,
+    token_hash          CHAR(64)    NOT NULL,
+    expires_at          DATETIME(6) NOT NULL,
+    used_at             DATETIME(6),
+    created_at          DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_password_reset_tokens_token_hash (token_hash),
+    KEY idx_password_reset_tokens_user_created (user_id, created_at),
+    CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS terms (
     id                  BIGINT       NOT NULL AUTO_INCREMENT,
     type                VARCHAR(50)  NOT NULL,

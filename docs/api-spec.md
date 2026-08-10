@@ -16,7 +16,7 @@
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
-로그인을 포함한 모든 외부 API는 기본 경로 `/api`를 사용합니다. OAuth2 Authorization Code 흐름과 Refresh Token은 구현하지 않습니다.
+일반 외부 API는 기본 경로 `/api`를 사용합니다. 로그인만 Auth Server의 OAuth2 경로(`/oauth2/**`, `/login`)를 사용하며, 자체 이메일·비밀번호 로그인 후 Authorization Code를 JWT Access Token으로 교환합니다. 소셜 로그인은 사용하지 않습니다. Auth Server가 Refresh Token을 반환해도 MVP 프론트엔드는 저장·갱신에 사용하지 않습니다.
 
 ---
 
@@ -81,54 +81,56 @@
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | `POST` | `/api/auth/login` | 공개 | 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
-| AUTH-03 | `POST` | `/api/auth/password-reset/requests` | 공개 | 비밀번호 재설정 요청 | 필수 |
-| AUTH-04 | `POST` | `/api/auth/password-reset/confirm` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
+| AUTH-01 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | 자체 이메일·비밀번호 로그인과 JWT Access Token 발급 | 필수 |
+| AUTH-03 | `POST` | `/api/users/register?action=request-password-reset` | 공개 | 비밀번호 재설정 요청 | 필수 |
+| AUTH-04 | `POST` | `/api/users/register?action=confirm-password-reset` | 공개 | 재설정 토큰으로 비밀번호 변경 | 필수 |
 | AUTH-05 | `POST` | `/api/users/register?action=request-email-verification` | 공개 | 이메일 인증 요청 | 필수 |
 | AUTH-06 | `POST` | `/api/users/register?action=confirm-email-verification` | 공개 | 이메일 인증 확인 | 필수 |
-| AUTH-07 | `POST` | `/api/auth/id-find/requests` | 공개 | 아이디 찾기 | 필수 |
-| AUTH-08 | `PUT` | `/api/auth/password` | 로그인 | 비밀번호 변경 | 필수 |
+| AUTH-07 | `POST` | `/api/users/register?action=request-id-find` | 공개 | 아이디 찾기 | 필수 |
+| AUTH-08 | `PUT` | `/api/users/me/password` | 로그인 | 비밀번호 변경 | 필수 |
+| AUTH-09 | `POST` | `/api/users/register?action=exchange-oauth-code` | 공개 | Authorization Code를 Access Token으로 교환 | 필수 |
 
-Auth Server는 `AUTH-01`의 이메일·비밀번호 검증과 JWT Access Token 발급을 담당합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로, 구현된 `AUTH-05`, `AUTH-06`은 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다. 서버를 새로 추가하지 않습니다.
+수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 Gateway/Auth 이미지와 다르며 실제 요청은 `401`을 반환합니다. 제공 Auth Server는 `authorization_code` grant를 지원하므로, 자체 이메일·비밀번호 로그인 후 `/oauth2/authorize`에서 Authorization Code를 받고 `/oauth2/token`에서 JWT를 발급받는 계약을 사용합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로 공개 보조 인증 API는 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다.
 
-이메일 인증은 SMTP로 6자리 코드를 보내며 로컬 개발에서는 MailHog를 사용합니다. SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 가입용 토큰은 해시로 저장하고 각각 15분 동안 한 번만 사용할 수 있습니다. 이메일 인증 요청은 이메일별 1분에 1회, 1시간에 5회로 제한합니다. 아이디 찾기와 비밀번호 재설정 메일은 후속 구현 대상입니다.
+이메일 인증은 SMTP로 6자리 코드를 보내며 로컬 개발에서는 MailHog를 사용합니다. SMTP 접속 정보와 발신 주소는 환경 변수로 주입합니다. 인증 코드와 가입용 토큰은 해시로 저장하고 각각 15분 동안 한 번만 사용할 수 있습니다. 이메일 인증 요청은 이메일별 1분에 1회, 1시간에 5회로 제한합니다. 비밀번호 재설정 토큰도 해시로 저장하며 요청은 계정 존재 여부와 무관하게 같은 응답을 반환하고, 활성 계정별 1분에 1회, 1시간에 5회로 제한합니다.
 
 ### AUTH-01 로그인
 
-프론트엔드는 이메일과 비밀번호를 API Gateway의 로그인 API로 전송합니다.
+브라우저는 Auth Server 로그인 화면으로 이동하고, 성공 후 콜백으로 받은 Authorization Code를 서버 측에서 토큰으로 교환합니다. 등록된 브라우저 클라이언트의 비밀값은 프론트엔드 번들에 포함하지 않습니다.
 
 ```http
-POST /api/auth/login
-Content-Type: application/json
+GET /oauth2/authorize?response_type=code&client_id=web-client&redirect_uri=http://localhost:3000/callback&scope=openid%20profile%20read%20write&state={random-state}
 ```
+
+로그인 페이지에서 이메일과 비밀번호를 제출하면 Auth Server가 BCrypt 비밀번호 해시를 검증합니다. 성공 시 `redirect_uri`에 `code`와 `state`를 붙여 리디렉션합니다. 콜백은 `AUTH-09`로 코드를 전달하고 user-service가 서버 측 코드 교환을 수행합니다. 성공 시 프론트가 받는 응답은 다음과 같습니다.
 
 ```json
 {
-  "email": "employee@company.com",
-  "password": "Password123!"
-}
-```
-
-인증 서버가 이메일과 BCrypt 비밀번호 해시를 검증하고 JWT Access Token을 직접 반환합니다.
-
-```json
-{
-  "data": {
-    "accessToken": "jwt-access-token",
-    "tokenType": "Bearer",
-    "expiresIn": 3600
-  },
+  "data": { "accessToken": "jwt-access-token", "tokenType": "Bearer", "expiresIn": 300 },
   "timestamp": "2026-08-10T10:30:00+09:00"
 }
 ```
 
-MVP에서는 OAuth2 Authorization Code와 Refresh Token을 발급하거나 저장하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 별도 서버 세션 없이 클라이언트가 저장한 Access Token을 삭제합니다.
+MVP에서는 Authorization Code로 Access Token을 발급받고 sessionStorage에 Access Token만 저장합니다. Refresh Token이 응답에 포함되어도 저장·사용하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 Auth Server 세션 종료 요청과 클라이언트 Access Token 삭제를 함께 처리합니다.
+
+콜백 화면은 다음 Gateway 공개 API로 Authorization Code를 전달합니다. `user-service`만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 Auth Server와 통신하며, 비밀값은 프론트엔드 번들·문서·저장소에 기록하지 않습니다.
+
+```http
+POST /api/users/register?action=exchange-oauth-code
+Content-Type: application/json
+
+{"code":"authorization-code"}
+```
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
 
 ### AUTH-03·04 비밀번호 재설정
 
 재설정 요청:
+
+```http
+POST /api/users/register?action=request-password-reset
+```
 
 ```json
 {
@@ -139,6 +141,10 @@ Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, 
 계정 존재 여부와 관계없이 `202 Accepted`와 공통 성공 형식을 반환합니다. 계정이 존재하면 등록된 이메일로 15분 동안 한 번만 사용할 수 있는 재설정 링크를 발송합니다.
 
 재설정 확인:
+
+```http
+POST /api/users/register?action=confirm-password-reset
+```
 
 ```json
 {
@@ -207,6 +213,10 @@ Content-Type: application/json
 
 요청:
 
+```http
+POST /api/users/register?action=request-id-find
+```
+
 ```json
 {
   "name": "이직원",
@@ -225,9 +235,14 @@ Content-Type: application/json
 }
 ```
 
-`user-service`는 이름과 기업 사업자번호가 일치하는 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다. 요청 횟수 제한을 적용합니다.
+`user-service`는 이름과 기업 사업자번호가 일치하는 활성 사용자를 확인하고, 계정이 존재하면 등록된 로그인 이메일로 아이디 안내 메일을 보냅니다. 계정 존재 여부를 노출하지 않도록 미일치 요청에도 같은 `202 Accepted` 응답을 반환하며, 화면이나 API 응답에는 이메일을 표시하지 않습니다.
 
 ### AUTH-08 로그인 사용자 비밀번호 변경
+
+```http
+PUT /api/users/me/password
+Authorization: Bearer {accessToken}
+```
 
 ```json
 {
@@ -236,7 +251,7 @@ Content-Type: application/json
 }
 ```
 
-현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `401 INVALID_CREDENTIALS`로 처리합니다.
+현재 비밀번호가 일치하면 변경하고 `200 OK`를 반환합니다. 불일치는 `422 INVALID_PASSWORD`로 처리합니다.
 
 ---
 
@@ -249,6 +264,7 @@ Content-Type: application/json
 | COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
 | USER-02 | `PATCH` | `/api/users/me` | 로그인 | 내 정보 수정 | 필수 |
+| USER-03 | `PUT` | `/api/users/me/password` | 로그인 | 현재 비밀번호 확인 후 변경 | 필수 |
 | USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 필수 |
 
 회원 탈퇴 시 `user-service`가 사용자를 `WITHDRAWN` 처리하고 비밀번호 해시를 로그인할 수 없는 임의 값으로 교체합니다. 이미 발급된 Access Token은 만료 전까지 남을 수 있으므로 보호 API는 사용자 상태를 확인해 탈퇴 사용자의 요청을 거부합니다.
@@ -1017,11 +1033,11 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 | 오류 코드 | HTTP | 설명 |
 | --- | --- | --- |
-| `INVALID_CREDENTIALS` | `401` | 이메일 또는 비밀번호 불일치 |
+| `INVALID_PASSWORD` | `422` | 현재 비밀번호 불일치 |
 | `INVALID_VERIFICATION_CODE` | `422` | 이메일 인증 코드 불일치·만료·재사용 |
 | `EMAIL_VERIFICATION_REQUEST_LIMIT` | `429` | 이메일별 인증 요청 1분 1회 또는 1시간 5회 초과 |
-| `INVALID_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 이미 사용됨 |
-| `RESET_TOKEN_EXPIRED` | `422` | 비밀번호 재설정 토큰 만료 |
+| `INVALID_PASSWORD_RESET_TOKEN` | `422` | 비밀번호 재설정 토큰이 유효하지 않거나 만료·재사용됨 |
+| `PASSWORD_RESET_REQUEST_LIMIT` | `429` | 활성 계정별 재설정 요청 1분 1회 또는 1시간 5회 초과 |
 | `INVALID_INTERNAL_API_KEY` | `401` 또는 `403` | 서비스 간 내부 API 키 누락·불일치. 신규 내부 API는 `401`을 우선 사용하며, 기존 user-service 내부 API는 현재 구현상 `403`을 반환 |
 | `INVALID_EMAIL_VERIFICATION` | `422` | 이메일 인증 토큰이 유효하지 않거나 이미 사용됨 |
 | `USER_INACTIVE` | `403` | 비활성 또는 탈퇴 사용자의 보호 API 요청 |

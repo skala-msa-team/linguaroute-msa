@@ -81,6 +81,13 @@ management:
 app:
   mail:
     from: ${MAIL_FROM:no-reply@linguaroute.local}
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  auth:
+    token-url: ${AUTH_SERVER_TOKEN_URL:http://localhost:9000/oauth2/token}
+    web-client-id: ${AUTH_WEB_CLIENT_ID:web-client}
+    web-client-secret: ${AUTH_WEB_CLIENT_SECRET:}
+    redirect-uri: ${AUTH_WEB_REDIRECT_URI:http://localhost:3000/callback}
   security:
     internal-api-key: ${INTERNAL_API_KEY:local-internal-api-key}
 
