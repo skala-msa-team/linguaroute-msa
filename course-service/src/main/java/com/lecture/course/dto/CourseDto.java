@@ -3,10 +3,8 @@ package com.lecture.course.dto;
 import com.lecture.course.entity.Course;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,12 +22,14 @@ public class CourseDto {
 
         private String description;
 
-        @NotNull(message = "카테고리는 필수입니다")
-        private Course.Category category;
+        @NotNull(message = "언어는 필수입니다")
+        private Course.Language language;
 
-        @NotNull(message = "가격은 필수입니다")
-        @PositiveOrZero(message = "가격은 0 이상이어야 합니다")
-        private BigDecimal price;
+        @NotNull(message = "상황은 필수입니다")
+        private Course.Situation situation;
+
+        @NotNull(message = "난이도는 필수입니다")
+        private Course.Level level;
     }
 
     // 강의 응답
@@ -41,24 +41,24 @@ public class CourseDto {
         private Long id;
         private String title;
         private String description;
-        private Course.Category category;
-        private BigDecimal price;
-        private Long instructorId;
-        private Integer enrollmentCount;
+        private Course.Language language;
+        private Course.Situation situation;
+        private Course.Level level;
         private Course.Status status;
         private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
 
         public static CourseResponse from(Course course) {
             return CourseResponse.builder()
                     .id(course.getId())
                     .title(course.getTitle())
                     .description(course.getDescription())
-                    .category(course.getCategory())
-                    .price(course.getPrice())
-                    .instructorId(course.getInstructorId())
-                    .enrollmentCount(course.getEnrollmentCount())
+                    .language(course.getLanguage())
+                    .situation(course.getSituation())
+                    .level(course.getLevel())
                     .status(course.getStatus())
                     .createdAt(course.getCreatedAt())
+                    .updatedAt(course.getUpdatedAt())
                     .build();
         }
     }
@@ -89,13 +89,13 @@ public class CourseDto {
         }
     }
 
-    // 추천 서비스용 응답 (카테고리 기반 미수강 강의 목록)
+    // 추천 서비스용 응답 (언어 기반 강의 목록)
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
     public static class RecommendResponse {
         private List<CourseResponse> courses;
-        private Course.Category category;
+        private Course.Language language;
     }
 }
