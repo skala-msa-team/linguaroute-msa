@@ -90,7 +90,7 @@ Authorization: Bearer {accessToken}
 
 ### 2.5 테스트와 실행 구성
 
-현재 다음 항목을 검증하는 테스트 5개가 있습니다.
+현재 추천 서비스 자동 테스트 12개가 통과합니다. 다음 핵심 항목을 검증합니다.
 
 - 정상 추천 응답
 - 활성 상태 및 언어 검증
@@ -173,7 +173,7 @@ docker compose config --services
 
 ---
 
-## 5. 가장 먼저 확인할 서비스 계약
+## 5. 확정해 반영한 서비스 계약
 
 ### 5.1 Access Token 클레임
 
@@ -185,35 +185,36 @@ companyId
 role
 ```
 
-현재 추천 구현은 Gateway 헤더에서 사용자 ID와 역할을 받고 `user-service`를 다시 호출해 기업 ID를 조회합니다. 실제 토큰에 세 클레임이 포함된다면 다음 구조로 단순화하는 작업을 우선 검토합니다.
+현재 추천 구현은 Gateway가 전달한 사용자 ID를 기준으로 `user-service`의 내부 권한 컨텍스트 API를 호출합니다. 기존 Auth Server 호환 필드인 `role`은 권한 판정에 사용하지 않고, 최신 프로필의 `businessRole`, `status`, `companyId`를 사용합니다.
 
 ```text
-Bearer Token 검증
-→ userId, companyId, role 추출
-→ EMPLOYEE 권한 검사
+Gateway Bearer Token 검증 및 userId 전달
+→ GET /internal/users/{userId}/authorization-context
+→ businessRole=EMPLOYEE, status=ACTIVE 확인
+→ companyId 사용
 → 추천 서비스 실행
 ```
 
-확인할 사항:
+아직 실행 환경에서 확인할 사항:
 
 - 실제 발급 토큰에 `userId`, `companyId`, `role`이 있는가?
 - API Gateway가 어떤 `X-User-*` 헤더를 전달하는가?
-- `recommend-service`가 토큰을 직접 검증할지 Gateway의 검증 결과를 신뢰할지?
-- 비활성 직원 또는 기업 소속 불일치를 어느 서비스에서 차단할지?
+- Gateway가 외부의 임의 `X-User-*` 헤더를 제거하고 인증된 값으로 덮어쓰는가?
+- Gateway를 우회한 직접 서비스 접근을 실행 환경에서 차단하는가?
 
 ### 5.2 course-service 후보 조회
 
-추천 기능은 `course-service`가 실제로 다음 필터와 응답을 제공해야 완성됩니다.
+추천 기능은 `course-service`가 제공하는 다음 내부 API를 사용합니다.
 
 ```http
-GET /api/courses?language=ENGLISH&status=ACTIVE
+GET /api/courses/internal/recommend?language=ENGLISH
 ```
 
 필요한 최소 응답 필드:
 
 ```json
 {
-  "courseId": 12,
+  "id": 12,
   "title": "해외 고객 미팅 영어",
   "language": "ENGLISH",
   "level": "INTERMEDIATE",
@@ -222,15 +223,7 @@ GET /api/courses?language=ENGLISH&status=ACTIVE
 }
 ```
 
-강의 담당자와 다음을 확인합니다.
-
-- 식별자 이름이 `id`인지 `courseId`인지
-- 응답이 배열인지 `data.content` 페이징 구조인지
-- 언어·수준·상황·상태 필드가 포함되는지
-- `language`와 `status` 필터를 서버에서 적용하는지
-- 서비스 간 요청에 사용자 토큰 또는 내부 인증이 필요한지
-
-현재 `CourseServiceClient`는 최신 명세의 `data.content` 페이징 구조에 맞춘 보완이 필요할 수 있습니다.
+응답은 배열이며 `language`, `level`, `situation`, `status`를 포함합니다. 강의 서비스는 지정 언어의 `ACTIVE` 강의만 조회하고, 추천 서비스도 저장 전에 같은 조건을 다시 검증합니다. 강의 서비스의 `id`는 `CourseServiceClient` 경계에서 추천 도메인의 `courseId`로 명시적으로 변환합니다.
 
 ### 5.3 API Gateway 담당 범위
 
@@ -254,12 +247,7 @@ API Gateway 연동과 서비스 통합 테스트는 김지민 담당입니다. �
 
 Gateway는 외부 요청의 Bearer Token을 검증하고, 인증되지 않은 요청은 `401 Unauthorized`로 차단해야 합니다. 추천 API는 직원 전용이므로 `EMPLOYEE`가 아닌 사용자는 `403 Forbidden`으로 거부해야 합니다.
 
-팀에서 다음 두 방식 중 하나를 확정합니다.
-
-1. Gateway가 토큰을 검증한 뒤 `X-User-Id`, `X-Company-Id`, `X-User-Role`을 신뢰할 수 있는 내부 헤더로 만들어 전달
-2. Gateway가 토큰 유효성만 검증하고 `recommend-service`가 같은 토큰에서 필요한 클레임을 추출
-
-Gateway 헤더 방식을 사용할 때는 클라이언트가 임의로 보낸 `X-User-*` 헤더를 제거하고, 검증한 토큰 값으로 덮어써야 합니다. 실제 제공 이미지가 `companyId`까지 전달하지 못하면 Gateway 소스 또는 설정을 수정할 수 있는지 확인해야 합니다.
+현재 구현은 Gateway의 인증된 `X-User-Id`만 사용자 식별에 사용하고, 권한·상태·기업 소속은 `X-Internal-Api-Key`로 보호된 `user-service` 내부 API에서 최신 값을 조회합니다. Gateway는 클라이언트가 임의로 보낸 `X-User-*` 헤더를 제거하고 검증한 토큰 값으로 덮어써야 하며, 이 동작은 실제 제공 이미지로 통합 검증해야 합니다.
 
 #### Gateway 통합 검증
 
@@ -273,7 +261,7 @@ Gateway 헤더 방식을 사용할 때는 클라이언트가 임의로 보낸 `X
 
 ---
 
-## 6. OpenAI API 연결 계획
+## 6. OpenAI API 연결
 
 ### 6.1 ChatGPT와 API의 차이
 
@@ -285,7 +273,9 @@ Gateway 헤더 방식을 사용할 때는 클라이언트가 임의로 보낸 `X
 
 ### 6.2 제공자 구조
 
-현재 경계를 유지하고 새 구현체를 추가합니다.
+기존 제공자 경계를 유지하면서 `OpenAiRecommendationProvider`를 추가했습니다. `OPENAI_API_KEY`가
+있으면 OpenAI 제공자를, 없으면 로컬 제공자를 조립하므로 팀원이 API 키 없이 실행하는 환경도
+깨지지 않습니다.
 
 ```text
 RecommendationProvider
@@ -307,15 +297,9 @@ OpenAI 시간 초과·요금 한도·인증 오류·형식 오류
 
 ### 6.3 모델 선택
 
-추천 작업은 제공된 후보 중 최대 3개를 고르는 제한된 작업이므로 가장 비싼 모델부터 사용할 필요는 없습니다.
-
-MVP 시작 모델 후보:
-
-- `gpt-4o-mini`: 낮은 비용과 구조화 출력 지원을 우선할 때
-- `gpt-5.6-luna`: 최신 모델 계열에서 비용 효율을 우선할 때
-- `gpt-5.6-terra`: 추천 이유 품질과 비용 균형을 높이고 싶을 때
-
-모델은 코드에 고정하지 않고 `OPENAI_MODEL` 환경변수로 교체 가능하게 만듭니다. 실제 팀 계정에서 사용할 수 있는 모델과 현재 가격은 구현 시 공식 모델 페이지에서 다시 확인합니다.
+2026-08-10 공식 최신 모델 확인 결과를 기준으로 기본값은 `gpt-5.6-sol`로 설정했습니다.
+다만 모델은 `OPENAI_MODEL` 환경변수로 분리했으므로 팀 계정의 사용 가능 모델, 품질 및 비용을
+비교한 뒤 배포 설정만 바꿀 수 있습니다.
 
 ### 6.4 환경변수
 
@@ -323,9 +307,10 @@ MVP 시작 모델 후보:
 
 ```text
 OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_SECONDS=5
+OPENAI_MODEL=gpt-5.6-sol
+OPENAI_TIMEOUT_SECONDS=15
 OPENAI_MAX_RETRIES=1
+OPENAI_MAX_OUTPUT_TOKENS=600
 ```
 
 API 키는 `recommend-service` 서버에서만 사용합니다. 브라우저 코드, Git 저장소, 로그, API 응답에 노출하지 않습니다.
@@ -394,15 +379,15 @@ LLM이 존재하지 않는 강의를 만들지 않도록 `course-service`에서 
 4. `data.content` 등 실제 응답 구조를 `CourseServiceClient`에 반영
 5. 서비스 호출 실패 시 오류 코드와 폴백 범위 확정
 
-### 우선순위 2: OpenAI API
+### 우선순위 2: OpenAI API (코드 및 단위 테스트 완료)
 
-1. 공식 Python OpenAI SDK 의존성 추가
-2. `OpenAiRecommendationProvider` 구현
-3. 환경변수 기반 모델·제한시간·재시도 설정
-4. 후보 강의만 포함하는 프롬프트 작성
-5. 구조화 출력 적용
-6. 반환된 ID를 기존 검증 로직으로 재검증
-7. OpenAI 실패 시 기존 규칙 기반 폴백 유지
+1. 공식 Python OpenAI SDK 의존성 추가 완료
+2. `OpenAiRecommendationProvider` 구현 완료
+3. 환경변수 기반 모델·제한시간·재시도·출력 토큰 설정 완료
+4. 후보 강의만 포함하는 프롬프트 작성 완료
+5. Responses API의 Pydantic 구조화 출력 적용 완료
+6. 반환된 ID를 기존 검증 로직으로 재검증 완료
+7. OpenAI 실패 시 기존 규칙 기반 폴백 유지 완료
 
 ### 우선순위 3: 테스트
 
@@ -511,9 +496,10 @@ docs: AI 추천 실행 환경과 검증 결과 갱신
 
 ## 10. 현재 제한사항
 
-- 실제 OpenAI API는 아직 연결하지 않았습니다.
+- OpenAI 제공자 코드와 모의 단위 테스트는 연결했지만, 팀 API 키를 사용한 실제 유료 호출은 아직 실행하지 않았습니다.
 - 실제 Auth Server 토큰 클레임은 실행 환경에서 확인하지 않았습니다.
-- `course-service`의 최신 강의 필터·응답 구현은 담당자 확인이 필요합니다.
+- `course-service` 내부 추천 후보 계약과 ID 변환은 코드 및 자동 테스트에 반영했습니다.
+- 실제 Gateway가 임의 `X-User-*` 헤더를 제거·덮어쓰는지는 실행 환경에서 확인하지 않았습니다.
 - Gateway를 통한 전체 추천 요청은 실제 컨테이너 환경에서 아직 검증하지 않았습니다.
 - 추천 프론트엔드는 현재 김지민 브랜치에 포함하지 않습니다.
 - Python 3.14에서는 현재 Pydantic 고정 버전 설치가 실패할 수 있습니다.

@@ -456,6 +456,17 @@ X-Internal-Api-Key: {internalApiKey}
 
 ### COURSE-01 목록·검색·필터
 
+> 현재 `dev` 구현은 목표 페이징 API를 아직 제공하지 않습니다. 추천 서비스는
+> 강의 서비스가 제공하는 아래 내부 계약을 사용하며, 외부 응답의 `id`를 추천
+> 도메인의 `courseId`로 변환합니다.
+
+```http
+GET /api/courses/internal/recommend?language=ENGLISH
+```
+
+이 내부 API는 지정 언어의 `ACTIVE` 강의를 배열로 반환합니다. 서비스 간 계약이므로
+API Gateway의 외부 강의 경로로 공개하지 않습니다.
+
 요청 예시:
 
 ```http
