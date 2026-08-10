@@ -10,6 +10,7 @@
 - 다른 서비스에서 받은 `company_id`, `user_id`, `course_id` 등은 논리 참조 ID로만 저장합니다.
 - 서비스 간 데이터 확인은 REST API 또는 Kafka 이벤트로 처리합니다.
 - 기업별 데이터는 `company_id`를 기준으로 분리합니다.
+- 강사 제공 Auth Server가 공용 `users` 테이블을 직접 읽는 현재 구조만 호환 예외로 유지하며, 새 서비스 간 직접 조인은 추가하지 않습니다.
 
 ---
 
@@ -17,7 +18,7 @@
 
 ```mermaid
 flowchart LR
-    AUTH_ACCOUNT["Auth Account<br/>auth-server"] -. "user_id 논리 참조" .-> USER
+    AUTH_SERVER["Auth Server<br/>OAuth2/JWT"] -. "users 로그인 필드 읽기" .-> USER
     COMPANY["Company<br/>user-service"] --> USER["User<br/>user-service"]
     COMPANY --> INVITATION["Invitation<br/>user-service"]
     COMPANY -. "논리 참조" .-> SUBSCRIPTION["Subscription<br/>payment-service"]
@@ -36,54 +37,11 @@ flowchart LR
 
 ---
 
-## 3. auth-server ERD
+## 3. 기존 Auth Server 호환
 
-```mermaid
-erDiagram
-    AUTH_ACCOUNT ||--o{ PASSWORD_RESET_TOKEN : resets
+Auth Server는 별도의 신규 인증 테이블을 소유하지 않고 공용 `users` 테이블의 `id`, `email`, `password`, `name`, `role`을 읽어 OAuth2 로그인과 Access Token 발급을 수행합니다. Refresh Token은 추가하지 않습니다.
 
-    AUTH_ACCOUNT {
-        bigint id PK
-        bigint user_id UK
-        varchar email UK
-        varchar password_hash
-        varchar status
-        datetime created_at
-        datetime updated_at
-    }
-
-    EMAIL_VERIFICATION {
-        bigint id PK
-        varchar email
-        varchar purpose
-        varchar code_hash
-        varchar token_hash UK
-        datetime expires_at
-        datetime verified_at
-        datetime used_at
-        datetime created_at
-    }
-
-    PASSWORD_RESET_TOKEN {
-        bigint id PK
-        bigint auth_account_id FK
-        varchar token_hash UK
-        datetime expires_at
-        datetime used_at
-        datetime created_at
-    }
-```
-
-### auth-server 주요 제약조건
-
-| 테이블 | 제약조건 |
-| --- | --- |
-| `auth_account` | 로그인 이메일 유일, 비밀번호는 해시만 저장 |
-| `auth_account.user_id` | `user-service` 사용자에 대한 논리 참조이며 실제 외래키를 만들지 않음 |
-| `email_verification` | 인증 코드와 토큰은 해시로 저장하고 만료·일회성 사용 처리 |
-| `password_reset_token` | 토큰은 해시로 저장하고 만료·일회성 사용 처리 |
-
-Auth Server는 로그인, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정과 Access Token 발급을 소유합니다. Refresh Token은 저장하거나 발급하지 않습니다. 회원가입 중에는 인증 계정을 `PENDING`으로 생성하고 `user-service` 프로필의 `user_id`를 연결한 뒤 `ACTIVE`로 전환합니다. 로그인 시 `user_id`로 `user-service`의 최신 상태·역할·기업 소속을 조회하여 Access Token의 `userId`, `companyId`, `role` 클레임에 반영합니다. 아이디 찾기는 이름과 기업 사업자번호로 대상을 확인한 후 등록된 로그인 이메일로만 안내합니다.
+제공 JAR의 역할 enum이 `STUDENT`, `INSTRUCTOR`로 고정되어 있으므로 `users.role`은 로그인 호환 필드로 유지합니다. `EMPLOYEE`는 `STUDENT`, `COMPANY_ADMIN`과 `PLATFORM_ADMIN`은 `INSTRUCTOR`로 매핑합니다. LinguaRoute의 실제 권한은 `users.business_role`에 저장하고 각 보호 API가 `user-service`의 사용자 상태·기업 소속과 함께 확인합니다.
 
 ---
 
@@ -96,6 +54,7 @@ erDiagram
     COMPANY ||--o| COMPANY_ENTITLEMENT : owns
     USER ||--o{ INVITATION : creates
     USER ||--o{ USER_AGREEMENT : agrees
+    USER ||--o{ PASSWORD_RESET_TOKEN : resets
     TERM ||--o{ USER_AGREEMENT : accepted_as
 
     COMPANY {
@@ -111,8 +70,10 @@ erDiagram
         bigint id PK
         bigint company_id FK
         varchar email UK
+        varchar password
         varchar name
         varchar role
+        varchar business_role
         varchar status
         datetime created_at
         datetime updated_at
@@ -166,6 +127,27 @@ erDiagram
         datetime agreed_at
     }
 
+    EMAIL_VERIFICATION {
+        bigint id PK
+        varchar email
+        varchar purpose
+        varchar code_hash
+        varchar token_hash UK
+        datetime expires_at
+        datetime verified_at
+        datetime used_at
+        datetime created_at
+    }
+
+    PASSWORD_RESET_TOKEN {
+        bigint id PK
+        bigint user_id FK
+        varchar token_hash UK
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
 ```
 
 ### user-service 주요 제약조건
@@ -173,15 +155,19 @@ erDiagram
 | 테이블 | 제약조건 |
 | --- | --- |
 | `company` | `business_number` 유일 |
-| `user` | `email` 유일 |
-| `user.email` | Auth Server 로그인 이메일의 조회용 사본이며 MVP에서는 직접 변경하지 않음 |
+| `users` | `email` 유일, `password`에는 BCrypt 해시만 저장 |
+| `users.role` | 기존 Auth Server 호환용 `STUDENT`, `INSTRUCTOR`만 저장 |
+| `users.business_role` | 실제 권한 `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` 저장 |
+| `users.company_id` | `PLATFORM_ADMIN`은 `NULL`, 기업 관리자와 직원은 필수 |
 | `invitation` | 원문 코드 대신 `code_hash` 저장 및 유일 처리 |
 | `invitation` | `UNUSED` 상태이고 만료 전일 때만 사용 가능 |
 | `company_entitlement` | 기업별 1개, 결제 이벤트의 최신 구독 권한을 조회용으로 저장 |
 | `processed_event` | `event_id` 유일로 Kafka 이벤트 중복 처리 방지 |
 | `user_agreement` | `(user_id, term_id)` 유일 |
+| `email_verification` | 코드와 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
+| `password_reset_token` | 토큰을 해시로 저장하고 만료·일회성 사용 처리 |
 
-`user-service`는 비밀번호와 인증 토큰을 저장하지 않습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 Kafka 이벤트로 받은 최신 이용 권한을 `company_entitlement`에 저장하여 직원 가입 시 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
+`user-service`는 사용자와 비밀번호 해시, 이메일 인증, 아이디 찾기, 비밀번호 변경·재설정을 소유합니다. Auth Server는 로그인 시 같은 `users` 테이블의 호환 필드만 읽습니다. 활성 직원 수가 사용 좌석 수입니다. 구매 좌석 수와 구독 상태의 원본은 `payment-service`가 소유하며, `user-service`는 Kafka 이벤트로 받은 최신 이용 권한을 `company_entitlement`에 저장하여 직원 가입 시 사용합니다. `subscription_id`는 `payment-service`에 대한 논리 참조입니다. 구독 해지 시 `auto_renew`만 `false`로 바꾸고 `current_period_end`까지 `entitlement_status=ACTIVE`를 유지합니다.
 
 ---
 
@@ -425,10 +411,11 @@ erDiagram
 
 | 엔티티 | 상태 |
 | --- | --- |
-| `AuthAccount` | `PENDING`, `ACTIVE`, `INACTIVE`, `WITHDRAWN` |
 | `Company` | `ACTIVE`, `INACTIVE` |
 | `User` | `ACTIVE`, `INACTIVE`, `WITHDRAWN` |
 | `Invitation` | `UNUSED`, `USED`, `EXPIRED`, `REVOKED` |
+| 로그인 호환 역할 | `STUDENT`, `INSTRUCTOR` |
+| 비즈니스 역할 | `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` |
 
 ### 10.2 강의·수강
 
@@ -565,7 +552,6 @@ MVP에서는 미발행 Outbox 이벤트를 5초 간격으로 재시도하고 성
 
 | 데이터 | 정책 |
 | --- | --- |
-| 인증 계정 | 물리 삭제 대신 Auth Server에서 `INACTIVE` 또는 `WITHDRAWN` 상태 사용 |
 | 기업·사용자 | 물리 삭제 대신 `INACTIVE` 또는 `WITHDRAWN` 상태 사용 |
 | 강의 | 수강 이력 보존을 위해 물리 삭제 대신 `INACTIVE` 사용 |
 | 초대코드 | 폐기 시 `REVOKED`, 만료 시 `EXPIRED` 사용 |
