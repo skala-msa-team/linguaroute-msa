@@ -44,6 +44,48 @@ API, 데이터 모델 또는 실행 방식이 변경되면 관련 코드와 문�
 - 로컬 통합 환경: 루트 `docker-compose.yml`
 - 공통 API 진입점: API Gateway
 
+### 팀원 로컬 인프라 최초 설정
+
+팀원은 프로젝트 루트에 아래 세 분할 파일을 먼저 준비합니다.
+
+```text
+infra-images.tar.gz.part-aa
+infra-images.tar.gz.part-ab
+infra-images.tar.gz.part-ac
+```
+
+세 파일은 제공 Auth Server와 API Gateway 이미지 묶음입니다. 처음 한 번만 합쳐서 Docker에 불러옵니다.
+
+```bash
+cat infra-images.tar.gz.part-aa infra-images.tar.gz.part-ab infra-images.tar.gz.part-ac > infra-images.tar.gz
+docker load -i infra-images.tar.gz
+docker image inspect msa-lecture/auth-server:1.0
+docker image inspect msa-lecture/api-gateway:1.0
+```
+
+현재 저장소의 소스 서비스를 처음 실행하거나 코드 변경을 반영할 때는 다음 명령을 순서대로 실행합니다.
+
+```bash
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+```
+
+이미 현재 소스로 서비스 이미지를 빌드한 뒤 단순히 다시 실행하는 경우에는 다운로드와 재빌드를 막을 수 있습니다.
+
+```bash
+docker compose up -d --no-build --pull never
+docker compose ps
+```
+
+기동 확인은 Spring 서비스의 `/actuator/health`와 FastAPI 추천 서비스의 `/health`를 사용합니다.
+
+- 위 이미지 묶음의 `msa-lecture/auth-server:1.0`을 사용하는 로컬 Compose 환경에서는 팀원이 `AUTH_WEB_CLIENT_SECRET`을 별도로 만들거나 `.env`에 입력하지 않습니다. `docker-compose.yml`이 배포 이미지의 로컬 실습용 `web-client` 등록값을 기본으로 `user-service`에 주입합니다.
+- 다른 Auth Server 또는 운영 환경에서만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 해당 환경의 등록값을 덮어씁니다.
+- 이 인프라 묶음에는 현재 확인 기준 Auth Server와 API Gateway만 포함됩니다. 저장소 소스 서비스 이미지까지 포함된 강사 배포용 전체 묶음과 혼동하지 않습니다.
+- 강사가 `docker-compose.local.yml`과 별도의 `msa-lecture-images.part.*` 전체 묶음을 함께 배포한 경우에는 그 배포 안내의 `--no-build --pull never` 절차를 우선합니다.
+- 현재 저장소 구성의 상세 실행 순서는 [`README.md`](./README.md)를 따릅니다.
+
 서비스별 책임을 유지합니다. 다른 서비스의 내부 구현을 편의상 침범하지 않습니다.
 
 - `course-service`는 강의와 차시를 소유합니다.

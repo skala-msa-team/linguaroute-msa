@@ -171,20 +171,20 @@ git commit -m "fix: 중복 수강 신청 문제 수정" \
 
 - Docker Desktop
 - 교수님이 배포한 Docker 이미지 분할 파일
-  - `msa-lecture-images.part.aa`
-  - `msa-lecture-images.part.ab`
-  - `msa-lecture-images.part.ac`
+  - `infra-images.tar.gz.part-aa`
+  - `infra-images.tar.gz.part-ab`
+  - `infra-images.tar.gz.part-ac`
 
-분할 파일에는 Auth Server, API Gateway와 수업용 기본 서비스 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
+현재 저장소와 함께 전달된 분할 파일에는 Auth Server와 API Gateway 이미지가 들어 있습니다. 용량이 커서 Git에는 포함하지 않으므로 팀에서 별도로 전달받아 프로젝트 최상위 폴더에 넣습니다.
 
 LinguaRoute 개발에서는 Auth Server와 API Gateway 이미지만 공통 실행 기반으로 사용합니다. `user-service`, `course-service`, `enrollment-service`, `payment-service`, `recommend-service`, `eureka-server`는 현재 저장소의 코드를 Docker로 빌드해서 실행합니다.
 
 ```text
 linguaroute-msa/
 ├── docker-compose.yml
-├── msa-lecture-images.part.aa
-├── msa-lecture-images.part.ab
-├── msa-lecture-images.part.ac
+├── infra-images.tar.gz.part-aa
+├── infra-images.tar.gz.part-ab
+├── infra-images.tar.gz.part-ac
 ├── course-service/
 ├── enrollment-service/
 └── ...
@@ -212,7 +212,7 @@ cd linguaroute-msa
 
 ```bash
 pwd
-ls docker-compose.yml msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac
+ls docker-compose.yml infra-images.tar.gz.part-aa infra-images.tar.gz.part-ab infra-images.tar.gz.part-ac
 ```
 
 ### 3. 공통 이미지 불러오기
@@ -220,8 +220,8 @@ ls docker-compose.yml msa-lecture-images.part.aa msa-lecture-images.part.ab msa-
 분할 파일을 하나의 압축 이미지 파일로 합친 뒤 Docker에 불러옵니다. 처음 실행할 때 한 번만 하면 됩니다.
 
 ```bash
-cat msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac > msa-lecture-images.tar.gz
-docker load -i msa-lecture-images.tar.gz
+cat infra-images.tar.gz.part-aa infra-images.tar.gz.part-ab infra-images.tar.gz.part-ac > infra-images.tar.gz
+docker load -i infra-images.tar.gz
 ```
 
 다음 명령으로 이미지가 있는지 확인합니다.
@@ -486,9 +486,9 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/plans
 
 LinguaRoute는 소셜 로그인이 아니라 자체 이메일·비밀번호 계정으로 Auth Server에 로그인합니다. 브라우저는 `http://localhost:3000`에서 시작한 뒤 Auth Server의 OAuth2 Authorization Code 흐름으로 JWT를 받습니다.
 
-- 프로젝트 루트에서 `cp .env.example .env`를 실행하고 `AUTH_WEB_CLIENT_SECRET`은 제공 Auth Server의 등록값으로 로컬에만 설정합니다.
 - Vite 개발 서버는 등록된 콜백 URI와 맞게 `3000` 포트로 실행됩니다.
-- `user-service`에는 `AUTH_WEB_CLIENT_SECRET` 환경변수가 필요합니다. 값은 제공 Auth Server에 등록된 브라우저 클라이언트 비밀값이며 저장소에 추가하지 않습니다.
+- 위 분할 인프라 파일에서 `msa-lecture/auth-server:1.0` 이미지를 불러온 로컬 환경은 별도 `AUTH_WEB_CLIENT_SECRET` 설정 없이 실행됩니다. Compose가 배포 이미지의 로컬 실습용 `web-client` 등록값을 기본으로 주입합니다.
+- 다른 Auth Server 또는 운영 환경에서는 `AUTH_WEB_CLIENT_SECRET` 환경변수로 해당 환경의 등록값을 덮어써야 합니다.
 - 콜백은 `POST /api/users/register?action=exchange-oauth-code`로 코드를 전달합니다. user-service가 서버 간 통신으로 토큰을 교환하므로 프론트에 비밀값이 노출되지 않습니다.
 - 로그아웃은 `POST /logout`으로 Auth Server 세션을 종료하고, 프론트는 sessionStorage의 Access Token을 삭제합니다.
 
@@ -623,11 +623,11 @@ pull access denied
 No such image
 ```
 
-`msa-lecture-images.part.*` 파일이 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
+`infra-images.tar.gz.part-*` 파일이 프로젝트 최상위 폴더에 있는지 확인한 뒤 이미지를 다시 불러옵니다.
 
 ```bash
-cat msa-lecture-images.part.aa msa-lecture-images.part.ab msa-lecture-images.part.ac > msa-lecture-images.tar.gz
-docker load -i msa-lecture-images.tar.gz
+cat infra-images.tar.gz.part-aa infra-images.tar.gz.part-ab infra-images.tar.gz.part-ac > infra-images.tar.gz
+docker load -i infra-images.tar.gz
 docker images
 ```
 

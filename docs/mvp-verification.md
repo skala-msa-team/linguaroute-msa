@@ -53,7 +53,7 @@ GET  /api/companies/me/enrollments/progress
 
 - 기본 프론트 환경 변수는 데모 화면 보존을 위해 `VITE_USE_LIVE_API=false`다. 실제 API 연동 화면을 확인하려면 `true`로 설정해야 한다.
 - 기업 대시보드, 구독·결제, 강의 목록·상세·관리·등록, 내 학습·플레이어·수강, 기업 진도·직원 관리 화면은 라이브 모드에서 현재 API를 호출한다. 라이브 응답이 빈 목록이면 강의·내 학습 화면은 목업으로 대체하지 않고 빈 상태를 표시한다. 통계·차트의 과거 추이처럼 API가 없는 표시 요소는 목업 값으로 남아 있다.
-- 이번 프론트 연결 변경은 `npm run build`로 정적 검증했다. 2026-08-11 라이브 재검증에서 Gateway의 서비스 토큰 발급과 `GET /api/plans`는 `200`을 반환했고, 브라우저 OAuth 로그인은 Auth Server의 Authorization Code 발급까지 진행됐다. 다만 `user-service` 컨테이너에 `AUTH_WEB_CLIENT_SECRET`이 없어 코드 교환 API가 `500`을 반환하므로, 인증이 필요한 결제 생성·강의 등록의 브라우저 재검증은 이 환경 변수 설정 후 다시 해야 한다.
+- 이번 프론트 연결 변경은 `npm run build`로 정적 검증했다. 2026-08-11 라이브 재검증에서 Gateway의 서비스 토큰 발급과 `GET /api/plans`는 `200`을 반환했다. 배포된 분할 인프라 파일의 `msa-lecture/auth-server:1.0`을 사용하는 Compose 기본 구성에서는 별도 `AUTH_WEB_CLIENT_SECRET` 설정 없이 브라우저 Authorization Code 교환 API도 `200`을 반환한다. 다른 Auth Server를 사용하는 환경에서는 해당 등록값을 환경변수로 덮어써야 한다.
 - 플랫폼 운영 화면과 AI 추천 화면은 대응하는 Gateway API가 아직 구현되지 않아 목업 화면으로 남아 있다. API 구현 완료와 화면 연동 완료를 같은 의미로 공유하면 안 된다.
 - AI 추천은 API 계약과 내부 호출 경로가 현재 설계와 다르므로 확정 MVP 완료 항목이 아니다.
 - 현재 검증 DB에는 API 검증용 강의·차시·수강 및 초대코드 데이터가 추가되어 있다. 제출 전에는 깨끗한 볼륨에서 초기화·재검증한다.
