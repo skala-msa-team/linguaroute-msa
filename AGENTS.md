@@ -84,6 +84,8 @@ docker compose ps
 - 다른 Auth Server 또는 운영 환경에서만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 해당 환경의 등록값을 덮어씁니다.
 - 이 인프라 묶음에는 현재 확인 기준 Auth Server와 API Gateway만 포함됩니다. 저장소 소스 서비스 이미지까지 포함된 강사 배포용 전체 묶음과 혼동하지 않습니다.
 - 강사가 `docker-compose.local.yml`과 별도의 `msa-lecture-images.part.*` 전체 묶음을 함께 배포한 경우에는 그 배포 안내의 `--no-build --pull never` 절차를 우선합니다.
+- 팀에 전달하는 완전 오프라인 ARM64 실행 파일은 `docker-compose.local.yml`, `msa-lecture-images-arm64.tar.part-aa`, `msa-lecture-images-arm64.tar.part-ab`, `msa-lecture-images-arm64.tar.part-ac` 네 개입니다. 세 조각을 `cat msa-lecture-images-arm64.tar.part-* > msa-lecture-images-arm64.tar`로 합친 뒤 `shasum -a 256 -c msa-lecture-images-arm64.tar.sha256`, `docker load -i msa-lecture-images-arm64.tar`, `docker compose -f docker-compose.local.yml up -d --no-build --pull never` 순서로 실행합니다.
+- `docker-compose.local.yml`은 ARM64 사전 빌드 이미지 전용이므로 이 파일로 `docker compose build` 또는 `docker compose up --build`를 실행하지 않습니다.
 - 현재 저장소 구성의 상세 실행 순서는 [`README.md`](./README.md)를 따릅니다.
 
 서비스별 책임을 유지합니다. 다른 서비스의 내부 구현을 편의상 침범하지 않습니다.

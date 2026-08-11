@@ -268,6 +268,35 @@ MariaDB / Kafka
         → Recommend Service
 ```
 
+### 5-1. ARM64 전체 이미지로 오프라인 실행
+
+팀원에게 다음 네 파일을 함께 전달하면 Dockerfile, Gradle 또는 pip 빌드 없이 실행할 수 있습니다.
+
+```text
+docker-compose.local.yml
+msa-lecture-images-arm64.tar.part-aa
+msa-lecture-images-arm64.tar.part-ab
+msa-lecture-images-arm64.tar.part-ac
+```
+
+프로젝트 루트에서 세 이미지 조각을 합치고 무결성을 확인한 뒤 이미지를 불러옵니다.
+
+```bash
+cat msa-lecture-images-arm64.tar.part-* > msa-lecture-images-arm64.tar
+shasum -a 256 -c msa-lecture-images-arm64.tar.sha256
+docker load -i msa-lecture-images-arm64.tar
+```
+
+그다음 로컬 전용 Compose 파일로 실행합니다.
+
+```bash
+docker compose -f docker-compose.local.yml config --quiet
+docker compose -f docker-compose.local.yml up -d --no-build --pull never
+docker compose -f docker-compose.local.yml ps
+```
+
+이 경로에서는 `docker compose build`와 `docker compose up -d --build`를 실행하지 않습니다. Gateway가 Eureka의 전체 서비스 목록을 처음 가져오기까지 잠시 걸릴 수 있으므로, 기동 직후 `503`이면 모든 컨테이너가 실행 중인지 확인하고 약 30초 뒤 다시 요청합니다.
+
 교수님 안내의 `docker compose up -d --no-build --pull never`는 배포받은 이미지 그대로 실행하는 방식입니다. 이 프로젝트에서는 팀이 수정한 최신 코드가 실행되어야 하므로, 기능 개발과 검증에는 기본적으로 `docker compose up -d --build`를 사용합니다.
 
 다만 외부 다운로드 제한 때문에 빌드가 실패하면 테더링을 사용하거나, 필요한 의존성이 캐시된 팀원 환경에서 빌드합니다. Auth Server와 API Gateway 이미지를 못 받는 문제는 위의 `docker load` 절차로 해결합니다.
