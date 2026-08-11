@@ -40,20 +40,22 @@ LinguaRoute는 기업이 비용을 지불하고 소속 직원이 학습하는 �
 | Pain Point | 핵심 기능 | AI 역할 | 검증 기준 |
 | --- | --- | --- | --- |
 | 기업의 계정·좌석 통제 어려움 | 월간·연간 구독, 모의 결제, 일회용 초대코드, 좌석 배정·회수 | AI 사용 없음. 서버 규칙으로 통제 | 구독 `ACTIVE`와 잔여 좌석을 모두 확인 |
-| 직원의 강의 탐색 어려움 | 언어·상황·난이도 검색과 AI 추천 | 언어, 수준, 직무, 상황, 목표를 분석 | 실제 동일 언어의 `ACTIVE` 강의만 반환 |
-| AI 장애 시 학습 중단 위험 | 규칙 기반 대체 추천 | 언어·수준·상황 일치도로 대체 결과 생성 | `source=RULE_BASED_FALLBACK` 명시 |
+| 직원의 강의 탐색 어려움 | 언어·상황·난이도 검색과 강의 추천 | 김지민 팀원 연동 예정. 현재는 API 응답 골격만 확인 | 최종 구현도 실제 동일 언어의 `ACTIVE` 강의만 반환 |
+| 외부 AI 미연결 환경 | 규칙 기반 추천 | 현재 골격은 직무·목표 입력과 대체 응답 구조를 확인 | `source=RULE_BASED_FALLBACK` 명시 |
 | 기업의 성과 파악 어려움 | 직원별 수강 상태와 서버 계산 진도율 | Sprint 1에서는 AI 분석 대상 아님 | 완료 차시를 기준으로 서버 계산 |
 | 플랫폼의 운영 상태 분산 | 역할별 운영 대시보드 | Sprint 1에서는 AI 분석 대상 아님 | 관리자 API로 상태와 예외 조회 |
 
 ### AI 추천 처리 과정
 
+> 아래 흐름은 김지민 팀원이 연동할 목표 흐름입니다. 현재 완료된 추천 기능을 설명하는 내용이 아닙니다.
+
 ```text
 직원이 언어·수준·직무·상황·목표 입력
-→ recommend-service가 조건 분석
+→ recommend-service가 언어·수준·상황 일치도 계산
 → course-service에서 실제 ACTIVE 강의 조회
 → 요청 언어와 일치하는 강의만 최종 검증
 → 강의 ID와 추천 이유 반환
-→ AI 장애 시 규칙 기반 대체 결과 반환
+→ RULE_BASED_FALLBACK 결과 반환
 ```
 
 ### AI 입력과 출력 예시
@@ -76,7 +78,7 @@ LinguaRoute는 기업이 비용을 지불하고 소속 직원이 학습하는 �
 | P0 | 구독·결제·권한 | 요금제, 월간·연간 구독, 모의 결제, 멱등성, 해지·만료·갱신, Kafka 이벤트 | 기업이 비용을 내고 직원에게 권한을 제공하는 수익 모델의 핵심 |
 | P0 | 초대·좌석·직원 | 일회용 초대코드, 만료·중복 방지, 좌석 배정·회수, 직원 상태 | 계약 인원 통제를 검증하는 B2B 핵심 기능 |
 | P0 | 강의·수강·학습 | 검색·필터·상세, 수강신청, 중복 방지, 차시 완료, 진도율 | 직원이 실제 교육 가치를 얻는 최소 학습 흐름 |
-| P0 | AI 추천 | 조건 입력, 추천 이유, 실제 강의 검증, 규칙 기반 대체 | 맞춤 강의 탐색이라는 서비스 차별화 가치 검증 |
+| P0 | AI 추천 | 김지민 팀원 연동 예정. 현재 API 계약·권한·내부 조회·대체 응답 골격 | 팀원 구현 병합 후 추천 품질과 전체 흐름 검증 |
 | P1 | 역할별 운영 화면 | 기업 관리자와 플랫폼 관리자 대시보드 | 구매자와 운영자가 상태를 확인해야 B2B 운영이 완결됨 |
 
 Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실행되는 것입니다.
@@ -110,7 +112,7 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | `course-service` | 강의·차시 서비스 | 강의와 차시 등록, 검색, 필터, `ACTIVE` 상태 관리 |
 | `enrollment-service` | 수강·학습 서비스 | 수강신청, 차시 시작·완료, 서버 진도율 계산 |
 | `payment-service` | 구독·결제 서비스 | 요금제, 구독, 모의 결제, 멱등성, 이벤트 발행 |
-| `recommend-service` | AI 추천 서비스 | 추천 조건 분석, 추천 이유, 실제 강의 검증, 대체 추천 |
+| `recommend-service` | AI 추천 서비스 | 김지민 팀원 연동 예정. 현재 계약·검증·대체 응답 골격 |
 | Kafka | 구독·결제 이벤트 버스 | 결제와 구독 상태를 비동기로 전달 |
 | MariaDB | `lecture_db` | 하나의 DB 안에서 서비스별 소유 테이블 분리 |
 
@@ -152,9 +154,9 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | --- | --- | --- | --- | --- | --- |
 | 로그인 | `GET`·`POST` | `/oauth2/authorize` → `/oauth2/token` | 공개 | 이메일·비밀번호 세션, Authorization Code | JWT Access Token과 만료시간 |
 | 기업 가입 | `POST` | `/api/users/register` | 공개 | 기업·관리자·인증·약관 | 기업·사용자 ID와 역할 |
-| 직원 가입 | `POST` | `/api/employees/signup` | 공개 | 초대코드·직원·인증·약관 | 직원 계정과 좌석 배정 |
-| 내 정보 | `GET`, `PATCH` | `/api/users/me` | 로그인 | 수정할 사용자 정보 | 사용자·역할·기업 정보 |
-| 기업 정보 | `GET`, `PATCH` | `/api/companies/me` | 기업 관리자 | 수정할 기업 정보 | 자신의 기업 정보 |
+| 직원 가입 | `POST` | `/api/users/register?action=employee-signup` | 공개 | 초대코드·직원·인증·약관 | 직원 계정과 좌석 배정 |
+| 내 정보 | `GET`, `POST` | `/api/users/me`, `/api/users/me?action=update-profile` | 로그인 | 수정할 사용자 정보 | 사용자·역할·기업 정보 |
+| 기업 정보 | `GET`, `POST` | `/api/companies/me`, `/api/companies/me?action=update-company` | 기업 관리자 | 수정할 기업 정보 | 자신의 기업 정보 |
 | 요금제 | `GET` | `/api/plans` | 기업 관리자 | 없음 | 가격·주기·좌석 수 |
 | 구독 결제 | `POST` | `/api/subscriptions` | 기업 관리자 | 요금제·결제 토큰·멱등성 키 | 구독·결제 ID와 기간 |
 | 구독 조회 | `GET` | `/api/subscriptions/me` | 기업 관리자 | 없음 | 상태·만료일·자동 갱신 |
@@ -173,10 +175,10 @@ Sprint 1의 완료 기준은 다음 전체 흐름이 API Gateway를 통해 실�
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start` | 직원 | 수강·차시 ID | 학습 시작 시각과 상태 |
 | 차시 완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/complete` | 직원 | 수강·차시 ID | 서버 계산 진도율 |
-| AI 추천 (개발 중) | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 목표 계약. 발표 라이브 시연 제외 |
-| 강의 등록 | `POST` | `/api/admin/courses` | 플랫폼 관리자 | 강의 정보 | 생성 강의 |
-| 강의 수정 | `PATCH` | `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 변경 정보 | 수정 강의 |
-| 운영 조회 (설계·목업) | `GET` | `/api/admin/users`, `/companies`, `/payments`, `/enrollments` | 플랫폼 관리자 | 검색·상태 조건 | 목표 계약. 발표 라이브 시연 제외 |
+| 강의 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | 팀원 연동 예정. 현재 규칙 기반 계약 골격 |
+| 강의 조회·등록 | `GET`, `POST` | `/api/admin/courses` | 플랫폼 관리자 | 검색·상태·강의 정보 | 전체 상태 목록과 생성 강의 |
+| 강의 수정 | `POST` | `/api/admin/courses/{courseId}?action=update-course` | 플랫폼 관리자 | 변경 정보 | 수정 강의 |
+| 운영 조회 | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 사용자·기업·결제·수강 상태 조회 | 플랫폼 관리자 `200`, 직원 `403` 검증 완료 |
 
 ### 예시 1. 이메일·비밀번호 로그인
 
@@ -281,9 +283,9 @@ Content-Type: application/json
 
 서버는 직원 역할, 기업의 활성 구독, 강의의 `ACTIVE` 상태와 중복 신청 여부를 모두 확인합니다.
 
-### 예시 5. AI 강의 추천 목표 계약
+### 예시 5. 팀원 연동용 강의 추천 계약 골격
 
-> 이 요청·응답은 추천 기능 구현 중인 목표 계약입니다. 발표 라이브 시연에서는 사용하지 않고, 구현·curl 검증 후 실제 결과로 교체합니다.
+추천 시스템은 김지민 팀원이 연동할 예정입니다. 현재 응답은 외부 경로와 권한, 실제 `ACTIVE` 상태·요청 언어 검증, 기존 수강 제외가 연결되는지 확인하기 위한 규칙 기반 골격입니다. 아래 예시는 최종 추천 완료 증거가 아니라 팀원 구현이 유지해야 할 계약입니다.
 
 ```http
 POST /api/courses/recommendations
@@ -305,7 +307,7 @@ Content-Type: application/json
 {
   "data": {
     "recommendationId": 3001,
-    "source": "AI",
+    "source": "RULE_BASED_FALLBACK",
     "courses": [
       {
         "courseId": 12,
@@ -333,67 +335,19 @@ Content-Type: application/json
 | 422 | `COURSE_INACTIVE` | 비활성 강의 신청 |
 | 503 | `AI_RECOMMENDATION_FAILED` | AI와 대체 추천 모두 실패 |
 
-### Swagger 실행 검증
+### 통합 실행 검증
 
-2026-08-11 Java 21로 로컬 실행한 `course-service` Swagger에서 기존 내부 경로인 `GET /api/courses/internal/recommend?language=ENGLISH`를 직접 실행하여 `200 OK`와 JSON 응답을 확인했습니다. 이후 내부 API 보안 기준 반영으로 현재 목표 경로는 `GET /internal/courses/recommend?language=ENGLISH`와 `X-Internal-Api-Key` 헤더입니다.
+2026-08-11 현재 Docker Compose 소스로 재빌드한 뒤 OAuth2와 공개·보호·내부 API를 포함한 curl 79건을 모두 통과했습니다. Chrome에서는 직원·기업 관리자·플랫폼 관리자 화면과 수정·상태 변경을 포함한 38개 상황을 모두 확인했습니다. 발표 근거는 과거 목업 캡처가 아니라 [MVP 통합 검증 기록](./mvp-verification.md)의 현재 실행 결과를 사용합니다.
 
-보호 API인 `GET /api/courses`는 인증 토큰 없이 직접 호출하면 `401 Unauthorized`가 반환됩니다. 따라서 Swagger 캡처는 course-service의 실제 기동과 과거 내부 추천 API 응답 확인 증거이며, 전체 API Gateway 인증 흐름 완료로 표시하지 않습니다.
+## 6. 라이브 시연 화면
 
-발표 전에는 최신 백엔드를 재빌드한 뒤 각 Swagger에서 목표 API를 실행하고 프론트를 `VITE_USE_LIVE_API=true`로 연결하여 최종 요청·응답을 다시 캡처해야 합니다.
+프론트엔드는 목업 모드를 제공하지 않고 실제 Auth Server와 API Gateway만 호출합니다.
 
-![course-service Swagger 실제 200 응답](./images/presentation/12-swagger-course-response.jpg)
-
-## 6. 동작 화면 스냅샷
-
-아래 화면은 최신 프론트 퍼블리싱을 `VITE_USE_LIVE_API=false`로 실행하여 브라우저에서 버튼과 상태 변화를 직접 조작한 UI 프로토타입입니다. 실제 실행이 확인된 API 증거는 위 Swagger 캡처입니다. UI 상태 변화와 전체 API 통합 완료를 구분하여 발표합니다.
-
-### 화면 1. B2B2E 서비스 소개
-
-기업 관리자, 직원, 플랫폼 관리자의 세 관점을 하나의 서비스로 연결한다는 핵심 가치를 보여줍니다.
-
-![LinguaRoute 서비스 소개](./images/presentation/01-landing.jpg)
-
-### 화면 2. 기업 구독 결제 전과 결제 후
-
-`POST /api/subscriptions` 목표 요청의 전후 상태입니다. 결제 전에는 요금제·주기·좌석을 확인하고, 결제 후에는 `PaymentCompleted → 구독 ACTIVE → 좌석 50석` 변화를 보여줍니다.
-
-![구독 결제 전](./images/presentation/02-checkout-before.jpg)
-
-![구독 결제 후](./images/presentation/03-checkout-after.jpg)
-
-### 화면 3. 직원 현황과 초대코드 생성
-
-직원·좌석 현황을 확인한 뒤 일회용 초대코드를 생성하는 기업 관리자 흐름입니다.
-
-![직원과 좌석 현황](./images/presentation/04-employees-before.jpg)
-
-![초대코드 생성 결과](./images/presentation/05-invitation-after.jpg)
-
-### 화면 4. 강의 상세와 수강신청 완료
-
-직원이 기업 구독 권한과 강의 상태를 확인하고 수강신청 성공 응답을 받았을 때 버튼과 안내 문구가 바뀌는 장면입니다.
-
-![수강신청 전](./images/presentation/06-course-before.jpg)
-
-![수강신청 후](./images/presentation/07-enrollment-after.jpg)
-
-### 화면 5. AI 추천 결과
-
-직원이 영어·중급·글로벌 세일즈·고객 미팅과 목표를 입력한 뒤 추천 강의와 추천 이유를 확인하는 장면입니다.
-
-![AI 추천 결과](./images/presentation/08-recommendation-after.jpg)
-
-### 화면 6. 기업 관리자 학습 성과
-
-직원·부서별 진도율과 수료 현황을 확인하는 기업 관리자 화면입니다.
-
-![기업 관리자 학습 현황](./images/presentation/10-company-progress.jpg)
-
-### 화면 7. 플랫폼 관리자 운영
-
-기업, 사용자, 결제, 수강과 예외 알림을 통합 조회하는 플랫폼 관리자 화면입니다.
-
-![플랫폼 관리자 대시보드](./images/presentation/09-admin-dashboard.jpg)
+| 역할 | 시연할 현재 화면 |
+| --- | --- |
+| 기업 관리자 | 가입 후 로그인·결제 복귀, 모의 결제, 초대코드, 직원 상태, 좌석, 진도율 |
+| 직원 | 강의 검색·수강신청·학습, 내 정보. 추천 결과·상세 이동은 팀원 연동 후 추가 |
+| 플랫폼 관리자 | 사용자·기업·결제·수강 운영 조회, 강의 등록·수정·상태 변경 |
 
 ## 발표 시연 시나리오
 
@@ -404,7 +358,7 @@ Content-Type: application/json
 → 기업 관리자: 직원별 진도 확인
 ```
 
-AI 추천과 플랫폼 운영 화면은 현재 UI 프로토타입 또는 목표 구조 설명용으로만 사용합니다. 라이브 시연에는 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화가 확인된 구현 기능만 포함합니다.
+플랫폼 운영 화면은 실제 API를 호출합니다. 추천 화면은 현재 API 골격에 연결되어 있으나 최종 추천 시스템이 아니므로 라이브 완료 기능에서 제외하고, 김지민 팀원 구현을 병합한 뒤 요청 URL, HTTP 상태 코드, 응답 데이터와 화면 상태 변화를 다시 확인해 시연에 포함합니다.
 
 ## 팀 담당 영역
 

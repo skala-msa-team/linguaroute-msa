@@ -280,9 +280,9 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO users (id, company_id, email, password, name, role, business_role, status, created_at, updated_at)
 VALUES
     (9100, NULL, 'platform-admin@linguaroute.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '플랫폼 관리자', 'INSTRUCTOR', 'PLATFORM_ADMIN', 'ACTIVE', '2026-08-10 09:10:00', '2026-08-10 09:10:00'),
-    (9101, 9101, 'admin@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '박관리', 'INSTRUCTOR', 'COMPANY_ADMIN', 'ACTIVE', '2026-08-10 09:11:00', '2026-08-10 09:11:00'),
-    (9102, 9101, 'employee.lee@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '이수강', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:12:00', '2026-08-10 09:12:00'),
-    (9103, 9101, 'employee.kim@scala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '김학습', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:13:00', '2026-08-10 09:13:00'),
+    (9101, 9101, 'admin@skala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '박관리', 'INSTRUCTOR', 'COMPANY_ADMIN', 'ACTIVE', '2026-08-10 09:11:00', '2026-08-10 09:11:00'),
+    (9102, 9101, 'employee.lee@skala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '이수강', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:12:00', '2026-08-10 09:12:00'),
+    (9103, 9101, 'employee.kim@skala-tech.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '김학습', 'STUDENT', 'EMPLOYEE', 'ACTIVE', '2026-08-10 09:13:00', '2026-08-10 09:13:00'),
     (9104, 9102, 'admin@global-link.local', '$2a$10$oUjs811YM5.JK7cliWxctOY32QifujCNDB1QYe2Pr74Lag6inAu4S', '정관리', 'INSTRUCTOR', 'COMPANY_ADMIN', 'ACTIVE', '2026-08-10 09:14:00', '2026-08-10 09:14:00')
 ON DUPLICATE KEY UPDATE
     company_id = VALUES(company_id),

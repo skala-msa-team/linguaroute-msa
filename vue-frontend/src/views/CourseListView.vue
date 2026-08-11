@@ -16,7 +16,6 @@
 
     <div class="result-head">
       <p><strong>{{ filtered.length }}</strong>개의 강의</p>
-      <div v-if="!useLiveApi" class="preview-control"><span>화면 상태</span><select v-model="viewState"><option value="ready">정상</option><option value="loading">로딩</option><option value="empty">빈 결과</option><option value="error">오류</option></select></div>
     </div>
 
     <AsyncState v-if="viewState === 'loading'" type="loading" title="강의를 불러오고 있어요" description="등록된 ACTIVE 강의를 확인하고 있습니다." />
@@ -36,7 +35,6 @@ import AppShell from '@/components/AppShell.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import CourseTile from '@/components/CourseTile.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courses } from '@/data/mockData.js'
 import { LANGUAGE_OPTIONS, LEVEL_OPTIONS, SITUATION_OPTIONS } from '@/constants/domain.js'
 import { courseApi } from '@/api/course.js'
 
@@ -45,13 +43,12 @@ const language = ref('')
 const situation = ref('')
 const level = ref('')
 const viewState = ref('ready')
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const liveCourses = ref([])
 const loadError = ref('잠시 후 다시 시도해 주세요.')
 const page = ref(0)
 const totalPages = ref(1)
 
-const filtered = computed(() => (useLiveApi ? liveCourses.value : courses).filter((course) => {
+const filtered = computed(() => liveCourses.value.filter((course) => {
   const query = keyword.value.trim().toLowerCase()
   return (!query || `${course.title} ${course.description}`.toLowerCase().includes(query))
     && (!language.value || course.languageCode === language.value)
@@ -60,7 +57,6 @@ const filtered = computed(() => (useLiveApi ? liveCourses.value : courses).filte
 }))
 
 async function loadCourses() {
-  if (!useLiveApi) return
   viewState.value = 'loading'
   try {
     const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, situation: situation.value || undefined, level: level.value || undefined, page: page.value, size: 20 })

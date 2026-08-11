@@ -1,31 +1,65 @@
-from pydantic import BaseModel
-from typing import List, Optional
 from enum import Enum
-from decimal import Decimal
-from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
-class CourseCategory(str, Enum):
-    BACKEND = "BACKEND"
-    FRONTEND = "FRONTEND"
-    DEVOPS = "DEVOPS"
-    DATA_SCIENCE = "DATA_SCIENCE"
-    MOBILE = "MOBILE"
-    SECURITY = "SECURITY"
-    DATABASE = "DATABASE"
-    OTHER = "OTHER"
+class Language(str, Enum):
+    ENGLISH = "ENGLISH"
+    JAPANESE = "JAPANESE"
+    CHINESE = "CHINESE"
 
 
-class CourseResponse(BaseModel):
+class Level(str, Enum):
+    BEGINNER = "BEGINNER"
+    ELEMENTARY = "ELEMENTARY"
+    INTERMEDIATE = "INTERMEDIATE"
+    ADVANCED = "ADVANCED"
+
+
+class Situation(str, Enum):
+    CUSTOMER_MEETING = "CUSTOMER_MEETING"
+    PRESENTATION = "PRESENTATION"
+    EMAIL = "EMAIL"
+    BUSINESS_TRIP = "BUSINESS_TRIP"
+    DAILY_CONVERSATION = "DAILY_CONVERSATION"
+
+
+class RecommendationRequest(BaseModel):
+    language: Language
+    level: Level
+    job: str = Field(min_length=1, max_length=100)
+    situation: Situation
+    goal: str = Field(min_length=1, max_length=500)
+
+
+class CourseCandidate(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
-    category: CourseCategory
-    price: Decimal
-    instructorId: int
-    enrollmentCount: int
+    language: Language
+    situation: Situation
+    level: Level
     status: str
-    createdAt: Optional[datetime] = None
+
+
+class RecommendedCourse(BaseModel):
+    courseId: int
+    title: str
+    language: Language
+    level: Level
+    reason: str
+
+
+class RecommendationResult(BaseModel):
+    recommendationId: int
+    source: str
+    courses: List[RecommendedCourse]
+
+
+class RecommendationApiResponse(BaseModel):
+    data: RecommendationResult
+    timestamp: str
 
 
 class EnrollmentHistoryResponse(BaseModel):
@@ -33,14 +67,8 @@ class EnrollmentHistoryResponse(BaseModel):
     activeCourseIds: List[int]
 
 
-class RecommendResponse(BaseModel):
+class AuthorizationContext(BaseModel):
     userId: int
-    recommendedCourses: List[CourseResponse]
-    basedOnCategory: Optional[CourseCategory] = None
-    message: str
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
+    companyId: Optional[int] = None
+    businessRole: str
+    status: str

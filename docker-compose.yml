@@ -34,7 +34,7 @@ services:
     command:
       - sh
       - -c
-      - mariadb -h mariadb -umanager -pSqlDba-1 lecture_db < /migrations/001_users_auth_compat.sql
+      - for migration in /migrations/*.sql; do echo "Applying $${migration}"; mariadb -h mariadb -umanager -pSqlDba-1 lecture_db < "$${migration}"; done
     volumes:
       - ./init-db/migrations:/migrations:ro
     depends_on:
@@ -168,7 +168,8 @@ services:
       - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**,/api/admin/payments,/api/admin/payments/**
       - SPRING_CLOUD_GATEWAY_ROUTES_6_ID=recommend-service
       - SPRING_CLOUD_GATEWAY_ROUTES_6_URI=lb://recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/recommend,/api/recommend/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/courses/recommendations,/api/recommend,/api/recommend/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_ORDER=-10
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -323,6 +324,7 @@ services:
       - JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
+      - USER_SERVICE_URL=http://user-service:8081
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:

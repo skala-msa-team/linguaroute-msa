@@ -59,6 +59,21 @@ class AccountRecoveryControllerIntegrationTest {
     }
 
     @Test
+    void Gateway_공개_별칭으로_활성_약관을_조회한다() throws Exception {
+        mockMvc.perform(get("/api/users/register?action=active-terms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void Gateway_공개_별칭의_직원가입은_인증없이_컨트롤러에_도달한다() throws Exception {
+        mockMvc.perform(post("/api/users/register?action=employee-signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 비밀번호_재설정_링크는_한번만_사용할_수_있다() throws Exception {
         mockMvc.perform(post("/api/users/register?action=request-password-reset")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"member@test.com\"}"))

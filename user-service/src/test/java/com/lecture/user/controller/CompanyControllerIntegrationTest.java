@@ -249,6 +249,14 @@ class CompanyControllerIntegrationTest {
                         .content("{\"name\":\"스칼라글로벌\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("스칼라글로벌"));
+
+        mockMvc.perform(post("/api/companies/me")
+                        .param("action", "update-company")
+                        .with(jwt().jwt(token -> token.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"스칼라브라우저\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("스칼라브라우저"));
     }
 
     @Test
@@ -285,6 +293,14 @@ class CompanyControllerIntegrationTest {
                         .content("{\"name\":\"김수정\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("김수정"));
+
+        mockMvc.perform(post("/api/users/me")
+                        .param("action", "update-profile")
+                        .with(jwt().jwt(token -> token.claim("userId", admin.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"김브라우저\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("김브라우저"));
     }
 
     @Test

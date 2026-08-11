@@ -10,9 +10,9 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | 인증·구독·직원·강의·수강 API는 구현·검증 기록 반영, AI 추천·플랫폼 운영 API는 설계·미구현 |
+| 문서 상태 | 추천 시스템은 팀원 연동 예정, 나머지 확정 MVP API의 2026-08-11 통합 검증 결과 반영 |
 
-인증·구독·직원·강의·수강 API의 구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. AI 추천과 플랫폼 운영 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
+구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. 외부·보호·내부 API와 OAuth2 흐름을 포함한 curl 79건, 역할별 Chrome 상황 38건을 2026-08-11 로컬 Docker Compose 환경에서 확인했습니다. 이 중 추천 요청은 팀원 연동 전 계약 골격 검증이며 추천 기능 완료 건수로 해석하지 않습니다.
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
@@ -271,9 +271,9 @@ Authorization: Bearer {accessToken}
 | --- | --- | --- | --- | --- | --- |
 | COMPANY-01 | `POST` | `/api/users/register` | 공개 | 기업 대표계정 회원가입 | 필수 |
 | COMPANY-02 | `GET` | `/api/companies/me` | 기업 관리자 | 기업 정보 조회 | 필수 |
-| COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
+| COMPANY-03 | `POST` | `/api/companies/me?action=update-company` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
-| USER-02 | `PATCH` | `/api/users/me` | 로그인 | 내 정보 수정 | 필수 |
+| USER-02 | `POST` | `/api/users/me?action=update-profile` | 로그인 | 내 정보 수정 | 필수 |
 | USER-03 | `PUT` | `/api/users/me/password` | 로그인 | 현재 비밀번호 확인 후 변경 | 필수 |
 | USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 필수 |
 
@@ -379,9 +379,9 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
 | INVITE-02 | `GET` | `/api/companies/me/invitations` | 기업 관리자 | 초대코드 목록·상태 조회 | 필수 |
 | INVITE-03 | `DELETE` | `/api/companies/me/invitations/{invitationId}` | 기업 관리자 | 초대코드 폐기 | 필수 |
 | INVITE-04 | `POST` | `/api/companies/me/invitations/{invitationId}/reissue` | 기업 관리자 | 초대코드 재발급 | 필수 |
-| EMPLOYEE-01 | `POST` | `/api/employees/signup` | 공개 | 초대코드 기반 직원 가입 | 필수 |
+| EMPLOYEE-01 | `POST` | `/api/users/register?action=employee-signup` | 공개 | 초대코드 기반 직원 가입 | 필수 |
 | EMPLOYEE-02 | `GET` | `/api/companies/me/employees` | 기업 관리자 | 소속 직원 목록 조회 | 필수 |
-| EMPLOYEE-03 | `PATCH` | `/api/companies/me/employees/{userId}/status` | 기업 관리자 | 직원 비활성화·소속 해제 | 필수 |
+| EMPLOYEE-03 | `POST` | `/api/companies/me/employees/{userId}/status?action=update-status` | 기업 관리자 | 직원 비활성화·소속 해제 | 필수 |
 | SEAT-01 | `GET` | `/api/companies/me/seats` | 기업 관리자 | 구매·사용·잔여 좌석 조회 | 필수 |
 
 ### INVITE-01 초대코드 생성
@@ -508,7 +508,7 @@ POST /api/companies/me/invitations/{invitationId}/reissue
 }
 ```
 
-`PATCH /api/companies/me/employees/{userId}/status` 요청은 아래 상태 중 하나를 사용합니다.
+`POST /api/companies/me/employees/{userId}/status?action=update-status` 요청은 아래 상태 중 하나를 사용합니다.
 
 ```json
 { "status": "INACTIVE" }
@@ -581,9 +581,10 @@ X-Internal-Api-Key: {internalApiKey}
 | COURSE-01 | `GET` | `/api/courses` | 직원 | 목록·검색·필터 | 필수 |
 | COURSE-02 | `GET` | `/api/courses/{courseId}` | 직원 | 강의 상세 조회 | 필수 |
 | COURSE-03 | `GET` | `/api/courses/{courseId}/lessons` | 직원 | 강의 차시 목록 조회 | 필수 |
+| ADMIN-COURSE-00 | `GET` | `/api/admin/courses` | 플랫폼 관리자 | 전체 강의·상태 검색 | 필수 |
 | ADMIN-COURSE-01 | `POST` | `/api/admin/courses` | 플랫폼 관리자 | 강의 등록 | 필수 |
-| ADMIN-COURSE-02 | `PATCH` | `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 강의 수정 | 필수 |
-| ADMIN-COURSE-03 | `PATCH` | `/api/admin/courses/{courseId}/status` | 플랫폼 관리자 | 강의 활성·비활성 | 필수 |
+| ADMIN-COURSE-02 | `POST` | `/api/admin/courses/{courseId}?action=update-course` | 플랫폼 관리자 | 강의 수정 | 필수 |
+| ADMIN-COURSE-03 | `POST` | `/api/admin/courses/{courseId}/status?action=update-status` | 플랫폼 관리자 | 강의 활성·비활성 | 필수 |
 | ADMIN-LESSON-01 | `POST` | `/api/admin/courses/{courseId}/lessons` | 플랫폼 관리자 | 강의 차시 등록 | 필수 |
 
 ### COURSE-01 목록·검색·필터
@@ -663,6 +664,10 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 ```
 
 직원용 강의 상세 조회와 동일하게 `ACTIVE` 강의만 조회할 수 있습니다.
+
+### ADMIN-COURSE-00 관리자 강의 목록
+
+플랫폼 관리자는 `GET /api/admin/courses`에서 `keyword`, `language`, `situation`, `level`, `status`, `page`, `size`를 사용할 수 있습니다. 직원용 목록과 달리 `status`를 생략하면 `ACTIVE`와 `INACTIVE`를 모두 반환하므로 비활성 강의를 다시 활성화할 수 있습니다. API Gateway가 전달한 사용자 ID를 내부 권한 API로 재검증합니다.
 
 ### ADMIN-COURSE-01 강의 등록
 
@@ -1042,15 +1047,15 @@ Authorization: Bearer {accessToken}
 
 ---
 
-## 9. AI 강의 추천 API (설계·미구현)
+## 9. 강의 추천 API (팀원 연동 예정)
 
-> 이 절의 경로와 요청·응답은 확정 MVP 목표 계약이다. 현재 `recommend-service`의 외부 경로와 내부 호출이 이 계약에 맞지 않아 Gateway 통합 API로 사용할 수 없다. 구현·curl 검증 전에는 완료 API로 공유하지 않는다.
+추천 시스템의 최종 구현은 김지민 팀원이 연동할 예정입니다. 현재 `recommend-service`의 외부 Gateway 경로, 직원 권한 확인, 내부 강의·수강 이력 조회와 `RULE_BASED_FALLBACK` 응답 골격까지만 통합 검증했습니다. 아래 계약은 팀원 연동 시 유지해야 할 목표 계약이며, 현재 상태를 추천 기능 완료로 표시하지 않습니다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수 |
+| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수·팀원 연동 예정 |
 
-추천 요청과 결과 데이터는 `recommend-service`가 소유합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
+추천 요청 처리와 결과 생성 책임은 `recommend-service`가 소유합니다. 현재 결과는 영속화하지 않고 즉시 응답합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
 
 ### AI-01 추천 요청
 
@@ -1070,14 +1075,14 @@ Authorization: Bearer {accessToken}
 {
   "data": {
     "recommendationId": 3001,
-    "source": "AI",
+    "source": "RULE_BASED_FALLBACK",
     "courses": [
       {
         "courseId": 12,
         "title": "해외 고객 미팅 영어",
         "language": "ENGLISH",
         "level": "INTERMEDIATE",
-        "reason": "해외영업 직무와 고객 미팅 목표에 적합합니다."
+        "reason": "선택한 언어, 현재 수준, 업무 상황과 학습 목표에 적합한 활성 강의입니다."
       }
     ]
   },
@@ -1085,7 +1090,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-AI 장애 시 대체 응답:
+현재 연동 골격 응답:
 
 ```json
 {
@@ -1104,18 +1109,19 @@ AI 장애 시 대체 응답:
 }
 ```
 
-AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언어와 다시 대조합니다.
+현재 골격은 추천 후보를 실제 `ACTIVE` 강의 및 선택 언어와 대조하고, 이미 수강 중인 강의를 제외합니다. 수준과 상황 일치 여부를 이용한 정렬은 연동 전 동작 확인용이며 최종 추천 판단으로 간주하지 않습니다. 팀원 추천 시스템을 추가한 뒤에도 같은 최종 검증을 통과한 강의만 반환해야 합니다.
 
 ### recommend-service 내부 의존 API
 
 `recommend-service`는 추천 후보와 기존 수강 이력을 조회할 때 Gateway를 거치지 않고 대상 서비스를 직접 호출합니다. 모든 내부 호출에는 `X-Internal-Api-Key`가 필요합니다.
 
-| 대상 서비스 | 이전 경로 | 현재 경로 | 비고 |
-| --- | --- | --- | --- |
-| `course-service` | `/api/courses/internal/recommend` | `/internal/courses/recommend` | `language`, `excludeIds` 파라미터 사용 |
-| `enrollment-service` | `/api/enrollments/internal/history/{userId}` | `/internal/enrollments/history/{userId}` | 응답 필드명 `activeCourseIds` 유지 |
+| 대상 서비스 | 현재 경로 | 비고 |
+| --- | --- | --- |
+| `user-service` | `/internal/users/{userId}/authorization` | 최신 역할·소속·상태 확인 |
+| `course-service` | `/internal/courses/recommend` | `language`, `excludeIds` 파라미터 사용 |
+| `enrollment-service` | `/internal/enrollments/history/{userId}` | `activeCourseIds`로 기존 수강 강의 제외 |
 
-`course-service` 추천 후보 응답은 `id`, `title`, `description`, `language`, `situation`, `level`, `status`, `createdAt`, `updatedAt` 구조입니다. 추천 서비스가 과거 강의 도메인의 `category`, `price`, `instructorId`, `enrollmentCount` 필드를 전제로 파싱한다면 새 강의 도메인 구조에 맞춰 조정해야 합니다.
+`course-service` 추천 후보 응답은 `id`, `title`, `description`, `language`, `situation`, `level`, `status` 구조이며 `recommend-service`의 현재 Pydantic 모델과 일치합니다.
 
 ---
 
@@ -1123,12 +1129,14 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| TERM-01 | `GET` | `/api/terms/active` | 공개 | 현재 필수·선택 약관 조회 | 필수 |
+| TERM-01 | `GET` | `/api/users/register?action=active-terms` | 공개 | 현재 필수·선택 약관 조회 | 필수 |
 | TERM-02 | `POST` | `/api/users/me/agreements` | 로그인 | 가입 후 선택 약관 동의 변경 | 필수 |
 
 기업 관리자와 직원 회원가입 요청은 현재 필수 약관의 `agreementIds`를 포함해야 하며, 서버는 누락된 필수 약관이 있으면 가입을 거부합니다.
 
 ### TERM-01 활성 약관 조회
+
+제공 Gateway의 공개 허용 경로에 맞춰 외부 클라이언트는 위 경로를 사용한다. user-service 직접 호출 호환 경로인 `GET /api/terms/active`도 같은 응답을 반환한다.
 
 응답 `200 OK`:
 
@@ -1194,7 +1202,7 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
     "content": [
       {
         "userId": 9102,
-        "email": "employee.lee@scala-tech.local",
+        "email": "employee.lee@skala-tech.local",
         "name": "이수강",
         "businessRole": "EMPLOYEE",
         "status": "ACTIVE",

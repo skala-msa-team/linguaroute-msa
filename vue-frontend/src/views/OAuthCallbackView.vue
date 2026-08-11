@@ -24,7 +24,10 @@ onMounted(async () => {
   }
   try {
     const user = await auth.completeOAuthLogin(code, state)
-    await router.replace(homeByRole[user?.businessRole] || '/app')
+    const requestedPath = sessionStorage.getItem('post_login_redirect')
+    sessionStorage.removeItem('post_login_redirect')
+    const safeRequestedPath = requestedPath?.startsWith('/') && !requestedPath.startsWith('//') ? requestedPath : null
+    await router.replace(safeRequestedPath || homeByRole[user?.businessRole] || '/app')
   } catch (error) {
     message.value = '로그인에 실패했습니다. 다시 시도해 주세요.'
     window.setTimeout(() => router.replace('/login?reason=session-expired'), 1500)

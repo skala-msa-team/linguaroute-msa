@@ -25,10 +25,10 @@
     </div>
 
     <section v-if="showResults" class="results">
-      <div class="result-title"><div><p class="eyebrow">Your next route</p><h2>이 강의부터 시작해 보세요</h2></div><div class="result-controls"><span>결과 상태</span><select v-model="resultMode"><option value="ai">AI 추천 성공</option><option value="fallback">규칙 기반 대체</option><option value="error">추천 실패</option></select></div></div>
-      <div v-if="resultMode !== 'error'" class="result-notice" :class="resultMode"><component :is="resultMode === 'ai' ? Sparkles : ShieldAlert" :size="19" /><span><strong>{{ resultMode === 'ai' ? 'AI 맞춤 추천 결과' : '규칙 기반 추천으로 전환했어요' }}</strong>{{ resultMode === 'ai' ? '입력한 직무·상황·목표를 분석해 추천했습니다.' : 'AI 연결이 지연되어 언어·수준·상황이 일치하는 ACTIVE 강의를 제공합니다.' }}</span></div>
-      <div v-if="resultMode !== 'error'" class="result-grid"><CourseTile v-for="course in courses.slice(0, 3)" :key="course.id" :course="course" /></div>
-      <AsyncState v-else type="error" title="추천 결과를 만들지 못했어요" description="추천 서비스 연결과 등록 강의 검증에 실패했습니다. 잠시 후 다시 시도해 주세요." @retry="resultMode = 'fallback'" />
+      <div class="result-title"><div><p class="eyebrow">Your next route</p><h2>이 강의부터 시작해 보세요</h2></div></div>
+      <div v-if="resultMode !== 'error'" class="result-notice" :class="resultMode"><ShieldAlert :size="19" /><span><strong>현재 MVP 규칙 기반 추천</strong>언어·수준·상황이 일치하는 실제 ACTIVE 강의를 우선순위로 제공합니다.</span></div>
+      <div v-if="resultMode !== 'error'" class="result-grid"><CourseTile v-for="course in resultCourses.slice(0, 3)" :key="course.id" :course="course" /></div>
+      <AsyncState v-else type="error" title="추천 결과를 만들지 못했어요" :description="errorMessage" @retry="requestRecommendation" />
     </section>
   </AppShell>
 </template>
@@ -40,7 +40,7 @@ import AppShell from '@/components/AppShell.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import CourseTile from '@/components/CourseTile.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courses } from '@/data/mockData.js'
+import { courseApi } from '@/api/course.js'
 
 const step = ref(1)
 const language = ref('영어')
@@ -50,10 +50,32 @@ const job = ref('글로벌 세일즈')
 const goal = ref('해외 고객에게 제품을 자연스럽게 설명하고 질문에 자신 있게 답하고 싶어요.')
 const showResults = ref(false)
 const resultMode = ref('ai')
+const liveCourses = ref([])
+const errorMessage = ref('추천 서비스 연결과 등록 강의 검증에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+const resultCourses = liveCourses
 const languages = [{ code: 'EN', label: '영어', desc: 'English' }, { code: 'JP', label: '일본어', desc: '日本語' }, { code: 'CN', label: '중국어', desc: '中文' }]
 const situations = [{ icon: MessagesSquare, label: '고객 미팅', desc: '고객과 제품·계약 논의' }, { icon: Presentation, label: '업무 발표', desc: '보고와 프레젠테이션' }, { icon: BriefcaseBusiness, label: '협업', desc: '동료·파트너와 협업' }, { icon: Plane, label: '출장', desc: '현지 업무와 네트워킹' }]
 
-function nextStep() { if (step.value < 3) step.value += 1; else showResults.value = true }
+const languageCodes = { 영어: 'ENGLISH', 일본어: 'JAPANESE', 중국어: 'CHINESE' }
+const levelCodes = { 초급: 'ELEMENTARY', 중급: 'INTERMEDIATE', 고급: 'ADVANCED' }
+const situationCodes = { '고객 미팅': 'CUSTOMER_MEETING', '업무 발표': 'PRESENTATION', 협업: 'DAILY_CONVERSATION', 출장: 'BUSINESS_TRIP' }
+const jobCodes = { '글로벌 세일즈': 'GLOBAL_SALES', '소프트웨어 개발': 'SOFTWARE_DEVELOPMENT', '데이터 분석': 'DATA_ANALYTICS', '프로덕트 관리': 'PRODUCT_MANAGEMENT' }
+
+async function requestRecommendation() {
+  try {
+    const response = await courseApi.recommend({ language: languageCodes[language.value], level: levelCodes[level.value], job: jobCodes[job.value], situation: situationCodes[situation.value], goal: goal.value })
+    const result = response.data.data
+    liveCourses.value = result.courses.map((course) => ({ id: course.courseId, title: course.title, description: course.reason, image: '', duration: '-', students: '-', language: course.language, level: course.level, situation: situationCodes[situation.value], tone: 'green' }))
+    resultMode.value = result.source === 'AI' ? 'ai' : 'fallback'
+    showResults.value = true
+  } catch (error) {
+    liveCourses.value = []
+    resultMode.value = 'error'
+    errorMessage.value = error.response?.data?.detail || error.response?.data?.message || '추천 결과를 만들지 못했습니다.'
+    showResults.value = true
+  }
+}
+function nextStep() { if (step.value < 3) step.value += 1; else requestRecommendation() }
 function previousStep() { if (step.value > 1) step.value -= 1 }
 </script>
 

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # 서비스 URL
     enrollment_service_url: str = "http://localhost:8083"
     course_service_url: str = "http://localhost:8082"
+    user_service_url: str = "http://localhost:8081"
+    internal_api_key: str = "local-internal-api-key"
 
     # Kafka
     kafka_bootstrap_servers: str = "localhost:9092"

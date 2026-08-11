@@ -70,6 +70,24 @@ public class CourseService {
                 .build();
     }
 
+    public CourseDto.CoursePageResponse searchAdminCourses(
+            String keyword,
+            Course.Language language,
+            Course.Situation situation,
+            Course.Level level,
+            Course.Status status,
+            Pageable pageable) {
+        Page<CourseDto.CourseSummaryResponse> result = courseRepository
+                .findAll(CourseSpecification.adminSearch(keyword, language, situation, level, status), pageable)
+                .map(CourseDto.CourseSummaryResponse::from);
+        return CourseDto.CoursePageResponse.builder()
+                .content(result.getContent())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .build();
+    }
+
     @Transactional
     public CourseDto.CourseResponse updateCourse(Long id, CourseDto.UpdateRequest request) {
         Course course = findCourseById(id);
