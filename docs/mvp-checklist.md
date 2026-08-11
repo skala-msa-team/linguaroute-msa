@@ -24,7 +24,7 @@
 - [x] `[마이페이지][전체 사용자]` 내 정보 조회·수정
 - [x] `[마이페이지][전체 사용자]` 회원 탈퇴
 
-> 검증 메모: Gateway OAuth2 코드 교환, 기업·내 정보, 비밀번호 변경, 회원 탈퇴 후 `USER_INACTIVE` 거부, 아이디 찾기·비밀번호 재설정 MailHog 수신은 검증 환경에서 확인했다. 현재 로컬 Compose 환경은 `AUTH_WEB_CLIENT_SECRET`이 없어 브라우저 코드 교환을 재현할 수 없으며, 이는 제공 Auth Server의 인프라 설정값이다. 전체 실행 경로와 프론트·환경 제한은 [MVP 통합 검증 기록](./mvp-verification.md)에서 관리한다.
+> 검증 메모: Gateway OAuth2 코드 교환, 기업·내 정보, 비밀번호 변경, 회원 탈퇴 후 `USER_INACTIVE` 거부, 아이디 찾기·비밀번호 재설정 MailHog 수신은 검증 환경에서 확인했다. 배포된 분할 인프라 파일로 `msa-lecture/auth-server:1.0` 이미지를 불러온 로컬 Compose 환경은 별도 `AUTH_WEB_CLIENT_SECRET` 설정 없이 코드 교환할 수 있다. 전체 실행 경로와 프론트·환경 제한은 [MVP 통합 검증 기록](./mvp-verification.md)에서 관리한다.
 
 ### 순서 2: 구독·결제·직원 초대·좌석
 

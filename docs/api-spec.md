@@ -113,7 +113,7 @@ GET /oauth2/authorize?response_type=code&client_id=web-client&redirect_uri=http:
 
 MVP에서는 Authorization Code로 Access Token을 발급받고 sessionStorage에 Access Token만 저장합니다. Refresh Token이 응답에 포함되어도 저장·사용하지 않습니다. Access Token이 만료되면 클라이언트는 로그인 화면으로 이동하고 사용자가 다시 로그인하여 새 Access Token을 발급받습니다. 로그아웃은 Auth Server 세션 종료 요청과 클라이언트 Access Token 삭제를 함께 처리합니다.
 
-콜백 화면은 다음 Gateway 공개 API로 Authorization Code를 전달합니다. `user-service`만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 Auth Server와 통신하며, 비밀값은 프론트엔드 번들·문서·저장소에 기록하지 않습니다.
+콜백 화면은 다음 Gateway 공개 API로 Authorization Code를 전달합니다. 배포된 로컬 Auth Server 이미지를 사용하는 Compose 환경은 이미지에 등록된 실습용 `web-client` 값으로 동작하므로 팀원이 `AUTH_WEB_CLIENT_SECRET`을 별도로 설정하지 않습니다. 다른 Auth Server 또는 운영 환경에서는 `user-service`에만 해당 환경의 `AUTH_WEB_CLIENT_SECRET`을 주입하며 프론트엔드 번들에는 포함하지 않습니다.
 
 ```http
 POST /api/users/register?action=exchange-oauth-code
