@@ -1,6 +1,13 @@
-# The following practice code is intended for educational purposes only. For contact :  audit@korea.ac.kr, Sungryel Lim Ph.D
-
-# This practice code is not a completed commercial version but has been developed for educational purposes; supplementation is required depending on the deployment objective for use as a commercial service.
+# The following practice code is intended for educational purposes only.
+# For contact: audit@korea.ac.kr, Sungryel Lim Ph.D
+#
+# Student runtime version (ARM64)
+# - Uses prebuilt Docker images only
+# - Does not execute Dockerfile/Gradle builds
+# - Load the distributed image archive before starting:
+#     docker load -i msa-lecture-images-arm64.tar
+# - Start with:
+#     docker compose -f docker-compose.local.yml up -d --no-build --pull never
 
 services:
 
@@ -8,6 +15,7 @@ services:
 
   mariadb:
     image: mariadb:11.2
+    platform: linux/arm64/v8
     container_name: lecturedb
     environment:
       MYSQL_ROOT_PASSWORD: SqlDba-1
@@ -30,6 +38,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.7.0
+    platform: linux/arm64
     container_name: lecture-kafka
     environment:
       KAFKA_NODE_ID: 1
@@ -66,13 +75,11 @@ services:
     networks:
       - lecture-net
 
-
   # Service Discovery
 
   eureka-server:
-    build:
-      context: ./eureka-server
-      dockerfile: Dockerfile
+    image: msa-lecture-eureka-server:latest
+    platform: linux/arm64
     container_name: lecture-eureka
     ports:
       - "8761:8761"
@@ -87,11 +94,11 @@ services:
     networks:
       - lecture-net
 
-
   # Auth Server
 
   auth-server:
     image: msa-lecture/auth-server:1.0
+    platform: linux/arm64
     container_name: lecture-auth
     ports:
       - "9000:9000"
@@ -115,11 +122,11 @@ services:
     networks:
       - lecture-net
 
-
   # API Gateway
 
   api-gateway:
     image: msa-lecture/api-gateway:1.0
+    platform: linux/arm64
     container_name: lecture-gateway
     ports:
       - "8080:8080"
@@ -128,36 +135,29 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
-      # [설계 이유 - 내부 API의 외부 노출 차단]
-      # 일반 서비스 라우트(/api/courses/** 등)는 internal 하위 경로까지 포함한다.
-      # 가장 높은 우선순위의 차단 라우트를 먼저 매칭해 외부에는 내부 API 존재와
-      # 인증 방식이 드러나지 않도록 404를 반환한다. 서비스 간 호출은 Gateway를
-      # 거치지 않고 Docker 네트워크에서 직접 수행하며 별도의 내부 키도 검증한다.
       - SPRING_CLOUD_GATEWAY_ROUTES_0_ID=auth-server
       - SPRING_CLOUD_GATEWAY_ROUTES_0_URI=http://auth-server:9000
       - SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0=Path=/oauth2/**,/login,/login/**,/logout,/userinfo,/error,/default-ui.css,/favicon.ico,/.well-known/openid-configuration,/.well-known/oauth-authorization-server
       - SPRING_CLOUD_GATEWAY_ROUTES_1_ID=block-internal-api
       - SPRING_CLOUD_GATEWAY_ROUTES_1_URI=no://op
-      # 새 공통 규칙인 /internal/**와 전환 기간의 레거시 경로를 모두 막는다.
-      # 서비스 간 호출은 Gateway가 아닌 Docker 내부 주소를 사용하므로 외부 라우트가 필요 없다.
-      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/internal/**,/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_1_FILTERS_0=SetStatus=404
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0=Path=/api/courses/internal/**,/api/enrollments/internal/**,/api/payments/internal/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_1_FILTERS_0=SetStatus=403
       - SPRING_CLOUD_GATEWAY_ROUTES_1_ORDER=-100
       - SPRING_CLOUD_GATEWAY_ROUTES_2_ID=user-service
       - SPRING_CLOUD_GATEWAY_ROUTES_2_URI=lb://user-service
       - SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0=Path=/api/users,/api/users/**,/api/companies,/api/companies/me,/api/companies/me/invitations,/api/companies/me/invitations/**,/api/companies/me/employees,/api/companies/me/employees/**,/api/companies/me/seats,/api/terms,/api/terms/**,/api/auth,/api/auth/**,/api/employees,/api/employees/**,/api/admin/users,/api/admin/users/**,/api/admin/companies,/api/admin/companies/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses/recommendations,/api/courses/recommendations/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=course-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://course-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/courses,/api/courses/**,/api/admin/courses,/api/admin/courses/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**,/api/companies/me/enrollments,/api/companies/me/enrollments/**
-      - SPRING_CLOUD_GATEWAY_ROUTES_6_ID=payment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_6_URI=lb://payment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_ID=course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_URI=lb://course-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses,/api/courses/**,/api/admin/courses,/api/admin/courses/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://enrollment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**,/api/companies/me/enrollments,/api/companies/me/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://payment-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_ID=recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_URI=lb://recommend-service
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/recommend,/api/recommend/**
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -166,13 +166,11 @@ services:
     networks:
       - lecture-net
 
-
   # Microservices
 
   user-service:
-    build:
-      context: ./user-service
-      dockerfile: Dockerfile
+    image: msa-lecture-user-service:latest
+    platform: linux/arm64
     container_name: lecture-user
     ports:
       - "8081:8081"
@@ -192,8 +190,6 @@ services:
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
       - AUTH_SERVER_TOKEN_URL=http://auth-server:9000/oauth2/token
       - AUTH_WEB_CLIENT_ID=${AUTH_WEB_CLIENT_ID:-web-client}
-      # 배포된 로컬 Auth Server 이미지의 web-client 등록값입니다.
-      # 다른 Auth Server를 사용하는 환경에서는 환경변수로 덮어씁니다.
       - AUTH_WEB_CLIENT_SECRET=${AUTH_WEB_CLIENT_SECRET:-web-secret}
       - AUTH_WEB_REDIRECT_URI=${AUTH_WEB_REDIRECT_URI:-http://localhost:3000/callback}
     depends_on:
@@ -211,9 +207,8 @@ services:
       - lecture-net
 
   course-service:
-    build:
-      context: ./course-service
-      dockerfile: Dockerfile
+    image: msa-lecture-course-service:latest
+    platform: linux/arm64
     container_name: lecture-course
     ports:
       - "8082:8082"
@@ -238,9 +233,8 @@ services:
       - lecture-net
 
   enrollment-service:
-    build:
-      context: ./enrollment-service
-      dockerfile: Dockerfile
+    image: msa-lecture-enrollment-service:latest
+    platform: linux/arm64
     container_name: lecture-enrollment
     ports:
       - "8083:8083"
@@ -253,7 +247,6 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8080
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      # recommend-service와 동일한 값을 주입해야 내부 수강 이력 요청을 검증할 수 있다.
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - SERVICE_COURSE_SERVICE_URL=http://course-service:8082
       - SERVICE_USER_SERVICE_URL=http://user-service:8081
@@ -270,9 +263,8 @@ services:
       - lecture-net
 
   payment-service:
-    build:
-      context: ./payment-service
-      dockerfile: Dockerfile
+    image: msa-lecture-payment-service:latest
+    platform: linux/arm64
     container_name: lecture-payment
     ports:
       - "8084:8084"
@@ -300,32 +292,21 @@ services:
       - lecture-net
 
   recommend-service:
-    build:
-      context: ./recommend-service
-      dockerfile: Dockerfile
+    image: msa-lecture-recommend-service:latest
+    platform: linux/arm64
     container_name: lecture-recommend
     ports:
       - "8085:8085"
     environment:
-      - APP_PORT=8085
       - EUREKA_SERVER_URL=http://eureka-server:8761/eureka
       - EUREKA_INSTANCE_HOST=recommend-service
       - JWT_ISSUER_URI=http://localhost:8080
       - JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
-      - USER_SERVICE_URL=http://user-service:8081
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.6-luna}
-      - OPENAI_TIMEOUT_SECONDS=${OPENAI_TIMEOUT_SECONDS:-15}
-      - OPENAI_MAX_RETRIES=${OPENAI_MAX_RETRIES:-1}
-      - OPENAI_MAX_OUTPUT_TOKENS=${OPENAI_MAX_OUTPUT_TOKENS:-600}
-      - DATABASE_URL=mysql+pymysql://manager:SqlDba-1@lecturedb:3306/lecture_db
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
-      mariadb:
-        condition: service_healthy
       eureka-server:
         condition: service_healthy
       auth-server:
@@ -336,13 +317,8 @@ services:
         condition: service_started
       course-service:
         condition: service_started
-      user-service:
-        condition: service_started
     networks:
       - lecture-net
-
-
-# Volumes & Networks
 
 volumes:
   mariadb_data:

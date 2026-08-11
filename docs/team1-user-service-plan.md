@@ -164,14 +164,14 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 ### 기존 Auth Server 제한
 
 - 제공 Gateway/Auth 이미지의 JSON 로그인 경로는 사용하지 않는다.
-- 등록된 브라우저 클라이언트 `web-client`의 Authorization Code 흐름을 사용하며, 클라이언트 비밀값은 `AUTH_WEB_CLIENT_SECRET` 환경변수로 user-service에만 주입한다.
+- 등록된 브라우저 클라이언트 `web-client`의 Authorization Code 흐름을 사용한다. 배포된 로컬 Auth Server 이미지는 Compose 기본값으로 연결하고, 다른 환경의 클라이언트 비밀값은 `AUTH_WEB_CLIENT_SECRET`으로 user-service에만 주입한다.
 
 ## 7. 다음 개발 순서
 
 ### PR 1 — 기업 계정 기반 마무리
 
 1. 이메일 인증 요청·확인 API와 MailHog SMTP 연동: 완료. 제공 Gateway의 공개 경로 제약에 맞춰 `POST /api/users/register?action=request-email-verification`, `POST /api/users/register?action=confirm-email-verification`을 사용한다.
-2. `AUTH_WEB_CLIENT_SECRET`을 로컬 실행 환경에 주입하고 브라우저 OAuth 로그인 확인
+2. 배포된 Auth Server 이미지 기준으로 별도 비밀값 설정 없이 브라우저 OAuth 로그인을 확인하고, 다른 환경에서는 `AUTH_WEB_CLIENT_SECRET`을 주입
 3. 관련 API·ERD·MVP 체크리스트 갱신
 
 ### PR 2 — 초대코드·직원 가입
