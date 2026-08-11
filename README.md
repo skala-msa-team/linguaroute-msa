@@ -460,7 +460,7 @@ sequenceDiagram
     participant AI as OpenAI API 또는 로컬 Provider
     participant DB as MariaDB
 
-    FE->>GW: 언어·수준·직무·상황·목표로 추천 요청
+    FE->>GW: 직무·비즈니스 상황·전문용어 목표를 포함한 추천 요청
     GW->>RS: 추천 요청과 인증 사용자 ID 전달
     RS->>US: 내부 API로 최신 직원 권한·상태 조회
     US-->>RS: companyId·businessRole·status 반환

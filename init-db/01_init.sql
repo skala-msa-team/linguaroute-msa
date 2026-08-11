@@ -344,7 +344,7 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO courses (id, title, description, language, situation, level, status, created_at, updated_at)
 VALUES
-    (9101, '해외 고객 미팅 영어', '해외 고객과 요구사항을 확인하고 제품을 설명하는 실전 영어 과정입니다.', 'ENGLISH', 'CUSTOMER_MEETING', 'INTERMEDIATE', 'ACTIVE', '2026-08-10 10:00:00', '2026-08-10 10:00:00'),
+    (9101, '해외 고객 미팅 영어', '해외 고객과 요구사항을 확인하고 제품 사양과 기술 용어를 설명하는 실전 비즈니스 영어 과정입니다.', 'ENGLISH', 'CUSTOMER_MEETING', 'INTERMEDIATE', 'ACTIVE', '2026-08-10 10:00:00', '2026-08-10 10:00:00'),
     (9102, '비즈니스 이메일 영어', '견적, 일정, 회신을 명확하게 작성하는 이메일 표현을 학습합니다.', 'ENGLISH', 'EMAIL', 'ELEMENTARY', 'ACTIVE', '2026-08-10 10:05:00', '2026-08-10 10:05:00'),
     (9103, '일본 출장 회화', '공항, 호텔, 회의실에서 바로 쓰는 일본어 출장 회화 과정입니다.', 'JAPANESE', 'BUSINESS_TRIP', 'BEGINNER', 'ACTIVE', '2026-08-10 10:10:00', '2026-08-10 10:10:00'),
     (9104, '중국어 프레젠테이션', '중국 파트너 앞에서 서비스와 성과를 발표하는 표현을 연습합니다.', 'CHINESE', 'PRESENTATION', 'INTERMEDIATE', 'ACTIVE', '2026-08-10 10:15:00', '2026-08-10 10:15:00'),

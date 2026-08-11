@@ -648,7 +648,7 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
   "data": {
     "id": 12,
     "title": "해외 고객 미팅 영어",
-    "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+    "description": "해외 고객 미팅에서 제품 사양과 기술 용어를 설명하는 비즈니스 영어 과정",
     "language": "ENGLISH",
     "situation": "CUSTOMER_MEETING",
     "level": "INTERMEDIATE",
@@ -695,7 +695,7 @@ API Gateway가 인증한 사용자 ID를 `X-User-Id` 헤더로 전달합니다. 
 ```json
 {
   "title": "해외 고객 미팅 영어",
-  "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+  "description": "해외 고객 미팅에서 제품 사양과 기술 용어를 설명하는 비즈니스 영어 과정",
   "language": "ENGLISH",
   "situation": "CUSTOMER_MEETING",
   "level": "INTERMEDIATE"
@@ -758,7 +758,7 @@ X-Internal-Api-Key: {internalApiKey}
   {
     "id": 12,
     "title": "해외 고객 미팅 영어",
-    "description": "고객 미팅에서 사용하는 비즈니스 영어 과정",
+    "description": "해외 고객 미팅에서 제품 사양과 기술 용어를 설명하는 비즈니스 영어 과정",
     "language": "ENGLISH",
     "situation": "CUSTOMER_MEETING",
     "level": "INTERMEDIATE",
@@ -1084,7 +1084,7 @@ Authorization: Bearer {accessToken}
   "level": "INTERMEDIATE",
   "job": "GLOBAL_SALES",
   "situation": "CUSTOMER_MEETING",
-  "goal": "제품을 자연스럽게 설명하고 싶음"
+  "goal": "제품 사양과 기술 용어를 해외 고객에게 자연스럽게 설명하고 싶음"
 }
 ```
 
@@ -1101,7 +1101,7 @@ Authorization: Bearer {accessToken}
         "title": "해외 고객 미팅 영어",
         "language": "ENGLISH",
         "level": "INTERMEDIATE",
-        "reason": "선택한 언어, 현재 수준, 업무 상황과 학습 목표에 적합한 활성 강의입니다."
+        "reason": "선택한 언어, 현재 수준, 업무 상황과 전문용어 학습 목표에 적합한 활성 강의입니다."
       }
     ]
   },
