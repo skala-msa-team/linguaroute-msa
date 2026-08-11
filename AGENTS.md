@@ -80,6 +80,8 @@ docker compose ps
 
 기동 확인은 Spring 서비스의 `/actuator/health`와 FastAPI 추천 서비스의 `/health`를 사용합니다.
 
+기존 MariaDB 볼륨은 `init-db`가 다시 적용되지 않으므로 Compose의 `db-migration` 서비스가 `init-db/migrations/001_users_auth_compat.sql`을 Auth Server보다 먼저 매번 실행합니다. `lecture-db-migration`의 정상 상태는 계속 실행 중인 `Up`이 아니라 작업을 마친 `Exited (0)`입니다. 이 마이그레이션이 실패하면 Auth Server를 먼저 실행하거나 볼륨을 임의로 삭제하지 말고 마이그레이션 로그와 기존 스키마를 확인합니다.
+
 - 위 이미지 묶음의 `msa-lecture/auth-server:1.0`을 사용하는 로컬 Compose 환경에서는 팀원이 `AUTH_WEB_CLIENT_SECRET`을 별도로 만들거나 `.env`에 입력하지 않습니다. `docker-compose.yml`이 배포 이미지의 로컬 실습용 `web-client` 등록값을 기본으로 `user-service`에 주입합니다.
 - 다른 Auth Server 또는 운영 환경에서만 `AUTH_WEB_CLIENT_SECRET` 환경변수로 해당 환경의 등록값을 덮어씁니다.
 - 이 인프라 묶음에는 현재 확인 기준 Auth Server와 API Gateway만 포함됩니다. 저장소 소스 서비스 이미지까지 포함된 강사 배포용 전체 묶음과 혼동하지 않습니다.

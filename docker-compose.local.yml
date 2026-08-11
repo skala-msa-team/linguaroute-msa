@@ -36,6 +36,23 @@ services:
     networks:
       - lecture-net
 
+  db-migration:
+    image: mariadb:11.2
+    platform: linux/arm64/v8
+    container_name: lecture-db-migration
+    command:
+      - sh
+      - -c
+      - mariadb -h mariadb -umanager -pSqlDba-1 lecture_db < /migrations/001_users_auth_compat.sql
+    volumes:
+      - ./init-db/migrations:/migrations:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - lecture-net
+
   kafka:
     image: confluentinc/cp-kafka:7.7.0
     platform: linux/arm64
@@ -111,6 +128,8 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+      db-migration:
+        condition: service_completed_successfully
       eureka-server:
         condition: service_healthy
     healthcheck:

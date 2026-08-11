@@ -684,6 +684,20 @@ DESC payments;
 
 팀 공용 데이터가 필요 없고 초기화해도 되는 개발 환경에서만 팀원과 확인한 뒤 `docker compose down -v`로 볼륨을 삭제하고 다시 실행합니다. 데이터를 유지해야 하면 별도 마이그레이션 SQL을 작성해서 오래된 컬럼을 정리합니다.
 
+#### Auth Server가 `business_role` 오류로 종료되는 경우
+
+기존 MariaDB 볼륨의 `users.business_role`에 기본값이 없으면 제공 Auth Server의 호환 INSERT가 실패할 수 있습니다. 현재 Compose는 `db-migration` 일회성 컨테이너가 [`init-db/migrations/001_users_auth_compat.sql`](./init-db/migrations/001_users_auth_compat.sql)을 Auth Server보다 먼저 실행해 기존 사용자 데이터는 유지하면서 누락 값과 기본값을 보정합니다.
+
+최신 `dev`를 받은 뒤에는 볼륨을 삭제하지 않고 다음 명령으로 다시 실행합니다.
+
+```bash
+docker compose up -d --build
+docker compose ps -a
+docker compose logs db-migration auth-server
+```
+
+`lecture-db-migration`이 `Exited (0)`이고 Auth Server가 `healthy`이면 정상입니다. 마이그레이션 SQL은 반복 실행해도 같은 결과가 되도록 작성되어 매 Compose 기동 시 안전하게 실행됩니다. `docker compose down -v`는 테스트 데이터를 모두 삭제해도 되는 경우에만 초기화 수단으로 사용합니다.
+
 #### Gateway 공개 가입 경로
 
 제공받은 API Gateway 이미지는 `/api/users/register`와 OAuth2 경로를 공개 라우팅합니다. 수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 이미지와 다르며 `401 Unauthorized`를 반환합니다. 브라우저 로그인은 `/oauth2/authorize`와 `/login`을 사용합니다. LinguaRoute 목표 API인 `POST /api/companies` 기업 관리자 가입은 user-service에 구현되어 있지만, 제공 Gateway 이미지의 보안 허용 목록에 없으면 Gateway 경유 호출이 `401 Unauthorized`를 반환합니다.
