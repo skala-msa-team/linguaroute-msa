@@ -7,10 +7,11 @@ import PageHeader from '@/components/PageHeader.vue'
 import { courses as mockCourses } from '@/data/mockData.js'
 import { courseApi } from '@/api/course.js'
 const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const courses = ref(mockCourses)
+const courses = ref(useLiveApi ? [] : mockCourses)
+const loadError = ref('')
 const keyword = ref(''), language = ref('')
 const stats = computed(() => [{label:'전체 강의',value:`${courses.value.length}`,desc:'조회 결과 기준',icon:LibraryBig},{label:'활성 강의',value:`${courses.value.filter((course) => course.status === 'ACTIVE').length}`,desc:'현재 노출 가능',icon:BadgeCheck},{label:'비활성 강의',value:`${courses.value.filter((course) => course.status === 'INACTIVE').length}`,desc:'상태 확인 필요',icon:BookX},{label:'전체 수강',value:'-',desc:'수강 조회 API 필요',icon:UsersRound}])
-async function loadCourses() { if (!useLiveApi) return; const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, page: 0, size: 100 }); courses.value = response.data.data.content.map((course) => ({ ...mockCourses[0], id: course.courseId, ...course, tone: 'green' })) }
+async function loadCourses() { if (!useLiveApi) return; loadError.value=''; try { const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, page: 0, size: 100 }); courses.value = response.data.data.content.map((course) => ({ id: course.courseId, ...course, image: '', tone: 'green' })) } catch (error) { courses.value=[];loadError.value=error.response?.data?.message||'강의 목록을 불러오지 못했습니다.' } }
 async function toggle(course) { if (!useLiveApi) { course.status = course.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'; return }; const response = await courseApi.updateStatus(course.id, course.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'); Object.assign(course, response.data.data) }
 onMounted(loadCourses)
 </script>

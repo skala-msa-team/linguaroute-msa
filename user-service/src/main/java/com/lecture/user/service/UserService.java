@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,19 @@ public class UserService {
 
     public UserDto.AuthorizationContextResponse getAuthorizationContext(Long id) {
         return UserDto.AuthorizationContextResponse.from(findUser(id));
+    }
+
+    public List<UserDto.UserResponse> getAllForPlatformAdmin(Long requesterId) {
+        requirePlatformAdmin(requesterId);
+        return userRepository.findAll().stream().map(UserDto.UserResponse::from).toList();
+    }
+
+    public void requirePlatformAdmin(Long userId) {
+        User user = findUser(userId);
+        validateActive(user);
+        if (user.getBusinessRole() != User.BusinessRole.PLATFORM_ADMIN) {
+            throw new ApiException(ErrorCode.PLATFORM_ADMIN_REQUIRED);
+        }
     }
 
     @Transactional

@@ -122,6 +122,16 @@ public class InvitationService {
         }
     }
 
+    @Transactional
+    public InvitationDto.ValidationResponse validateForSignup(String rawCode) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        Invitation invitation = invitationRepository.findByCodeHash(TokenHash.sha256(normalizeCode(rawCode)))
+                .orElseThrow(() -> new ApiException(ErrorCode.INVITATION_NOT_FOUND));
+        validateInvitation(invitation, now);
+        validateActiveEntitlementAndSeat(invitation.getCompany().getId(), now);
+        return new InvitationDto.ValidationResponse(true, invitation.getCompany().getId(), invitation.getExpiresAt());
+    }
+
     private InvitationDto.Response issue(User admin, int expiresInDays) {
         LocalDateTime expiresAt = LocalDateTime.now(clock).plusDays(expiresInDays);
         for (int attempt = 0; attempt < 5; attempt++) {

@@ -33,7 +33,7 @@ import BrandLogo from '@/components/BrandLogo.vue'
 const showPassword=ref(false)
 const email=ref('employee@scalatech.co.kr'),password=ref('Password123!'),loginError=ref(''),isSubmitting=ref(false)
 const route=useRoute(),router=useRouter(),auth=useAuthStore(); const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
-const reasonMessage=computed(()=>route.query.reason==='session-expired'?'Access Token이 만료되었습니다. 다시 로그인해 주세요.':route.query.reason==='user-inactive'?'비활성 또는 탈퇴 계정은 서비스를 이용할 수 없습니다.':'')
+const reasonMessage=computed(()=>route.query.reason==='session-expired'?'Access Token이 만료되었습니다. 다시 로그인해 주세요.':route.query.reason==='user-inactive'?'비활성 또는 탈퇴 계정은 서비스를 이용할 수 없습니다.':route.query.reason==='auth-required'?'로그인이 필요한 화면입니다. 로그인 후 다시 이용해 주세요.':'')
 const homeByRole={PLATFORM_ADMIN:'/admin',COMPANY_ADMIN:'/company',EMPLOYEE:'/app'}
 async function login(){
   loginError.value=''

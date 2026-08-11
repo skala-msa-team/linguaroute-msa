@@ -44,9 +44,10 @@ import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { subscriptionApi } from '@/api/subscription.js'
 
-const plans=ref([{name:'Business 30',seats:30,monthly:'199,000',yearly:'1,990,000',priceIds:{MONTHLY:1,YEARLY:2}},{name:'Business 50',seats:50,monthly:'299,000',yearly:'2,990,000',priceIds:{MONTHLY:3,YEARLY:4}},{name:'Business 100',seats:100,monthly:'549,000',yearly:'5,490,000',priceIds:{MONTHLY:5,YEARLY:6}}])
-const step=ref(1),cycle=ref('MONTHLY'),selectedPlan=ref(plans.value[1]),paymentToken=ref('mock-success'),paymentResult=ref('success'),reuseIdempotencyKey=ref(false),idempotencyKey=ref(''),submitting=ref(false),paymentFeedback=ref('')
+const demoPlans=[{name:'Business 30',seats:30,monthly:'199,000',yearly:'1,990,000',priceIds:{MONTHLY:1,YEARLY:2}},{name:'Business 50',seats:50,monthly:'299,000',yearly:'2,990,000',priceIds:{MONTHLY:3,YEARLY:4}},{name:'Business 100',seats:100,monthly:'549,000',yearly:'5,490,000',priceIds:{MONTHLY:5,YEARLY:6}}]
 const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
+const plans=ref(useLiveApi?[]:demoPlans)
+const step=ref(1),cycle=ref('MONTHLY'),selectedPlan=ref(plans.value[0]||{name:'요금제 불러오는 중',seats:0,monthly:'-',yearly:'-',priceIds:{}}),paymentToken=ref('mock-success'),paymentResult=ref('success'),reuseIdempotencyKey=ref(false),idempotencyKey=ref(''),submitting=ref(false),paymentFeedback=ref('')
 const paymentOptions=[{value:'mock-success',label:'결제 성공',description:'PaymentCompleted 상태 확인',icon:CircleCheck},{value:'mock-failure',label:'결제 실패',description:'PaymentFailed 상태 확인',icon:CircleX}]
 const price=computed(()=>cycle.value==='MONTHLY'?selectedPlan.value.monthly:selectedPlan.value.yearly)
 const resultContent=computed(()=>paymentResult.value==='success'?{icon:CircleCheck,eyebrow:'Payment completed',title:'구독 결제가 완료되었습니다',description:'기업 학습 공간과 좌석이 활성화되었습니다. 이제 직원을 초대할 수 있습니다.',status:'ACTIVE'}:paymentResult.value==='failed'?{icon:CircleX,eyebrow:'Payment failed',title:'결제를 완료하지 못했습니다',description:'결제 승인에 실패했습니다. 구독 권한과 좌석은 활성화되지 않았습니다.',status:'PAYMENT_FAILED'}:{icon:CopyCheck,eyebrow:'Duplicate protected',title:'이미 처리된 결제 요청입니다',description:'중복 결제를 만들지 않고 이전에 완료된 결제 결과를 불러왔습니다.',status:'DUPLICATE'} )
@@ -64,9 +65,10 @@ onMounted(async()=>{
     })
     plans.value=[...grouped.values()]
     selectedPlan.value=plans.value[0]||selectedPlan.value
-  } catch (_) { paymentFeedback.value='요금제 정보를 불러오지 못해 기본 테스트 요금제를 표시합니다.' }
+  } catch (_) { plans.value=[];paymentFeedback.value='요금제 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' }
 })
 async function completePayment(){
+  if(!selectedPlan.value.priceIds[cycle.value]){paymentFeedback.value='결제 가능한 요금제를 먼저 불러와 주세요.';return}
   idempotencyKey.value=reuseIdempotencyKey.value&&idempotencyKey.value?idempotencyKey.value:crypto.randomUUID()
   if(!useLiveApi){paymentResult.value=paymentToken.value==='mock-failure'?'failed':'success';step.value=3;return}
   submitting.value=true;paymentFeedback.value=''

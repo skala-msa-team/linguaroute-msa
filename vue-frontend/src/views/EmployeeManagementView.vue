@@ -76,9 +76,9 @@ import { companyApi } from '@/api/company.js'
 
 const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
 const tab=ref('employees'), inviteModal=ref(false), copied=ref(''), generatedCode=ref(''), toast=ref(''), keyword=ref(''), statusFilter=ref('전체 상태'), employeeDialog=ref(null), expiresInDays=ref(7)
-const employeeRows=ref(employees.map(item=>({...item})))
-const invitationRows=ref(invitations.map(item=>({...item})))
-const seats=ref({purchased:50,used:employees.filter(item=>item.status==='활성').length+38,remaining:50-(employees.filter(item=>item.status==='활성').length+38)})
+const employeeRows=ref(useLiveApi?[]:employees.map(item=>({...item})))
+const invitationRows=ref(useLiveApi?[]:invitations.map(item=>({...item})))
+const seats=ref(useLiveApi?{purchased:0,used:0,remaining:0}:{purchased:50,used:employees.filter(item=>item.status==='활성').length+38,remaining:50-(employees.filter(item=>item.status==='활성').length+38)})
 const seatUsagePercent=computed(()=>seats.value.purchased?Math.min(100,seats.value.used/seats.value.purchased*100):0)
 const filteredEmployees=computed(()=>employeeRows.value.filter(item=>(!keyword.value||item.name.includes(keyword.value)||item.email.includes(keyword.value))&&(statusFilter.value==='전체 상태'||item.status===statusFilter.value)))
 
@@ -91,9 +91,9 @@ function isUnused(invite){return invite.status==='UNUSED'||invite.status==='미�
 function invitationStatusLabel(status){return ({UNUSED:'미사용',USED:'사용됨',EXPIRED:'만료',REVOKED:'폐기'})[status]||status}
 function formatDate(value){return value?value.slice(0,10).replaceAll('-','.'):'-'}
 function toInvitationRow(invite){return {invitationId:invite.invitationId,code:invite.code,codeMasked:invite.codeMasked,status:invite.status,created:formatDate(invite.createdAt),expires:formatDate(invite.expiresAt)}}
-async function loadInvitations(){if(!useLiveApi)return;try{invitationRows.value=(await companyApi.getInvitations()).data.data.map(toInvitationRow)}catch(error){notify(error.response?.data?.message||'초대코드 목록을 불러오지 못했습니다.')}}
+async function loadInvitations(){if(!useLiveApi)return;try{invitationRows.value=(await companyApi.getInvitations()).data.data.map(toInvitationRow)}catch(error){invitationRows.value=[];notify(error.response?.data?.message||'초대코드 목록을 불러오지 못했습니다.')}}
 function toEmployeeRow(employee){return {...employee,joined:formatDate(employee.joinedAt)}}
-async function loadEmployees(){if(!useLiveApi)return;try{const [employeeResponse,seatResponse]=await Promise.all([companyApi.getEmployees(),companyApi.getSeats()]);employeeRows.value=employeeResponse.data.data.map(toEmployeeRow);seats.value=seatResponse.data.data}catch(error){notify(error.response?.data?.message||'직원 또는 좌석 정보를 불러오지 못했습니다.')}}
+async function loadEmployees(){if(!useLiveApi)return;try{const [employeeResponse,seatResponse]=await Promise.all([companyApi.getEmployees(),companyApi.getSeats()]);employeeRows.value=employeeResponse.data.data.map(toEmployeeRow);seats.value=seatResponse.data.data}catch(error){employeeRows.value=[];seats.value={purchased:0,used:0,remaining:0};notify(error.response?.data?.message||'직원 또는 좌석 정보를 불러오지 못했습니다.')}}
 async function discardInvitation(invite){try{if(useLiveApi){await companyApi.revokeInvitation(invite.invitationId);await loadInvitations()}else invite.status='폐기';notify('초대코드를 폐기했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 폐기하지 못했습니다.')}}
 async function reissueInvitation(invite){try{if(useLiveApi){const created=toInvitationRow((await companyApi.reissueInvitation(invite.invitationId)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}notify('새 초대코드를 발급했습니다.')}catch(error){notify(error.response?.data?.message||'초대코드를 재발급하지 못했습니다.')}}
 async function generateInvitation(){try{if(useLiveApi){const created=toInvitationRow((await companyApi.createInvitation(expiresInDays.value)).data.data);generatedCode.value=created.code;await loadInvitations();invitationRows.value=invitationRows.value.map(row=>row.invitationId===created.invitationId?created:row)}else{const code=`LR${Math.floor(1000+Math.random()*9000)}-${Math.floor(1000+Math.random()*9000)}`;generatedCode.value=code;invitationRows.value.unshift({code,status:'미사용',created:'2026.08.10',expires:'2026.08.17'})}}catch(error){notify(error.response?.data?.message||'초대코드를 생성하지 못했습니다.')}}

@@ -14,6 +14,7 @@ export const authApi = {
   updateMyCompany(name) { return api.patch('/api/companies/me', { name }) },
   registerCompany(data) { return api.post('/api/users/register', data) },
   registerEmployee(data) { return api.post('/api/employees/signup', data) },
+  validateInvitation(invitationCode) { return api.post('/api/users/register?action=validate-invitation', { invitationCode }) },
   getActiveTerms() { return api.get('/api/terms/active') },
   agreeToTerms(agreementIds) { return api.post('/api/users/me/agreements', { agreementIds }) },
   requestEmailVerification(email) { return api.post('/api/users/register?action=request-email-verification', { email, purpose: 'SIGNUP' }) },

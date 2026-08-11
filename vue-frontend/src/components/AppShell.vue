@@ -25,14 +25,8 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <div v-if="!collapsed" class="role-preview">
-          <span>화면 미리보기</span>
-          <select v-model="selectedRole" aria-label="사용자 역할 전환" @change="changeRole">
-            <option value="employee">직원</option><option value="company">기업 관리자</option><option value="admin">플랫폼 관리자</option>
-          </select>
-        </div>
         <router-link to="/profile" class="profile-chip">
-          <span class="avatar">박</span><span v-if="!collapsed"><strong>박건우</strong><small>{{ roleLabel }}</small></span><MoreHorizontal v-if="!collapsed" :size="17" />
+          <span class="avatar">{{ userInitial }}</span><span v-if="!collapsed"><strong>{{ userName }}</strong><small>{{ roleLabel }}</small></span><MoreHorizontal v-if="!collapsed" :size="17" />
         </router-link>
         <button class="logout-button" :title="collapsed ? '로그아웃' : undefined" @click="logoutModal = true">
           <LogOut :size="17" /><span v-if="!collapsed">로그아웃</span>
@@ -44,7 +38,7 @@
       <header class="topbar">
         <button class="mobile-trigger icon-button" aria-label="사이드바 열기" @click="mobileOpen = !mobileOpen"><Menu :size="19" /></button>
         <div class="search-box"><Search :size="17" /><input aria-label="전체 검색" placeholder="강의, 직원, 기업 검색" /><kbd>⌘ K</kbd></div>
-        <div class="topbar-actions"><span class="prototype-label"><FlaskConical :size="14" /> UI PROTOTYPE</span><button class="icon-button" aria-label="알림"><Bell :size="18" /><i></i></button></div>
+        <div class="topbar-actions"><button class="icon-button" aria-label="알림"><Bell :size="18" /></button></div>
       </header>
       <main class="workspace-main"><slot /></main>
     </div>
@@ -62,31 +56,30 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { LayoutDashboard, BookOpen, Sparkles, GraduationCap, UserRound, Building2, UsersRound, CreditCard, ChartNoAxesCombined, ReceiptText, LibraryBig, Bell, Search, Menu, MoreHorizontal, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, FlaskConical, LogOut } from '@lucide/vue'
+import { useRoute } from 'vue-router'
+import { LayoutDashboard, BookOpen, Sparkles, GraduationCap, UserRound, Building2, UsersRound, CreditCard, ChartNoAxesCombined, ReceiptText, LibraryBig, Bell, Search, Menu, MoreHorizontal, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, LogOut } from '@lucide/vue'
 import BrandLogo from './BrandLogo.vue'
+import { useAuthStore } from '@/store/auth.js'
 
 const route = useRoute()
-const router = useRouter()
+const auth = useAuthStore()
 const collapsed = ref(false)
 const mobileOpen = ref(false)
 const logoutModal = ref(false)
-const selectedRole = ref(route.meta.role || 'employee')
-
-watch(() => route.meta.role, (role) => { if (role) selectedRole.value = role; mobileOpen.value = false })
+watch(() => route.path, () => { mobileOpen.value = false })
 
 const configs = {
   employee: {
-    label: '직원 학습 공간', description: '스칼라테크',
+    label: '직원 학습 공간',
     groups: [
       { label: '학습', items: [
-        { label: '홈', to: '/app', icon: LayoutDashboard }, { label: '강의 찾기', to: '/courses', icon: BookOpen }, { label: 'AI 강의 추천', to: '/recommendations', icon: Sparkles }, { label: '내 학습', to: '/learning', icon: GraduationCap, count: 3 }
+        { label: '홈', to: '/app', icon: LayoutDashboard }, { label: '강의 찾기', to: '/courses', icon: BookOpen }, { label: 'AI 강의 추천', to: '/recommendations', icon: Sparkles }, { label: '내 학습', to: '/learning', icon: GraduationCap }
       ]},
       { label: '계정', items: [{ label: '내 정보', to: '/profile', icon: UserRound }] }
     ]
   },
   company: {
-    label: '기업 관리자', description: '스칼라테크',
+    label: '기업 관리자',
     groups: [
       { label: '운영', items: [
         { label: '대시보드', to: '/company', icon: LayoutDashboard }, { label: '직원 · 초대', to: '/company/employees', icon: UsersRound }, { label: '학습 현황', to: '/company/progress', icon: ChartNoAxesCombined }
@@ -95,7 +88,7 @@ const configs = {
     ]
   },
   admin: {
-    label: '플랫폼 운영', description: 'LinguaRoute',
+    label: '플랫폼 운영',
     groups: [
       { label: '모니터링', items: [{ label: '운영 대시보드', to: '/admin', icon: LayoutDashboard }, { label: '기업', to: '/admin/companies', icon: Building2 }, { label: '사용자', to: '/admin/users', icon: UsersRound }] },
       { label: '콘텐츠 · 거래', items: [{ label: '강의 관리', to: '/admin/courses', icon: LibraryBig }, { label: '결제', to: '/admin/payments', icon: ReceiptText }, { label: '수강', to: '/admin/enrollments', icon: GraduationCap }] },
@@ -103,19 +96,17 @@ const configs = {
   }
 }
 
-const current = computed(() => configs[selectedRole.value] || configs.employee)
+const roleKey = computed(() => ({ EMPLOYEE: 'employee', COMPANY_ADMIN: 'company', PLATFORM_ADMIN: 'admin' }[auth.businessRole] || 'employee'))
+const current = computed(() => configs[roleKey.value])
 const navigation = computed(() => current.value.groups)
 const roleLabel = computed(() => current.value.label)
-const roleDescription = computed(() => current.value.description)
-
-function changeRole() {
-  router.push({ employee: '/app', company: '/company', admin: '/admin' }[selectedRole.value])
-}
+const roleDescription = computed(() => roleKey.value === 'admin' ? 'LinguaRoute' : auth.user?.companyName || '소속 기업')
+const userName = computed(() => auth.user?.name || auth.user?.email || '사용자')
+const userInitial = computed(() => userName.value.trim().charAt(0) || 'U')
 
 function confirmLogout() {
-  sessionStorage.removeItem('access_token')
-  sessionStorage.removeItem('user')
-  router.push('/login')
+  logoutModal.value = false
+  auth.logout()
 }
 </script>
 

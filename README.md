@@ -519,7 +519,7 @@ LinguaRoute는 소셜 로그인이 아니라 자체 이메일·비밀번호 계�
 - 위 분할 인프라 파일에서 `msa-lecture/auth-server:1.0` 이미지를 불러온 로컬 환경은 별도 `AUTH_WEB_CLIENT_SECRET` 설정 없이 실행됩니다. Compose가 배포 이미지의 로컬 실습용 `web-client` 등록값을 기본으로 주입합니다.
 - 다른 Auth Server 또는 운영 환경에서는 `AUTH_WEB_CLIENT_SECRET` 환경변수로 해당 환경의 등록값을 덮어써야 합니다.
 - 콜백은 `POST /api/users/register?action=exchange-oauth-code`로 코드를 전달합니다. user-service가 서버 간 통신으로 토큰을 교환하므로 프론트에 비밀값이 노출되지 않습니다.
-- 로그아웃은 `POST /logout`으로 Auth Server 세션을 종료하고, 프론트는 sessionStorage의 Access Token을 삭제합니다.
+- 로그아웃은 Gateway가 같은 경로를 먼저 처리하지 않도록 Auth Server 공개 포트의 `POST http://localhost:9000/logout`으로 세션을 종료하고, 프론트는 sessionStorage의 Access Token을 삭제합니다. 프론트 설정값은 `VITE_AUTH_LOGOUT_URL`입니다.
 
 ### 7. 데모 데이터
 

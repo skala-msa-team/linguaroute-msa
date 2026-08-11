@@ -124,6 +124,17 @@ public class EnrollmentService {
         return managementPage(authorization.getCompanyId(), page, size);
     }
 
+    public EnrollmentDto.PageResponse<EnrollmentDto.ManagementEnrollmentResponse> getAllForPlatformAdmin(
+            Long adminId, int page, int size) {
+        UserAuthorizationClient.AuthorizationContext authorization = userAuthorizationClient.getAuthorizationContext(adminId);
+        if (!authorization.isActivePlatformAdmin()) {
+            throw new EnrollmentException(ErrorCode.FORBIDDEN);
+        }
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        return EnrollmentDto.PageResponse.from(enrollmentRepository.findAll(pageable)
+                .map(EnrollmentDto.ManagementEnrollmentResponse::from));
+    }
+
     private EnrollmentDto.PageResponse<EnrollmentDto.ManagementEnrollmentResponse> managementPage(
             Long companyId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));

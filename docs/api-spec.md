@@ -89,6 +89,7 @@
 | AUTH-07 | `POST` | `/api/users/register?action=request-id-find` | 공개 | 아이디 찾기 | 필수 |
 | AUTH-08 | `PUT` | `/api/users/me/password` | 로그인 | 비밀번호 변경 | 필수 |
 | AUTH-09 | `POST` | `/api/users/register?action=exchange-oauth-code` | 공개 | Authorization Code를 Access Token으로 교환 | 필수 |
+| AUTH-10 | `POST` | `/api/users/register?action=validate-invitation` | 공개 | 직원 가입 전 초대코드·만료·사용·구독·좌석 검증 | 필수 |
 
 수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 Gateway/Auth 이미지와 다르며 실제 요청은 `401`을 반환합니다. 제공 Auth Server는 `authorization_code` grant를 지원하므로, 자체 이메일·비밀번호 로그인 후 `/oauth2/authorize`에서 Authorization Code를 받고 `/oauth2/token`에서 JWT를 발급받는 계약을 사용합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로 공개 보조 인증 API는 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다.
 
@@ -123,6 +124,15 @@ Content-Type: application/json
 ```
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
+
+직원 가입 화면은 최종 가입 전에 다음 공개 요청으로 초대코드를 검사합니다. 제공 Gateway의 공개 경로가 고정되어 있으므로 신규 `/api/employees/**` 공개 경로를 만들지 않고 기존 공개 가입 경로의 `action` 계약을 사용합니다. 이 검사는 코드를 소비하지 않으며 최종 가입 트랜잭션이 같은 조건을 다시 검사합니다.
+
+```http
+POST /api/users/register?action=validate-invitation
+Content-Type: application/json
+
+{"invitationCode":"ABCD-EFGH"}
+```
 
 ### AUTH-03·04 비밀번호 재설정
 
@@ -1152,9 +1162,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 ---
 
-## 11. 플랫폼 운영 API (설계·미구현)
+## 11. 플랫폼 운영 API
 
-> 아래 운영 조회 API는 화면·클라이언트에서 호출하지 않는다. 현재 각 소유 서비스에 플랫폼 관리자용 집계 API가 구현되어 있지 않으므로, 구현 및 Gateway 검증 전에는 설계 계약으로만 관리한다.
+아래 운영 조회 API는 플랫폼 관리자만 호출할 수 있습니다. 사용자·기업은 `user-service`, 결제는 `payment-service`, 수강은 `enrollment-service`가 각각 소유하며 프론트 운영 화면이 Gateway를 통해 결과를 조합합니다. 플랫폼 관리자 계정은 네 API 모두 `200`, 직원 계정은 `403`으로 실제 검증했습니다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -1165,6 +1175,10 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | OPS-05 | `GET` | `/api/admin/audit-logs` | 플랫폼 관리자 | 주요 감사 로그 조회 | 추후 확장 |
 
 운영 화면이 데이터를 한 번에 조회하더라도 각 데이터의 소유 서비스는 유지합니다. 별도 운영 DB를 추가하지 않고 API Gateway 또는 프론트엔드가 각 서비스의 관리자 조회 API를 조합합니다.
+
+- `OPS-01`, `OPS-02`, `OPS-03`은 배열을 `data`로 반환합니다.
+- `OPS-04`는 `page`, `size`, `totalElements`, `totalPages`, `content`를 포함한 페이지 응답을 `data`로 반환하며 기본값은 `page=0`, `size=100`입니다.
+- `OPS-03`, `OPS-04`는 Gateway의 payment/enrollment 라우트에 `/api/admin/**` 경로를 명시적으로 추가해 해당 소유 서비스로 전달합니다.
 
 ---
 

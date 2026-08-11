@@ -2,9 +2,11 @@ package com.lecture.user.controller;
 
 import com.lecture.user.dto.ApiResponse;
 import com.lecture.user.dto.AuthDto;
+import com.lecture.user.dto.InvitationDto;
 import com.lecture.user.service.EmailVerificationService;
 import com.lecture.user.service.AccountRecoveryService;
 import com.lecture.user.service.OAuthTokenExchangeService;
+import com.lecture.user.service.InvitationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +24,7 @@ public class AuthController {
     private final EmailVerificationService emailVerificationService;
     private final AccountRecoveryService accountRecoveryService;
     private final OAuthTokenExchangeService oauthTokenExchangeService;
+    private final InvitationService invitationService;
 
     @PostMapping(params = "action=request-email-verification")
     public ResponseEntity<ApiResponse<AuthDto.AcceptedResponse>> requestEmailVerification(
@@ -72,5 +75,12 @@ public class AuthController {
             @Valid @RequestBody AuthDto.OAuthCodeExchangeRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(oauthTokenExchangeService.exchangeCode(request)));
+    }
+
+    @PostMapping(params = "action=validate-invitation")
+    public ResponseEntity<ApiResponse<InvitationDto.ValidationResponse>> validateInvitation(
+            @Valid @RequestBody InvitationDto.ValidateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                invitationService.validateForSignup(request.getInvitationCode())));
     }
 }

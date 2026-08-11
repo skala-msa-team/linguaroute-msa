@@ -30,7 +30,7 @@ import { authApi } from '@/api/auth.js'
 import { formatBusinessNumber, unwrapApiData } from '@/constants/domain.js'
 
 const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const company = reactive({ id: 10, name: '스칼라테크', businessNumber: '1234567890', status: 'ACTIVE' })
+const company = reactive(useLiveApi ? { id: null, name: '', businessNumber: '', status: '' } : { id: 10, name: '스칼라테크', businessNumber: '1234567890', status: 'ACTIVE' })
 const form = reactive({ name: company.name })
 const saving = ref(false)
 const saved = ref(false)

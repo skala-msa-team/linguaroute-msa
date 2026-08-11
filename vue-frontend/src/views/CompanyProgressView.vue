@@ -8,7 +8,7 @@ import { employees as mockEmployees } from '@/data/mockData.js'
 import { companyApi } from '@/api/company.js'
 
 const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const employees = ref(mockEmployees)
+const employees = ref(useLiveApi ? [] : mockEmployees)
 const departments = computed(() => employees.value.map((employee) => ({ name: employee.name, value: employee.progress })))
 const stats = computed(() => {
   const items = employees.value
@@ -32,7 +32,7 @@ onMounted(async () => {
       joined: enrollment.completedAt || enrollment.startedAt || enrollment.enrolledAt || '-', status: enrollment.status
     }))
   } catch (_) {
-    // 라이브 API 오류 시 기존 데모 데이터로 화면을 유지한다.
+    employees.value = []
   }
 })
 </script>
