@@ -10,9 +10,9 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | 추천 시스템은 팀원 연동 예정, 나머지 확정 MVP API의 2026-08-11 통합 검증 결과 반영 |
+| 문서 상태 | 인증·구독·직원·강의·수강·AI 추천·플랫폼 운영 API의 2026-08-11 구현 및 통합 검증 결과 반영 |
 
-구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. 외부·보호·내부 API와 OAuth2 흐름을 포함한 curl 79건, 역할별 Chrome 상황 38건을 2026-08-11 로컬 Docker Compose 환경에서 확인했습니다. 이 중 추천 요청은 팀원 연동 전 계약 골격 검증이며 추천 기능 완료 건수로 해석하지 않습니다.
+구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. 외부·보호·내부 API와 OAuth2 흐름을 포함한 curl 회귀와 역할별 브라우저 검증 결과를 실제 코드·Swagger UI와 함께 대조했습니다.
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
@@ -1062,15 +1062,15 @@ Authorization: Bearer {accessToken}
 
 ---
 
-## 9. 강의 추천 API (팀원 연동 예정)
+## 9. AI 강의 추천 API
 
-추천 시스템의 최종 구현은 김지민 팀원이 연동할 예정입니다. 현재 `recommend-service`의 외부 Gateway 경로, 직원 권한 확인, 내부 강의·수강 이력 조회와 `RULE_BASED_FALLBACK` 응답 골격까지만 통합 검증했습니다. 아래 계약은 팀원 연동 시 유지해야 할 목표 계약이며, 현재 상태를 추천 기능 완료로 표시하지 않습니다.
+> 외부 경로, 서비스 간 내부 호출, 추천 결과 저장과 프론트 라이브 API 호출을 구현했다. 로컬 Provider를 사용한 서비스 간 통합 호출은 검증했으며, 실제 직원 OAuth 토큰을 사용한 Gateway 종단 간 호출과 OpenAI 유료 API 호출은 별도 환경 설정 후 검증한다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수·팀원 연동 예정 |
+| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수 |
 
-추천 요청 처리와 결과 생성 책임은 `recommend-service`가 소유합니다. 현재 결과는 영속화하지 않고 즉시 응답합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
+추천 요청 처리와 결과 생성 책임은 `recommend-service`가 소유합니다. 추천 요청과 결과는 추천 서비스 소유 테이블에 저장합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
 
 ### AI-01 추천 요청
 

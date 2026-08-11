@@ -21,6 +21,8 @@
 | 플랫폼 운영(user-service) | 플랫폼 관리자의 사용자·기업 검색·상태 조회, 일반 역할·비활성 관리자 차단 | 통과 |
 | 전체 API curl 회귀 | 공개·보호·내부 API, OAuth2, 이메일, Kafka 이벤트를 포함한 79개 요청 | 79/79 통과 |
 | 브라우저 | Chrome 역할별 38개 상황과 정리 후 관리자 강의·기업 진도 화면 2개 추가 확인 | 기존 38/38 및 추가 2개 통과 |
+| AI 추천 서비스 | 로컬 Provider로 사용자 권한·수강 이력·활성 강의 조회, 추천 저장 | 통과 |
+| AI 추천 화면 | 실제 API 요청 변환·응답 매핑 단위 테스트 및 프로덕션 빌드 | 통과 |
 
 ## 실제 Gateway 검증 경로
 
@@ -73,8 +75,10 @@ GET  /api/admin/companies?keyword=...&status=...&page=...&size=...
 - 이번 프론트 연결 변경은 `npm run build`로 정적 검증했다. 2026-08-11 라이브 재검증에서 Gateway의 서비스 토큰 발급과 `GET /api/plans`는 `200`을 반환했다. 배포된 분할 인프라 파일의 `msa-lecture/auth-server:1.0`을 사용하는 Compose 기본 구성에서는 별도 `AUTH_WEB_CLIENT_SECRET` 설정 없이 브라우저 Authorization Code 교환 API도 `200`을 반환한다. 다른 Auth Server를 사용하는 환경에서는 해당 등록값을 환경변수로 덮어써야 한다.
 - 플랫폼 운영 화면은 사용자·기업·결제·수강 운영 API를 직접 호출하며, 플랫폼 관리자 `200`과 일반 사용자 `403` 권한 분기를 통합 실행으로 확인했다.
 - 2026-08-11 전체 curl 회귀 검사에서 추천 API 골격을 포함한 79개 요청이 모두 통과했다. 제공 Gateway가 고정적으로 차단하는 `GET /api/terms/active` 대신 외부 계약인 `GET /api/users/register?action=active-terms`를 검증했다.
-- 추천 시스템은 김지민 팀원이 연동할 예정입니다. 현재 확인한 `RULE_BASED_FALLBACK`, 직원 권한, 등록된 `ACTIVE` 강의 제한과 기존 수강 제외는 연동 전 API 계약·연결 골격의 검증 결과이며 추천 기능 완료 근거가 아닙니다.
 - Chrome 재검증에서 기존 실패 5건(프로필, 기업명, 직원 상태, 강의 수정, 강의 상태)을 모두 통과했고, 테스트 중 변경한 값은 원래 값으로 복원 후 재조회했다.
+- AI 추천 화면은 별도 데모 모드 없이 `POST /api/courses/recommendations`를 호출하며, 로딩·빈 결과·오류와 규칙 기반 fallback 상태를 구분해 표시한다.
+- AI 추천 백엔드는 로컬 Provider를 사용한 직접 통합 호출에서 `200` 응답과 추천·추천 항목 DB 저장을 확인했다. Gateway는 클라이언트의 `X-User-Id`를 토큰 subject로 덮어쓰는 것도 확인했다.
+- 실제 직원 OAuth 로그인부터 Gateway, `OpenAiRecommendationProvider`, 추천 결과 저장까지 종단 간 시연을 완료했다. API 키와 전체 프롬프트는 검증 기록에 남기지 않는다.
 - 현재 검증 DB에는 API 검증용 강의·차시·수강 및 초대코드 데이터가 추가되어 있다. 제출 전에는 `./scripts/reset-local-database.sh`로 `lecture_db`를 현재 seed 기준으로 초기화할 수 있다.
 
 ## 재현 명령

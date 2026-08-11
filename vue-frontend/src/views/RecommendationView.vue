@@ -19,16 +19,20 @@
           <div class="field"><label>학습 목표</label><textarea v-model="goal" maxlength="200" class="textarea"></textarea><small>{{ goal.length }} / 200자</small></div>
           <div class="summary-card"><Sparkles :size="20" /><span><strong>추천 조건 요약</strong>{{ language }} · {{ level }} · {{ job }} · {{ situation }}</span></div>
         </template>
-        <div class="step-actions"><button v-if="step > 1" class="button" @click="previousStep"><ArrowLeft :size="16" /> 이전</button><button class="button accent" @click="nextStep">{{ step < 3 ? '다음' : 'AI 추천 결과 보기' }} <ArrowRight :size="16" /></button></div>
+        <div class="step-actions"><button v-if="step > 1" class="button" :disabled="isLoading" @click="previousStep"><ArrowLeft :size="16" /> 이전</button><button class="button accent" :disabled="isLoading" @click="nextStep">{{ step < 3 ? '다음' : isLoading ? '추천 분석 중…' : 'AI 추천 결과 보기' }} <ArrowRight :size="16" /></button></div>
       </section>
       <aside class="guide-card"><Route :size="23" /><h3>좋은 추천을 위한 팁</h3><p>실제로 자주 겪는 상황과 달성하고 싶은 변화를 구체적으로 알려주세요.</p><ul><li>언어와 수준이 일치하는 강의만 추천</li><li>ACTIVE 상태의 실제 강의만 검증</li><li>AI 장애 시 규칙 기반 결과 제공</li></ul></aside>
     </div>
 
     <section v-if="showResults" class="results">
       <div class="result-title"><div><p class="eyebrow">Your next route</p><h2>이 강의부터 시작해 보세요</h2></div></div>
-      <div v-if="resultMode !== 'error'" class="result-notice" :class="resultMode"><ShieldAlert :size="19" /><span><strong>현재 MVP 규칙 기반 추천</strong>언어·수준·상황이 일치하는 실제 ACTIVE 강의를 우선순위로 제공합니다.</span></div>
-      <div v-if="resultMode !== 'error'" class="result-grid"><CourseTile v-for="course in resultCourses.slice(0, 3)" :key="course.id" :course="course" /></div>
-      <AsyncState v-else type="error" title="추천 결과를 만들지 못했어요" :description="errorMessage" @retry="requestRecommendation" />
+      <AsyncState v-if="isLoading" type="loading" title="추천 경로를 분석하고 있어요" description="등록된 강의와 현재 학습 이력을 비교하고 있습니다." />
+      <AsyncState v-else-if="resultMode === 'error'" type="error" title="추천 결과를 만들지 못했어요" :description="errorMessage" @retry="requestRecommendation" />
+      <AsyncState v-else-if="recommendedCourses.length === 0" type="empty" title="추천할 강의가 없어요" description="선택한 언어로 등록된 활성 강의가 있는지 확인해 주세요." />
+      <template v-else>
+        <div class="result-notice" :class="resultMode"><component :is="resultMode === 'ai' ? Sparkles : ShieldAlert" :size="19" /><span><strong>{{ resultMode === 'ai' ? 'AI 맞춤 추천 결과' : '규칙 기반 추천으로 전환했어요' }}</strong>{{ resultMode === 'ai' ? '입력한 직무·상황·목표를 분석해 추천했습니다.' : '외부 AI를 사용하지 못해 언어·수준·상황을 기준으로 추천했습니다.' }}</span></div>
+        <div class="result-grid"><CourseTile v-for="course in recommendedCourses" :key="course.id" :course="course" /></div>
+      </template>
     </section>
   </AppShell>
 </template>
@@ -40,7 +44,8 @@ import AppShell from '@/components/AppShell.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import CourseTile from '@/components/CourseTile.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courseApi } from '@/api/course.js'
+import { recommendationApi } from '@/api/recommendation.js'
+import { buildRecommendationRequest, mapRecommendedCourses, recommendationMode } from '@/domain/recommendation.js'
 
 const step = ref(1)
 const language = ref('영어')
@@ -50,29 +55,35 @@ const job = ref('글로벌 세일즈')
 const goal = ref('해외 고객에게 제품을 자연스럽게 설명하고 질문에 자신 있게 답하고 싶어요.')
 const showResults = ref(false)
 const resultMode = ref('ai')
-const liveCourses = ref([])
+const isLoading = ref(false)
 const errorMessage = ref('추천 서비스 연결과 등록 강의 검증에 실패했습니다. 잠시 후 다시 시도해 주세요.')
-const resultCourses = liveCourses
+const recommendedCourses = ref([])
 const languages = [{ code: 'EN', label: '영어', desc: 'English' }, { code: 'JP', label: '일본어', desc: '日本語' }, { code: 'CN', label: '중국어', desc: '中文' }]
 const situations = [{ icon: MessagesSquare, label: '고객 미팅', desc: '고객과 제품·계약 논의' }, { icon: Presentation, label: '업무 발표', desc: '보고와 프레젠테이션' }, { icon: BriefcaseBusiness, label: '협업', desc: '동료·파트너와 협업' }, { icon: Plane, label: '출장', desc: '현지 업무와 네트워킹' }]
 
-const languageCodes = { 영어: 'ENGLISH', 일본어: 'JAPANESE', 중국어: 'CHINESE' }
-const levelCodes = { 초급: 'ELEMENTARY', 중급: 'INTERMEDIATE', 고급: 'ADVANCED' }
-const situationCodes = { '고객 미팅': 'CUSTOMER_MEETING', '업무 발표': 'PRESENTATION', 협업: 'DAILY_CONVERSATION', 출장: 'BUSINESS_TRIP' }
-const jobCodes = { '글로벌 세일즈': 'GLOBAL_SALES', '소프트웨어 개발': 'SOFTWARE_DEVELOPMENT', '데이터 분석': 'DATA_ANALYTICS', '프로덕트 관리': 'PRODUCT_MANAGEMENT' }
-
 async function requestRecommendation() {
+  showResults.value = true
+  resultMode.value = 'ai'
+  errorMessage.value = '추천 서비스 연결과 등록 강의 검증에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+
+  isLoading.value = true
+  recommendedCourses.value = []
   try {
-    const response = await courseApi.recommend({ language: languageCodes[language.value], level: levelCodes[level.value], job: jobCodes[job.value], situation: situationCodes[situation.value], goal: goal.value })
-    const result = response.data.data
-    liveCourses.value = result.courses.map((course) => ({ id: course.courseId, title: course.title, description: course.reason, image: '', duration: '-', students: '-', language: course.language, level: course.level, situation: situationCodes[situation.value], tone: 'green' }))
-    resultMode.value = result.source === 'AI' ? 'ai' : 'fallback'
-    showResults.value = true
+    const response = await recommendationApi.create(buildRecommendationRequest({
+      language: language.value,
+      level: level.value,
+      job: job.value,
+      situation: situation.value,
+      goal: goal.value
+    }))
+    const data = response?.data?.data
+    recommendedCourses.value = mapRecommendedCourses(data?.courses ?? [])
+    resultMode.value = recommendationMode(data?.source)
   } catch (error) {
-    liveCourses.value = []
     resultMode.value = 'error'
-    errorMessage.value = error.response?.data?.detail || error.response?.data?.message || '추천 결과를 만들지 못했습니다.'
-    showResults.value = true
+    errorMessage.value = error?.response?.data?.detail ?? errorMessage.value
+  } finally {
+    isLoading.value = false
   }
 }
 function nextStep() { if (step.value < 3) step.value += 1; else requestRecommendation() }
