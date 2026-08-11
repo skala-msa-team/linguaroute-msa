@@ -4,12 +4,11 @@
 
 ## 발표 산출물
 
-- 발표자용 PPTX: `output/presentation/광주3반_6조_LinguaRoute_발표자용.pptx`
-- 발표자용 PDF: `output/pdf/광주3반_6조_LinguaRoute_발표자용.pdf`
+- 최종 발표자료: `output/presentation/LinguaRoute_최종발표.key`
 - Chrome 시연 순서: [LinguaRoute 발표 시연 가이드](./demo-scenario.md)
 - 자동 시연 스킬: `$linguaroute-demo`
 
-발표자료는 14장으로 구성하며 PowerPoint 발표자 노트에 슬라이드별 설명과 저장소 근거를 포함합니다. 동작 화면은 2026-08-11 실제 Chrome에서 다시 캡처한 랜딩·직원·기업 관리자·플랫폼 관리자 화면 9장을 사용합니다.
+발표자료는 25장으로 구성하며 슬라이드별 설명과 저장소 근거는 [발표 대본](../output/LinguaRoute_발표대본.md)에 정리합니다. 동작 화면은 2026-08-11 실제 Chrome에서 다시 캡처한 랜딩·직원·기업 관리자·플랫폼 관리자 화면 9장을 사용합니다.
 
 ## 1. 이해관계자 가치(Pain Point)
 

@@ -415,7 +415,7 @@ Auth Server, API Gateway와 Eureka는 수정 대상이 아닌 제공 인프라�
 | `payment-service` | 월간·연간 구독, 모의 결제, 멱등성, 결제 내역, 해지·만료·갱신 | 구현·검증 완료 |
 | Kafka + `user-service` | `PaymentCompleted`, `PaymentFailed`, `SubscriptionCanceled`, `SubscriptionExpired`, `SubscriptionRenewed` 발행·소비와 기업 좌석 권한 갱신 | 구현·검증 완료 |
 | 기업·플랫폼 운영 화면 | 결제·좌석·직원 진도와 플랫폼 운영 데이터를 실제 API로 연결 | 구현·검증 완료 |
-| `recommend-service` | 언어·수준·직무·상황·목표 기반 추천, 실제 `ACTIVE` 강의 검증, fallback과 결과 저장 | 구현·검증 완료 |
+| `recommend-service` | 언어·수준·직무·비즈니스 상황·전문용어 학습 목표 기반 추천, 실제 `ACTIVE` 강의 검증, fallback과 결과 저장 | 구현·검증 완료 |
 
 현재 전체 흐름은 `기업 구독·결제 → Kafka 이벤트 → 기업 권한·좌석 → 직원 초대 → 강의 검색·AI 추천 → 수강신청 → 학습·진도 → 기업·플랫폼 운영`까지 동작합니다. OAuth2와 공개·보호·내부 API 79건, 역할별 Chrome 상황, 실제 직원 OAuth 토큰을 사용한 추천 요청과 MariaDB 저장을 2026-08-11 통합 검증했습니다.
 
@@ -516,7 +516,7 @@ MariaDB는 한 개를 사용하지만 각 서비스는 자신의 테이블만 �
 | 수강신청 | `POST` | `/api/enrollments` | 직원 | `courseId` | `enrollmentId`, `ENROLLED`, 진도율 |
 | 내 학습 | `GET` | `/api/enrollments/me` | 직원 | 상태 조건 | 신청 강의와 학습 상태 |
 | 차시 시작·완료 | `POST` | `/api/enrollments/{enrollmentId}/lessons/{lessonId}/start`, `/complete` | 직원 | 경로 ID | 차시 상태와 서버 계산 진도율 |
-| 강의 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·상황·목표 | `recommendationId`, 출처, 최대 3개 강의와 추천 이유 |
+| 강의 추천 | `POST` | `/api/courses/recommendations` | 직원 | 언어·수준·직무·비즈니스 상황·전문용어 학습 목표 | `recommendationId`, 출처, 최대 3개 강의와 추천 이유 |
 | 강의 관리 | `GET`, `POST` | `/api/admin/courses`, `/api/admin/courses/{courseId}?action=update-course` | 플랫폼 관리자 | 검색·상태·강의 정보 | 전체 상태 목록과 생성·수정 강의 |
 | 플랫폼 운영 | `GET` | `/api/admin/users`, `/api/admin/companies`, `/api/admin/payments`, `/api/admin/enrollments` | 플랫폼 관리자 | 페이지 조건 | 각 소유 서비스의 실제 조회 결과 |
 
