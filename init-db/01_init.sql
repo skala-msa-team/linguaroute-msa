@@ -143,6 +143,42 @@ CREATE TABLE IF NOT EXISTS courses (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- [설계 이유 - 추천 데이터 소유권]
+-- 초기 구현은 SQLAlchemy가 실행 시 테이블을 자동 생성했기 때문에 초기 DDL만 보면
+-- 추천 테이블이 누락된 것처럼 보였다. 새 환경에서도 동일한 스키마를 재현하고
+-- 개인과제에서 데이터 흐름을 설명할 수 있도록 명시적인 DDL을 함께 관리한다.
+-- user_id/company_id는 user-service, course_id는 course-service 소유 데이터이므로
+-- 서비스 간 외래키를 만들지 않는다. 반면 recommendation_id는 같은 추천 서비스
+-- 내부 관계이므로 FK와 cascade를 사용해 추천 요청 삭제 시 항목도 함께 정리한다.
+CREATE TABLE IF NOT EXISTS recommendations (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    user_id     BIGINT       NOT NULL,
+    company_id  BIGINT       NOT NULL,
+    language    VARCHAR(30)  NOT NULL,
+    level       VARCHAR(30)  NOT NULL,
+    job         VARCHAR(50)  NOT NULL,
+    situation   VARCHAR(50)  NOT NULL,
+    goal        TEXT         NOT NULL,
+    source      VARCHAR(30)  NOT NULL COMMENT 'AI | RULE_BASED_FALLBACK',
+    status      VARCHAR(20)  NOT NULL COMMENT 'SUCCESS | FALLBACK | FAILED',
+    created_at  DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_recommendations_user_id (user_id),
+    KEY idx_recommendations_company_id (company_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS recommendation_items (
+    id                  BIGINT      NOT NULL AUTO_INCREMENT,
+    recommendation_id   BIGINT      NOT NULL,
+    course_id           BIGINT      NOT NULL,
+    rank                INT         NOT NULL,
+    reason              TEXT        NOT NULL,
+    created_at          DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_recommendation_course (recommendation_id, course_id),
+    FOREIGN KEY (recommendation_id) REFERENCES recommendations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS lessons (
     id                  BIGINT       NOT NULL AUTO_INCREMENT,
     course_id           BIGINT       NOT NULL,

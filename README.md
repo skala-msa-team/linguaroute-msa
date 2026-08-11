@@ -447,29 +447,34 @@ sequenceDiagram
     ES->>DB: 차시 상태·진도율·완료 상태 저장
 ```
 
-#### 6. 강의 추천 (팀원 연동 예정)
+#### 6. AI 강의 추천
 
 ```mermaid
 sequenceDiagram
     participant FE as Vue Frontend
     participant GW as API Gateway
     participant RS as recommend-service
+    participant US as user-service
     participant CS as course-service
     participant ES as enrollment-service
-    participant US as user-service
+    participant AI as OpenAI API 또는 로컬 Provider
+    participant DB as MariaDB
 
     FE->>GW: 언어·수준·직무·상황·목표로 추천 요청
     GW->>RS: 추천 요청과 인증 사용자 ID 전달
-    RS->>US: 내부 API로 최신 직원 역할·상태 확인
-    US-->>RS: ACTIVE EMPLOYEE 권한 반환
+    RS->>US: 내부 API로 최신 직원 권한·상태 조회
+    US-->>RS: companyId·businessRole·status 반환
     RS->>ES: 내부 API로 기존 수강 이력 조회
     ES-->>RS: 제외할 수강 강의 반환
     RS->>CS: 내부 API로 언어가 일치하는 ACTIVE 강의 조회
-    CS-->>RS: 추천 후보 강의 반환
-    RS-->>FE: RULE_BASED_FALLBACK 추천 강의와 이유 반환
+    CS-->>RS: 수강 이력을 제외한 추천 후보 반환
+    RS->>AI: 후보 강의 안에서 추천과 이유 생성
+    AI-->>RS: 추천 강의 ID와 추천 이유 반환
+    RS->>DB: 추천 요청·결과 저장
+    RS-->>FE: 추천 강의와 추천 이유 반환
 ```
 
-추천 시스템의 최종 구현은 김지민 팀원이 연동할 예정입니다. 현재 `recommend-service`에는 외부 추천 경로, 직원 권한 확인, 실제 수강 이력·`ACTIVE` 강의 조회와 `RULE_BASED_FALLBACK` 응답 골격만 있습니다. 전체 curl 회귀에서는 이 API 계약과 서비스 연결까지만 검증했으며 추천 기능 완료로 보지 않습니다. 팀원 구현은 같은 외부 계약과 최종 강의 검증을 유지한 채 추천 판단 로직을 연결한 후 다시 통합 검증합니다.
+`OPENAI_API_KEY`가 있으면 OpenAI Responses API를 사용하고, 키가 없는 로컬 환경에서는 교체 가능한 로컬 Provider로 동작합니다. 외부 AI 호출이 실패하거나 유효한 추천을 반환하지 않으면 규칙 기반 결과로 전환하며, 최종 응답 전에는 실제 `ACTIVE` 강의와 요청 언어를 다시 검증합니다.
 
 ### 이메일 인증 로컬 확인
 
