@@ -108,21 +108,6 @@ public class CompanyDto {
 
     @Getter
     @AllArgsConstructor
-    public static class AdminResponse {
-        private Long id;
-        private String name;
-        private String businessNumber;
-        private com.lecture.user.entity.Company.Status status;
-        private LocalDateTime createdAt;
-
-        public static AdminResponse from(com.lecture.user.entity.Company company) {
-            return new AdminResponse(company.getId(), company.getName(), company.getBusinessNumber(),
-                    company.getStatus(), company.getCreatedAt());
-        }
-    }
-
-    @Getter
-    @AllArgsConstructor
     public static class EntitlementResponse {
         private Long companyId;
         private Long subscriptionId;

@@ -34,8 +34,8 @@ const errorMessage = ref('잠시 후 다시 시도해 주세요.')
 const data = ref({ users: [], companies: [], payments: [], enrollments: [] })
 const configs = {
   dashboard: { title: '운영 대시보드', description: '사용자·기업·결제·수강 상태를 서비스별 실제 데이터로 확인합니다.', columns: [] },
-  users: { title: '사용자 관리', description: '계정의 역할, 소속과 상태를 확인합니다.', columns: [{ key: 'id', label: 'ID' }, { key: 'name', label: '이름' }, { key: 'email', label: '이메일' }, { key: 'businessRole', label: '역할' }, { key: 'companyId', label: '기업 ID' }, { key: 'status', label: '상태' }] },
-  companies: { title: '기업 관리', description: '가입 기업과 계정 상태를 확인합니다.', columns: [{ key: 'id', label: 'ID' }, { key: 'name', label: '기업명' }, { key: 'businessNumber', label: '사업자번호' }, { key: 'status', label: '상태' }, { key: 'createdAt', label: '등록일' }] },
+  users: { title: '사용자 관리', description: '계정의 역할, 소속과 상태를 확인합니다.', columns: [{ key: 'userId', label: 'ID' }, { key: 'name', label: '이름' }, { key: 'email', label: '이메일' }, { key: 'businessRole', label: '역할' }, { key: 'companyId', label: '기업 ID' }, { key: 'status', label: '상태' }] },
+  companies: { title: '기업 관리', description: '가입 기업과 계정 상태를 확인합니다.', columns: [{ key: 'companyId', label: 'ID' }, { key: 'name', label: '기업명' }, { key: 'businessNumber', label: '사업자번호' }, { key: 'status', label: '상태' }, { key: 'createdAt', label: '등록일' }] },
   payments: { title: '결제 관리', description: '전체 기업의 결제 처리 결과를 확인합니다.', columns: [{ key: 'paymentId', label: '결제 ID' }, { key: 'companyId', label: '기업 ID' }, { key: 'amount', label: '금액' }, { key: 'currency', label: '통화' }, { key: 'status', label: '상태' }, { key: 'requestedAt', label: '요청일' }] },
   enrollments: { title: '수강 관리', description: '전체 기업의 수강 상태와 서버 계산 진도율을 확인합니다.', columns: [{ key: 'enrollmentId', label: '수강 ID' }, { key: 'companyId', label: '기업 ID' }, { key: 'userId', label: '사용자 ID' }, { key: 'courseId', label: '강의 ID' }, { key: 'progressRate', label: '진도율' }, { key: 'status', label: '상태' }] },
 }
@@ -49,6 +49,10 @@ const dashboardMetrics = computed(() => [
 ])
 
 function unwrap(response) { return response?.data?.data ?? response?.data ?? [] }
+function rowsFrom(response) {
+  const payload = unwrap(response)
+  return Array.isArray(payload) ? payload : (payload?.content || [])
+}
 function display(row, key) {
   const value = row[key]
   if (value == null || value === '') return '-'
@@ -62,10 +66,10 @@ async function load() {
   try {
     if (props.type === 'dashboard') {
       const [users, companies, payments, enrollments] = await Promise.all([adminApi.getUsers(), adminApi.getCompanies(), adminApi.getPayments(), adminApi.getEnrollments({ page: 0, size: 100 })])
-      data.value = { users: unwrap(users), companies: unwrap(companies), payments: unwrap(payments), enrollments: unwrap(enrollments).content || [] }
+      data.value = { users: rowsFrom(users), companies: rowsFrom(companies), payments: rowsFrom(payments), enrollments: rowsFrom(enrollments) }
     } else {
       const response = props.type === 'users' ? await adminApi.getUsers() : props.type === 'companies' ? await adminApi.getCompanies() : props.type === 'payments' ? await adminApi.getPayments() : await adminApi.getEnrollments({ page: 0, size: 100 })
-      data.value[props.type] = props.type === 'enrollments' ? (unwrap(response).content || []) : unwrap(response)
+      data.value[props.type] = rowsFrom(response)
     }
     state.value = 'ready'
   } catch (error) {

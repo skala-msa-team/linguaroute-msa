@@ -93,18 +93,6 @@ public class CompanyService {
         return CompanyDto.Response.from(requireCompanyAdmin(userId).getCompany());
     }
 
-    public List<CompanyDto.AdminResponse> getAllForPlatformAdmin(Long requesterId) {
-        User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-        if (requester.getStatus() != User.Status.ACTIVE) {
-            throw new ApiException(ErrorCode.USER_INACTIVE);
-        }
-        if (requester.getBusinessRole() != User.BusinessRole.PLATFORM_ADMIN) {
-            throw new ApiException(ErrorCode.PLATFORM_ADMIN_REQUIRED);
-        }
-        return companyRepository.findAll().stream().map(CompanyDto.AdminResponse::from).toList();
-    }
-
     @Transactional
     public CompanyDto.Response updateMyCompany(Long userId, CompanyDto.UpdateRequest request) {
         Company company = requireCompanyAdmin(userId).getCompany();

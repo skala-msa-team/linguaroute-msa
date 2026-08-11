@@ -36,19 +36,6 @@ public class UserService {
         return UserDto.AuthorizationContextResponse.from(findUser(id));
     }
 
-    public List<UserDto.UserResponse> getAllForPlatformAdmin(Long requesterId) {
-        requirePlatformAdmin(requesterId);
-        return userRepository.findAll().stream().map(UserDto.UserResponse::from).toList();
-    }
-
-    public void requirePlatformAdmin(Long userId) {
-        User user = findUser(userId);
-        validateActive(user);
-        if (user.getBusinessRole() != User.BusinessRole.PLATFORM_ADMIN) {
-            throw new ApiException(ErrorCode.PLATFORM_ADMIN_REQUIRED);
-        }
-    }
-
     @Transactional
     public UserDto.UserResponse updateMe(Long userId, UserDto.UpdateRequest request) {
         User user = findUser(userId);
