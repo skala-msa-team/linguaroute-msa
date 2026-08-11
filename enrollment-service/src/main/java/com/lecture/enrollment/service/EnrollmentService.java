@@ -190,4 +190,34 @@ public class EnrollmentService {
                 .activeCourseIds(activeCourseIds)
                 .build();
     }
+
+    /**
+     * [추가] 플랫폼 관리자의 전체 수강 상태 조회
+     * GET /api/admin/enrollments
+     */
+    public EnrollmentDto.PageResponse<
+            EnrollmentDto.ManagementEnrollmentResponse
+    > getAdminEnrollments(
+            Long adminId,
+            int page,
+            int size
+    ) {
+        UserAuthorizationClient.AuthorizationContext authorization =
+                userAuthorizationClient.getAuthorizationContext(adminId);
+
+        if (!authorization.isActivePlatformAdmin()) {
+            throw new EnrollmentException(ErrorCode.FORBIDDEN);
+        }
+
+        Pageable pageable = PageRequest.of(
+                Math.max(page, 0),
+                Math.min(Math.max(size, 1), 100)
+        );
+
+        Page<EnrollmentDto.ManagementEnrollmentResponse> result =
+                enrollmentRepository.findAll(pageable)
+                        .map(EnrollmentDto.ManagementEnrollmentResponse::from);
+
+        return EnrollmentDto.PageResponse.from(result);
+    }
 }

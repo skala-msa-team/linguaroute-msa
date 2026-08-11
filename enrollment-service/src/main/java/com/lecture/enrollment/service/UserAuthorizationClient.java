@@ -90,5 +90,12 @@ public class UserAuthorizationClient {
                     && "COMPANY_ADMIN".equals(businessRole)
                     && companyId != null;
         }
+
+        /* [추가] 활성 플랫폼 관리자인지 확인
+        Platform_Admin은 특정 기업에 소속되지 않을 수 있으므로 companyId는 검사사하지 않는다 */
+        public boolean isActivePlatformAdmin() {
+            return "ACTIVE".equals(status)
+                    && "PLATFORM_ADMIN".equals(businessRole);
+        }
     }
 }
