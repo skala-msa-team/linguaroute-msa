@@ -1152,9 +1152,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 ---
 
-## 11. 플랫폼 운영 API (설계·미구현)
+## 11. 플랫폼 운영 API (부분 구현)
 
-> 아래 운영 조회 API는 화면·클라이언트에서 호출하지 않는다. 현재 각 소유 서비스에 플랫폼 관리자용 집계 API가 구현되어 있지 않으므로, 구현 및 Gateway 검증 전에는 설계 계약으로만 관리한다.
+`OPS-01`, `OPS-02`는 user-service에 구현되어 Gateway 실제 호출까지 검증했다. `OPS-03`, `OPS-04`는 각 소유 서비스의 구현과 통합 검증 전까지 설계 계약으로만 관리하며 화면에서 호출하지 않는다. 운영 화면이 데이터를 한 번에 조회하더라도 별도 운영 DB를 추가하지 않고 API Gateway 또는 프론트엔드가 소유 서비스별 응답을 조합한다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -1164,7 +1164,81 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | OPS-04 | `GET` | `/api/admin/enrollments` | 플랫폼 관리자 | 수강 상태 조회 | 필수 |
 | OPS-05 | `GET` | `/api/admin/audit-logs` | 플랫폼 관리자 | 주요 감사 로그 조회 | 추후 확장 |
 
-운영 화면이 데이터를 한 번에 조회하더라도 각 데이터의 소유 서비스는 유지합니다. 별도 운영 DB를 추가하지 않고 API Gateway 또는 프론트엔드가 각 서비스의 관리자 조회 API를 조합합니다.
+### 11.1 OPS-01 사용자 상태 조회
+
+쿼리 파라미터:
+
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `keyword` | 아니오 | 사용자 이름, 이메일 또는 소속 기업명 부분 검색. 대소문자 구분 없음 |
+| `businessRole` | 아니오 | `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` |
+| `status` | 아니오 | `ACTIVE`, `INACTIVE`, `WITHDRAWN` |
+| `page` | 아니오 | 0부터 시작. 기본값 `0`, 음수는 `0`으로 보정 |
+| `size` | 아니오 | 기본값 `20`, 허용 범위 `1~100`으로 보정 |
+
+응답은 `createdAt`, `userId` 내림차순이다.
+
+```json
+{
+  "data": {
+    "content": [
+      {
+        "userId": 9102,
+        "email": "employee.lee@scala-tech.local",
+        "name": "이수강",
+        "businessRole": "EMPLOYEE",
+        "status": "ACTIVE",
+        "companyId": 9101,
+        "companyName": "스칼라테크",
+        "createdAt": "2026-08-10T09:12:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "timestamp": "2026-08-11T09:42:45+09:00"
+}
+```
+
+플랫폼 관리자는 기업 소속이 없으므로 `companyId`, `companyName`이 `null`일 수 있다.
+
+### 11.2 OPS-02 기업 상태 조회
+
+쿼리 파라미터:
+
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `keyword` | 아니오 | 기업명 또는 사업자번호 부분 검색. 사업자번호의 `-`는 제거해 비교 |
+| `status` | 아니오 | `ACTIVE`, `INACTIVE` |
+| `page` | 아니오 | 0부터 시작. 기본값 `0`, 음수는 `0`으로 보정 |
+| `size` | 아니오 | 기본값 `20`, 허용 범위 `1~100`으로 보정 |
+
+응답은 `createdAt`, `companyId` 내림차순이다. 결제·구독 상세는 payment-service 소유이므로 이 응답에 포함하지 않는다.
+
+```json
+{
+  "data": {
+    "content": [
+      {
+        "companyId": 9101,
+        "name": "스칼라테크",
+        "businessNumber": "9910000001",
+        "status": "ACTIVE",
+        "createdAt": "2026-08-10T09:00:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "timestamp": "2026-08-11T09:42:45+09:00"
+}
+```
+
+두 API는 Bearer Token의 사용자 ID로 user-service의 최신 `businessRole`, `status`를 다시 확인한다. 활성 `PLATFORM_ADMIN`이 아니면 `403 PLATFORM_ADMIN_REQUIRED` 또는 `403 USER_INACTIVE`를 반환한다. 알 수 없는 enum 필터는 `400 BAD_REQUEST`를 반환한다.
 
 ---
 
@@ -1193,6 +1267,7 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `DUPLICATE_PAYMENT` | `409` | 중복 결제 요청 |
 | `INVALID_USER_CONTEXT` | `401` | Gateway가 전달한 인증 사용자 정보가 없거나 올바르지 않음 |
 | `COMPANY_ADMIN_REQUIRED` | `403` | 기업 관리자 권한 필요 |
+| `PLATFORM_ADMIN_REQUIRED` | `403` | 플랫폼 관리자 권한 필요 |
 | `USER_AUTHORIZATION_UNAVAILABLE` | `503` | 사용자 권한 정보를 확인할 수 없음 |
 | `PAYMENT_FAILED` | `422` | 결제 실패 |
 | `COURSE_NOT_FOUND` | `404` | 강의 없음 |
