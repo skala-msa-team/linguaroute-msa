@@ -4,15 +4,12 @@ import { computed, onMounted, ref } from 'vue'
 import { MoreHorizontal,Play,ArrowRight,Plus } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courses } from '@/data/mockData.js'
 import { courseApi } from '@/api/course.js'
 import { enrollmentApi } from '@/api/enrollment.js'
 
 const tab = ref('전체')
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const liveCourses = ref([])
-const learningCourses = ref([{ ...courses[0], progress: 68, enrollmentId: 9001, nextLessonId: 103 }, { ...courses[1], progress: 24, enrollmentId: 9002, nextLessonId: 103 }, { ...courses[3], progress: 100, enrollmentId: 9003, nextLessonId: 103 }])
-const activeCourses = computed(() => useLiveApi ? liveCourses.value : learningCourses.value)
+const activeCourses = computed(() => liveCourses.value)
 const counts = computed(() => ({
   전체: activeCourses.value.length,
   '학습 중': activeCourses.value.filter((course) => course.progress < 100).length,
@@ -22,7 +19,6 @@ const tabs = ['전체', '학습 중', '완료']
 const visibleCourses = computed(() => tab.value === '전체' ? activeCourses.value : tab.value === '완료' ? activeCourses.value.filter((course) => course.progress === 100) : activeCourses.value.filter((course) => course.progress < 100))
 
 onMounted(async () => {
-  if (!useLiveApi) return
   try {
     const response = await enrollmentApi.getMyEnrollments()
     liveCourses.value = await Promise.all(response.data.data.map(async (enrollment) => {

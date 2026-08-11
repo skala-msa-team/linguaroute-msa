@@ -55,6 +55,13 @@ public class CompanyController {
         ));
     }
 
+    @PostMapping(value = "/me", params = "action=update-company")
+    public ResponseEntity<ApiResponse<CompanyDto.Response>> updateMyCompanyFromBrowser(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CompanyDto.UpdateRequest request) {
+        return updateMyCompany(jwt, request);
+    }
+
     @PostMapping("/me/invitations")
     public ResponseEntity<ApiResponse<InvitationDto.Response>> createInvitation(
             @AuthenticationPrincipal Jwt jwt,
@@ -84,6 +91,14 @@ public class CompanyController {
             @Valid @RequestBody CompanyDto.UpdateEmployeeStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(employeeManagementService.updateEmployeeStatus(
                 authenticatedUser.userId(jwt), employeeId, request)));
+    }
+
+    @PostMapping(value = "/me/employees/{employeeId}/status", params = "action=update-status")
+    public ResponseEntity<ApiResponse<CompanyDto.EmployeeResponse>> updateEmployeeStatusFromBrowser(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long employeeId,
+            @Valid @RequestBody CompanyDto.UpdateEmployeeStatusRequest request) {
+        return updateEmployeeStatus(jwt, employeeId, request);
     }
 
     @GetMapping("/me/seats")

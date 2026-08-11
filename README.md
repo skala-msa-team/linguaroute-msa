@@ -447,7 +447,7 @@ sequenceDiagram
     ES->>DB: 차시 상태·진도율·완료 상태 저장
 ```
 
-#### 6. AI 강의 추천 (설계 흐름 — 현재 구현 전)
+#### 6. 강의 추천 (팀원 연동 예정)
 
 ```mermaid
 sequenceDiagram
@@ -456,19 +456,20 @@ sequenceDiagram
     participant RS as recommend-service
     participant CS as course-service
     participant ES as enrollment-service
-    participant DB as MariaDB
+    participant US as user-service
 
     FE->>GW: 언어·수준·직무·상황·목표로 추천 요청
     GW->>RS: 추천 요청과 인증 사용자 ID 전달
-    RS->>CS: 내부 API로 언어가 일치하는 ACTIVE 강의 조회
-    CS-->>RS: 추천 후보 강의 반환
+    RS->>US: 내부 API로 최신 직원 역할·상태 확인
+    US-->>RS: ACTIVE EMPLOYEE 권한 반환
     RS->>ES: 내부 API로 기존 수강 이력 조회
     ES-->>RS: 제외할 수강 강의 반환
-    RS->>DB: 추천 요청·결과 저장
-    RS-->>FE: 추천 강의와 추천 이유 반환
+    RS->>CS: 내부 API로 언어가 일치하는 ACTIVE 강의 조회
+    CS-->>RS: 추천 후보 강의 반환
+    RS-->>FE: RULE_BASED_FALLBACK 추천 강의와 이유 반환
 ```
 
-현재 `recommend-service`의 외부 계약과 내부 호출 경로는 위 설계와 아직 일치하지 않아, 추천 API는 완료 기능으로 표시하지 않습니다. 수강·학습 흐름과 달리 실제 운영 경로로 사용하기 전에 별도 정비가 필요합니다.
+추천 시스템의 최종 구현은 김지민 팀원이 연동할 예정입니다. 현재 `recommend-service`에는 외부 추천 경로, 직원 권한 확인, 실제 수강 이력·`ACTIVE` 강의 조회와 `RULE_BASED_FALLBACK` 응답 골격만 있습니다. 전체 curl 회귀에서는 이 API 계약과 서비스 연결까지만 검증했으며 추천 기능 완료로 보지 않습니다. 팀원 구현은 같은 외부 계약과 최종 강의 검증을 유지한 채 추천 판단 로직을 연결한 후 다시 통합 검증합니다.
 
 ### 이메일 인증 로컬 확인
 
@@ -530,9 +531,9 @@ LinguaRoute는 소셜 로그인이 아니라 자체 이메일·비밀번호 계�
 | 구분 | 이메일 | 설명 |
 | --- | --- | --- |
 | 플랫폼 관리자 | `platform-admin@linguaroute.local` | 플랫폼 운영자 계정 |
-| 기업 관리자 | `admin@scala-tech.local` | 스칼라테크 관리자, 활성 구독 보유 |
-| 직원 | `employee.lee@scala-tech.local` | 스칼라테크 직원, 영어 강의 학습·수료 데이터 보유 |
-| 직원 | `employee.kim@scala-tech.local` | 스칼라테크 직원, 일본어 강의 신청 데이터 보유 |
+| 기업 관리자 | `admin@skala-tech.local` | 스칼라테크 관리자, 활성 구독 보유 |
+| 직원 | `employee.lee@skala-tech.local` | 스칼라테크 직원, 영어 강의 학습·수료 데이터 보유 |
+| 직원 | `employee.kim@skala-tech.local` | 스칼라테크 직원, 일본어 강의 신청 데이터 보유 |
 | 기업 관리자 | `admin@global-link.local` | 글로벌링크 관리자 |
 
 대표 seed 데이터는 다음과 같습니다.
@@ -627,13 +628,13 @@ docker compose down
 docker compose up -d
 ```
 
-데이터까지 완전히 초기화해야 할 때만 다음 명령을 사용합니다.
+현재 프로젝트의 MariaDB 스키마와 seed 데이터를 다시 만들어야 할 때는 다음 스크립트를 사용합니다.
 
 ```bash
-docker compose down -v
+./scripts/reset-local-database.sh
 ```
 
-`docker compose down -v`는 MariaDB와 Kafka의 저장 데이터를 삭제하므로 팀원과 확인한 뒤 사용합니다.
+스크립트는 실행 전 `RESET` 입력을 요구하며, `lecture_db`만 삭제·재생성한 뒤 `init-db/01_init.sql`과 모든 마이그레이션을 순서대로 적용하고 서비스를 다시 기동합니다. MariaDB Docker 볼륨과 Kafka 데이터는 삭제하지 않습니다. 자동 확인이 필요한 개인 개발 환경에서는 `--yes`, ARM64 사전 빌드 이미지 환경에서는 `--local`을 추가합니다.
 
 ### 11. 자주 발생하는 오류
 
@@ -682,7 +683,7 @@ docker exec -it lecturedb mariadb -umanager -pSqlDba-1 lecture_db
 DESC payments;
 ```
 
-팀 공용 데이터가 필요 없고 초기화해도 되는 개발 환경에서만 팀원과 확인한 뒤 `docker compose down -v`로 볼륨을 삭제하고 다시 실행합니다. 데이터를 유지해야 하면 별도 마이그레이션 SQL을 작성해서 오래된 컬럼을 정리합니다.
+팀 공용 데이터가 필요 없고 초기화해도 되는 개발 환경에서만 팀원과 확인한 뒤 `./scripts/reset-local-database.sh`를 실행합니다. 이 스크립트는 Kafka 데이터나 Docker 볼륨을 지우지 않고 `lecture_db`만 현재 스키마와 seed로 재생성합니다. 데이터를 유지해야 하면 초기화하지 말고 별도 마이그레이션 SQL을 작성해서 오래된 컬럼을 정리합니다.
 
 #### Auth Server가 `business_role` 오류로 종료되는 경우
 
@@ -696,13 +697,15 @@ docker compose ps -a
 docker compose logs db-migration auth-server
 ```
 
-`lecture-db-migration`이 `Exited (0)`이고 Auth Server가 `healthy`이면 정상입니다. 마이그레이션 SQL은 반복 실행해도 같은 결과가 되도록 작성되어 매 Compose 기동 시 안전하게 실행됩니다. `docker compose down -v`는 테스트 데이터를 모두 삭제해도 되는 경우에만 초기화 수단으로 사용합니다.
+`lecture-db-migration`이 `Exited (0)`이고 Auth Server가 `healthy`이면 정상입니다. `init-db/migrations`의 SQL은 파일명 순서대로 실행되며 반복 실행해도 같은 결과가 되도록 작성합니다. 테스트 데이터를 모두 삭제해도 되는 경우에만 `./scripts/reset-local-database.sh`를 초기화 수단으로 사용합니다.
 
 #### Gateway 공개 가입 경로
 
 제공받은 API Gateway 이미지는 `/api/users/register`와 OAuth2 경로를 공개 라우팅합니다. 수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 이미지와 다르며 `401 Unauthorized`를 반환합니다. 브라우저 로그인은 `/oauth2/authorize`와 `/login`을 사용합니다. LinguaRoute 목표 API인 `POST /api/companies` 기업 관리자 가입은 user-service에 구현되어 있지만, 제공 Gateway 이미지의 보안 허용 목록에 없으면 Gateway 경유 호출이 `401 Unauthorized`를 반환합니다.
 
-Gateway 이미지는 수정하지 않는 전제이므로, 외부 기업 관리자 가입은 Gateway가 공개 허용하는 `POST /api/users/register`를 사용합니다. 요청과 응답 구조는 기존 `POST /api/companies` 기업 가입 API와 같습니다. `POST /api/companies`는 user-service 직접 호출에서는 유지되지만 Gateway 경유 MVP 기준 경로가 아닙니다.
+Gateway 이미지는 수정하지 않는 전제이므로, 외부 기업 관리자 가입은 `POST /api/users/register`, 활성 약관 조회는 `GET /api/users/register?action=active-terms`, 직원 가입은 `POST /api/users/register?action=employee-signup`을 사용합니다. 기존 `/api/companies`, `/api/terms/active`, `/api/employees/signup`은 user-service 직접 호출 호환 경로로 유지하지만 Gateway 경유 MVP 기준 경로가 아닙니다.
+
+제공 Gateway 이미지의 브라우저 CORS 정책은 `PATCH` 사전 요청을 거부합니다. 따라서 Vue 화면의 수정 요청은 `POST` 액션 경로(`/api/users/me?action=update-profile`, `/api/companies/me?action=update-company`, 직원·강의 상태 변경의 `action=update-status`)를 사용합니다. 각 소스 서비스의 기존 `PATCH` 매핑은 직접 호출과 기존 클라이언트 호환을 위해 같은 로직으로 유지합니다.
 
 ### 프론트엔드 실행
 

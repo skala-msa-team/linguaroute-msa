@@ -4,7 +4,7 @@
     <div class="settings-grid">
       <section class="panel company-profile">
         <div class="company-head"><span class="company-logo">S</span><span><h2>{{ form.name }}</h2><p>기업 ID {{ company.id }} · {{ company.status }}</p></span><span class="tag" :class="company.status === 'ACTIVE' ? '' : 'gray'">{{ company.status }}</span></div>
-        <div class="contract-note"><ShieldCheck :size="18" /><span><strong>최신 user-service 계약 반영</strong><code>GET/PATCH /api/companies/me</code>는 기업명만 수정하며 사업자번호는 변경하지 않습니다.</span></div>
+        <div class="contract-note"><ShieldCheck :size="18" /><span><strong>최신 user-service 계약 반영</strong><code>POST /api/companies/me?action=update-company</code>는 기업명만 수정하며 사업자번호는 변경하지 않습니다.</span></div>
         <form class="form-stack" @submit.prevent="saveCompany">
           <div class="field"><label>기업명</label><input v-model.trim="form.name" class="input" maxlength="100" required /><small>최대 100자</small></div>
           <div class="field"><label>사업자등록번호</label><input class="input" :value="formattedBusinessNumber" disabled /><small>가입 후에는 변경할 수 없습니다.</small></div>
@@ -14,7 +14,7 @@
       </section>
 
       <aside>
-        <section class="panel admin-card"><span class="tag">대표 관리자</span><div class="person-large"><span class="avatar">김</span><span><strong>김관리</strong><small>admin@scalatech.co.kr</small></span></div><div class="contact-row"><ShieldCheck :size="15" /><span><small>비즈니스 역할</small><strong>COMPANY_ADMIN</strong></span></div><div class="contact-row"><Building2 :size="15" /><span><small>기업 소속</small><strong>companyId {{ company.id }}</strong></span></div><router-link class="button" to="/profile">관리자 계정 설정</router-link></section>
+        <section class="panel admin-card"><span class="tag">대표 관리자</span><div class="person-large"><span class="avatar">{{ admin.name?.[0] || '?' }}</span><span><strong>{{ admin.name || '-' }}</strong><small>{{ admin.email || '-' }}</small></span></div><div class="contact-row"><ShieldCheck :size="15" /><span><small>비즈니스 역할</small><strong>{{ admin.businessRole || '-' }}</strong></span></div><div class="contact-row"><Building2 :size="15" /><span><small>기업 소속</small><strong>companyId {{ admin.companyId ?? company.id }}</strong></span></div><router-link class="button" to="/profile">관리자 계정 설정</router-link></section>
         <section class="panel scope-card"><h3>관리 가능한 정보</h3><p><CircleCheck :size="14" /> 기업명</p><p><LockKeyhole :size="14" /> 사업자번호는 읽기 전용</p><p><LockKeyhole :size="14" /> 구독·좌석은 각 소유 API에서 관리</p></section>
       </aside>
     </div>
@@ -29,8 +29,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import { authApi } from '@/api/auth.js'
 import { formatBusinessNumber, unwrapApiData } from '@/constants/domain.js'
 
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const company = reactive(useLiveApi ? { id: null, name: '', businessNumber: '', status: '' } : { id: 10, name: '스칼라테크', businessNumber: '1234567890', status: 'ACTIVE' })
+const company = reactive({ id: null, name: '', businessNumber: '', status: '' })
+const admin = reactive({ name: '', email: '', businessRole: '', companyId: null })
 const form = reactive({ name: company.name })
 const saving = ref(false)
 const saved = ref(false)
@@ -38,9 +38,10 @@ const error = ref('')
 const formattedBusinessNumber = computed(() => formatBusinessNumber(company.businessNumber))
 
 onMounted(async () => {
-  if (!useLiveApi) return
   try {
-    Object.assign(company, unwrapApiData(await authApi.getMyCompany()))
+    const [companyResponse, userResponse] = await Promise.all([authApi.getMyCompany(), authApi.getMe()])
+    Object.assign(company, unwrapApiData(companyResponse))
+    Object.assign(admin, unwrapApiData(userResponse))
     form.name = company.name
   } catch (requestError) {
     error.value = requestError.response?.data?.message || '기업 정보를 불러오지 못했습니다.'
@@ -52,8 +53,7 @@ async function saveCompany() {
   error.value = ''
   saving.value = true
   try {
-    if (useLiveApi) Object.assign(company, unwrapApiData(await authApi.updateMyCompany(form.name)))
-    else company.name = form.name
+    Object.assign(company, unwrapApiData(await authApi.updateMyCompany(form.name)))
     saved.value = true
   } catch (requestError) {
     error.value = requestError.response?.data?.message || '기업 정보를 저장하지 못했습니다.'

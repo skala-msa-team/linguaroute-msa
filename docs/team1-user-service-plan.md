@@ -38,9 +38,9 @@
 - [x] 일회용 이메일 인증 토큰 해시 검증·소비
 - [x] 서비스 직접 호환 `POST /api/companies`
 - [x] Gateway 공개 가입 `POST /api/users/register`
-- [x] `GET/PATCH /api/companies/me`
-- [x] `GET/PATCH /api/users/me`
-- [x] `GET /api/terms/active`
+- [x] `GET /api/companies/me`, `POST /api/companies/me?action=update-company`
+- [x] `GET /api/users/me`, `POST /api/users/me?action=update-profile`
+- [x] Gateway 공개 `GET /api/users/register?action=active-terms`와 서비스 직접 호환 `GET /api/terms/active`
 - [x] `POST /api/users/me/agreements`
 - [x] 내부 사용자 권한 조회와 API 키 검증
 - [x] 공통 성공·오류 응답 및 주요 예외 상태 코드
@@ -182,7 +182,7 @@ X-Internal-Api-Key: ${INTERNAL_API_KEY}
 - [x] 이메일 인증·필수 약관을 포함한 직원 가입 API
 - [x] Auth 호환 `STUDENT`, 비즈니스 역할 `EMPLOYEE` 저장
 
-초대코드 원문은 생성·재발급 응답에서만 한 번 반환한다. 목록은 `code=null`, `codeMasked`와 상태·시각만 반환하며, 원문 해시는 `invitations.code_hash`에만 저장한다. 직원 가입 화면은 이메일 인증·필수 약관 동의 후 `POST /api/employees/signup`을 호출한다.
+초대코드 원문은 생성·재발급 응답에서만 한 번 반환한다. 목록은 `code=null`, `codeMasked`와 상태·시각만 반환하며, 원문 해시는 `invitations.code_hash`에만 저장한다. 직원 가입 화면은 이메일 인증·필수 약관 동의 후 Gateway 공개 경로인 `POST /api/users/register?action=employee-signup`을 호출한다.
 
 ### PR 3 — 구독 권한·좌석
 

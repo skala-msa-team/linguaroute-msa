@@ -19,18 +19,6 @@ export const SITUATION_OPTIONS = [
   { value: 'DAILY_CONVERSATION', label: '일상 회화' },
 ]
 
-export const USER_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE', 'WITHDRAWN']
-export const INVITATION_STATUS_OPTIONS = ['UNUSED', 'USED', 'EXPIRED', 'REVOKED']
-export const COURSE_STATUS_OPTIONS = ['ACTIVE', 'INACTIVE']
-export const ENROLLMENT_STATUS_OPTIONS = ['ENROLLED', 'LEARNING', 'COMPLETED']
-export const SUBSCRIPTION_STATUS_OPTIONS = ['PENDING', 'ACTIVE', 'CANCELED', 'EXPIRED']
-export const PAYMENT_STATUS_OPTIONS = ['PENDING', 'SUCCESS', 'FAILED']
-
-export const labelOf = (options, value) => options.find((option) => option.value === value)?.label ?? value
-export const languageLabel = (value) => labelOf(LANGUAGE_OPTIONS, value)
-export const levelLabel = (value) => labelOf(LEVEL_OPTIONS, value)
-export const situationLabel = (value) => labelOf(SITUATION_OPTIONS, value)
-
 export function unwrapApiData(response) {
   return response?.data?.data ?? response?.data ?? response
 }

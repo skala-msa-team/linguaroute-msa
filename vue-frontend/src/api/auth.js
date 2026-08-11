@@ -8,14 +8,14 @@ export const authApi = {
     return api.get('/api/users/me')
   },
 
-  updateMe(name) { return api.patch('/api/users/me', { name }) },
+  updateMe(name) { return api.post('/api/users/me?action=update-profile', { name }) },
   withdrawMe() { return api.delete('/api/users/me') },
   getMyCompany() { return api.get('/api/companies/me') },
-  updateMyCompany(name) { return api.patch('/api/companies/me', { name }) },
+  updateMyCompany(name) { return api.post('/api/companies/me?action=update-company', { name }) },
   registerCompany(data) { return api.post('/api/users/register', data) },
-  registerEmployee(data) { return api.post('/api/employees/signup', data) },
+  registerEmployee(data) { return api.post('/api/users/register?action=employee-signup', data) },
   validateInvitation(invitationCode) { return api.post('/api/users/register?action=validate-invitation', { invitationCode }) },
-  getActiveTerms() { return api.get('/api/terms/active') },
+  getActiveTerms() { return api.get('/api/users/register?action=active-terms') },
   agreeToTerms(agreementIds) { return api.post('/api/users/me/agreements', { agreementIds }) },
   requestEmailVerification(email) { return api.post('/api/users/register?action=request-email-verification', { email, purpose: 'SIGNUP' }) },
   confirmEmailVerification(email, verificationCode) { return api.post('/api/users/register?action=confirm-email-verification', { email, verificationCode }) },

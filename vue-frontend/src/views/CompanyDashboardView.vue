@@ -19,16 +19,13 @@ import { onMounted, ref } from 'vue'
 import { UserPlus,ArrowRight,UsersRound,Armchair,GraduationCap,ChartNoAxesCombined } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { employees as mockEmployees } from '@/data/mockData.js'
 import { companyApi } from '@/api/company.js'
 
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const employees = ref(useLiveApi ? [] : mockEmployees)
-const metrics = ref(useLiveApi ? [] : [{label:'활성 직원',value:'42명',trend:'데모 데이터',icon:UsersRound},{label:'잔여 좌석',value:'8석',trend:'데모 데이터',icon:Armchair},{label:'수강 중 강의',value:'87건',trend:'데모 데이터',icon:GraduationCap},{label:'평균 진도율',value:'78%',trend:'데모 데이터',icon:ChartNoAxesCombined}])
+const employees = ref([])
+const metrics = ref([])
 const loadError = ref('')
 
 onMounted(async () => {
-  if (!useLiveApi) return
   try {
     const [employeeResponse, seatResponse, progressResponse] = await Promise.all([
       companyApi.getEmployees(), companyApi.getSeats(), companyApi.getEnrollmentProgress()

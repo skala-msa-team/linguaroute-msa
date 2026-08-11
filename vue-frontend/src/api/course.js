@@ -5,6 +5,10 @@ export const courseApi = {
     return api.get('/api/courses', { params })
   },
 
+  getAdminCourses(params) {
+    return api.get('/api/admin/courses', { params })
+  },
+
   getById(id) {
     return api.get(`/api/courses/${id}`)
   },
@@ -18,14 +22,18 @@ export const courseApi = {
   },
 
   update(id, data) {
-    return api.patch(`/api/admin/courses/${id}`, data)
+    return api.post(`/api/admin/courses/${id}?action=update-course`, data)
   },
 
   updateStatus(id, status) {
-    return api.patch(`/api/admin/courses/${id}/status`, { status })
+    return api.post(`/api/admin/courses/${id}/status?action=update-status`, { status })
   },
 
   createLesson(courseId, data) {
     return api.post(`/api/admin/courses/${courseId}/lessons`, data)
+  },
+
+  recommend(data) {
+    return api.post('/api/courses/recommendations', data)
   }
 }
