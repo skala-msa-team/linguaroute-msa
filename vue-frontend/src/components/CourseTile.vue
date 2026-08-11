@@ -1,7 +1,7 @@
 <template>
   <article class="course-tile card">
     <router-link :to="`/courses/${course.id}`" class="thumbnail" :class="`tone-${course.tone}`">
-      <img :src="course.image" :alt="`${course.title} 강의 이미지`" /><span class="course-number">LR · {{ String(course.id).padStart(3,'0') }}</span>
+      <img v-if="course.image" :src="course.image" :alt="`${course.title} 강의 이미지`" /><span v-else class="image-placeholder">LR</span><span class="course-number">LR · {{ String(course.id).padStart(3,'0') }}</span>
       <span v-if="course.progress" class="progress-label">{{ course.progress }}% 학습</span>
     </router-link>
     <div class="course-body"><div class="tags"><span class="tag">{{ course.language }}</span><span class="tag gray">{{ course.level }}</span><span class="tag gray">{{ course.situation }}</span></div><router-link :to="`/courses/${course.id}`"><h3>{{ course.title }}</h3></router-link><p>{{ course.description }}</p><div class="course-meta"><span><Clock3 :size="14" />{{ course.duration }}</span><span><UsersRound :size="14" />{{ course.students }}명</span><button aria-label="강의 북마크"><Bookmark :size="16" /></button></div><div v-if="course.progress" class="progress"><span :style="`width:${course.progress}%`"></span></div></div>

@@ -51,10 +51,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (!redirect) return
 
-    const authServerBaseUrl = import.meta.env.VITE_AUTH_SERVER_BASE_URL || 'http://localhost:8080'
+    const logoutUrl = import.meta.env.VITE_AUTH_LOGOUT_URL || 'http://localhost:9000/logout'
     const form = document.createElement('form')
     form.method = 'post'
-    form.action = `${authServerBaseUrl}/logout`
+    form.action = logoutUrl
     document.body.appendChild(form)
     form.submit()
   }

@@ -25,4 +25,5 @@ public class EmployeeController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(invitationService.signupEmployee(request)));
     }
+
 }

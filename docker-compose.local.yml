@@ -36,6 +36,23 @@ services:
     networks:
       - lecture-net
 
+  db-migration:
+    image: mariadb:11.2
+    platform: linux/arm64/v8
+    container_name: lecture-db-migration
+    command:
+      - sh
+      - -c
+      - for migration in /migrations/*.sql; do echo "Applying $${migration}"; mariadb -h mariadb -umanager -pSqlDba-1 lecture_db < "$${migration}"; done
+    volumes:
+      - ./init-db/migrations:/migrations:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - lecture-net
+
   kafka:
     image: confluentinc/cp-kafka:7.7.0
     platform: linux/arm64
@@ -111,6 +128,8 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+      db-migration:
+        condition: service_completed_successfully
       eureka-server:
         condition: service_healthy
     healthcheck:
@@ -151,13 +170,14 @@ services:
       - SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0=Path=/api/courses,/api/courses/**,/api/admin/courses,/api/admin/courses/**
       - SPRING_CLOUD_GATEWAY_ROUTES_4_ID=enrollment-service
       - SPRING_CLOUD_GATEWAY_ROUTES_4_URI=lb://enrollment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**,/api/companies/me/enrollments,/api/companies/me/enrollments/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0=Path=/api/enrollments,/api/enrollments/**,/api/companies/me/enrollments,/api/companies/me/enrollments/**,/api/admin/enrollments,/api/admin/enrollments/**
       - SPRING_CLOUD_GATEWAY_ROUTES_5_ID=payment-service
       - SPRING_CLOUD_GATEWAY_ROUTES_5_URI=lb://payment-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_5_PREDICATES_0=Path=/api/payments,/api/payments/**,/api/plans,/api/plans/**,/api/subscriptions,/api/subscriptions/**,/api/admin/payments,/api/admin/payments/**
       - SPRING_CLOUD_GATEWAY_ROUTES_6_ID=recommend-service
       - SPRING_CLOUD_GATEWAY_ROUTES_6_URI=lb://recommend-service
-      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/recommend,/api/recommend/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_PREDICATES_0=Path=/api/courses/recommendations,/api/recommend,/api/recommend/**
+      - SPRING_CLOUD_GATEWAY_ROUTES_6_ORDER=-10
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -304,6 +324,7 @@ services:
       - JWK_SET_URI=http://auth-server:9000/oauth2/jwks
       - ENROLLMENT_SERVICE_URL=http://enrollment-service:8083
       - COURSE_SERVICE_URL=http://course-service:8082
+      - USER_SERVICE_URL=http://user-service:8081
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:-local-internal-api-key}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:

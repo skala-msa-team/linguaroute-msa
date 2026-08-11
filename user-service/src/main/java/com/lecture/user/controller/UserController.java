@@ -54,6 +54,13 @@ public class UserController {
         ));
     }
 
+    @PostMapping(value = "/me", params = "action=update-profile")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updateMeFromBrowser(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UserDto.UpdateRequest request) {
+        return updateMe(jwt, request);
+    }
+
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal Jwt jwt,

@@ -16,11 +16,10 @@
 
     <div class="result-head">
       <p><strong>{{ filtered.length }}</strong>개의 강의</p>
-      <div class="preview-control"><span>화면 상태</span><select v-model="viewState"><option value="ready">정상</option><option value="loading">로딩</option><option value="empty">빈 결과</option><option value="error">오류</option></select></div>
     </div>
 
     <AsyncState v-if="viewState === 'loading'" type="loading" title="강의를 불러오고 있어요" description="등록된 ACTIVE 강의를 확인하고 있습니다." />
-    <AsyncState v-else-if="viewState === 'error'" type="error" title="강의를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요." @retry="viewState = 'ready'" />
+    <AsyncState v-else-if="viewState === 'error'" type="error" title="강의를 불러오지 못했어요" :description="loadError" @retry="loadCourses" />
     <AsyncState v-else-if="viewState === 'empty' || !filtered.length" type="empty" title="조건에 맞는 강의가 없어요" description="검색어나 필터를 바꾸면 더 많은 강의를 찾을 수 있어요." />
     <template v-else>
       <section class="course-grid"><CourseTile v-for="course in filtered" :key="course.id" :course="course" /></section>
@@ -36,7 +35,6 @@ import AppShell from '@/components/AppShell.vue'
 import AsyncState from '@/components/AsyncState.vue'
 import CourseTile from '@/components/CourseTile.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courses } from '@/data/mockData.js'
 import { LANGUAGE_OPTIONS, LEVEL_OPTIONS, SITUATION_OPTIONS } from '@/constants/domain.js'
 import { courseApi } from '@/api/course.js'
 
@@ -45,13 +43,12 @@ const language = ref('')
 const situation = ref('')
 const level = ref('')
 const viewState = ref('ready')
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const liveCourses = ref([])
-const liveLoaded = ref(false)
+const loadError = ref('잠시 후 다시 시도해 주세요.')
 const page = ref(0)
 const totalPages = ref(1)
 
-const filtered = computed(() => (liveLoaded.value ? liveCourses.value : courses).filter((course) => {
+const filtered = computed(() => liveCourses.value.filter((course) => {
   const query = keyword.value.trim().toLowerCase()
   return (!query || `${course.title} ${course.description}`.toLowerCase().includes(query))
     && (!language.value || course.languageCode === language.value)
@@ -60,19 +57,19 @@ const filtered = computed(() => (liveLoaded.value ? liveCourses.value : courses)
 }))
 
 async function loadCourses() {
-  if (!useLiveApi) return
   viewState.value = 'loading'
   try {
     const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, situation: situation.value || undefined, level: level.value || undefined, page: page.value, size: 20 })
     liveCourses.value = response.data.data.content.map((course) => ({
-      ...courses[0], id: course.courseId, title: course.title, languageCode: course.language,
+      id: course.courseId, title: course.title, description: '', image: '', duration: '-', students: '-', languageCode: course.language,
       language: course.language, situationCode: course.situation, situation: course.situation,
       levelCode: course.level, level: course.level, status: course.status, tone: 'green'
     }))
-    liveLoaded.value = true
     totalPages.value = Math.max(1, Math.ceil(response.data.data.totalElements / response.data.data.size))
     viewState.value = 'ready'
-  } catch (_) {
+  } catch (error) {
+    liveCourses.value = []
+    loadError.value = error.response?.data?.message || '잠시 후 다시 시도해 주세요.'
     viewState.value = 'error'
   }
 }

@@ -1,17 +1,70 @@
-<template><AppShell><PageHeader eyebrow="Course operations" title="강의 관리" description="강의를 등록·수정하고 활성 상태와 차시 구성을 관리합니다."><router-link class="button accent" to="/admin/courses/new"><Plus :size="16"/> 새 강의 등록</router-link></PageHeader><section class="metric-grid summary"><article v-for="item in stats" :key="item.label" class="metric card"><div class="metric-head"><span>{{ item.label }}</span><span class="metric-icon"><component :is="item.icon" :size="17"/></span></div><div><strong class="metric-value">{{ item.value }}</strong><p class="trend">{{ item.desc }}</p></div></article></section><section class="panel course-panel"><div class="table-toolbar"><div class="table-search"><Search :size="16"/><input v-model="keyword" placeholder="강의명 검색"/></div><select v-model="language" class="select"><option value="">모든 언어</option><option value="ENGLISH">영어</option><option value="JAPANESE">일본어</option></select><select class="select"><option>모든 상태</option><option>ACTIVE</option><option>INACTIVE</option></select><button class="button small" @click="loadCourses"><SlidersHorizontal :size="14"/> 필터</button></div><div class="course-admin-list"><article v-for="course in courses" :key="course.id"><div class="course-image" :class="`tone-${course.tone}`"><img :src="course.image" :alt="course.title"/></div><div class="course-info"><div><span class="tag" :class="course.status==='INACTIVE'?'gray':''">{{ course.status }}</span><span>{{ course.language }} · {{ course.level }} · {{ course.situation }}</span></div><h2>{{ course.title }}</h2><p>COURSE-{{ course.id }}</p></div><div class="lesson-count"><BookOpen :size="16"/><span><strong>-</strong>차시</span></div><div class="course-actions"><router-link class="button small" :to="`/admin/courses/${course.id}/edit`"><Pencil :size="14"/> 수정</router-link><button class="button small" @click="toggle(course)"><Power :size="14"/> {{ course.status==='ACTIVE'?'비활성화':'활성화' }}</button><button class="row-menu"><MoreHorizontal :size="17"/></button></div></article></div></section></AppShell></template>
+<template>
+  <AppShell>
+    <PageHeader eyebrow="Course operations" title="강의 관리" description="강의를 등록·수정하고 활성 상태를 관리합니다.">
+      <router-link class="button accent" to="/admin/courses/new"><Plus :size="16" /> 새 강의 등록</router-link>
+    </PageHeader>
+    <section class="metric-grid summary">
+      <article v-for="item in stats" :key="item.label" class="metric card">
+        <div class="metric-head"><span>{{ item.label }}</span><span class="metric-icon"><component :is="item.icon" :size="17" /></span></div>
+        <div><strong class="metric-value">{{ item.value }}</strong><p class="trend">{{ item.desc }}</p></div>
+      </article>
+    </section>
+    <section class="panel course-panel">
+      <div class="table-toolbar">
+        <div class="table-search"><Search :size="16" /><input v-model="keyword" placeholder="강의명 검색" /></div>
+        <select v-model="language" class="select"><option value="">모든 언어</option><option value="ENGLISH">영어</option><option value="JAPANESE">일본어</option><option value="CHINESE">중국어</option></select>
+        <select v-model="status" class="select"><option value="">모든 상태</option><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select>
+        <button class="button small" @click="loadCourses"><SlidersHorizontal :size="14" /> 필터</button>
+      </div>
+      <p v-if="loadError" class="empty-message">{{ loadError }}</p>
+      <div v-else class="course-admin-list">
+        <article v-for="course in courses" :key="course.id">
+          <div class="course-info"><div><span class="tag" :class="course.status === 'INACTIVE' ? 'gray' : ''">{{ course.status }}</span><span>{{ course.language }} · {{ course.level }} · {{ course.situation }}</span></div><h2>{{ course.title }}</h2><p>COURSE-{{ course.id }}</p></div>
+          <div class="course-actions"><router-link class="button small" :to="`/admin/courses/${course.id}/edit`"><Pencil :size="14" /> 수정</router-link><button class="button small" @click="toggle(course)"><Power :size="14" /> {{ course.status === 'ACTIVE' ? '비활성화' : '활성화' }}</button></div>
+        </article>
+        <p v-if="!courses.length" class="empty-message">조건에 맞는 활성 강의가 없습니다.</p>
+      </div>
+    </section>
+  </AppShell>
+</template>
+
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Plus,LibraryBig,BadgeCheck,BookX,UsersRound,Search,SlidersHorizontal,BookOpen,Pencil,Power,MoreHorizontal } from '@lucide/vue'
+import { BadgeCheck, BookX, LibraryBig, Pencil, Plus, Power, Search, SlidersHorizontal } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { courses as mockCourses } from '@/data/mockData.js'
 import { courseApi } from '@/api/course.js'
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const courses = ref(mockCourses)
-const keyword = ref(''), language = ref('')
-const stats = computed(() => [{label:'전체 강의',value:`${courses.value.length}`,desc:'조회 결과 기준',icon:LibraryBig},{label:'활성 강의',value:`${courses.value.filter((course) => course.status === 'ACTIVE').length}`,desc:'현재 노출 가능',icon:BadgeCheck},{label:'비활성 강의',value:`${courses.value.filter((course) => course.status === 'INACTIVE').length}`,desc:'상태 확인 필요',icon:BookX},{label:'전체 수강',value:'-',desc:'수강 조회 API 필요',icon:UsersRound}])
-async function loadCourses() { if (!useLiveApi) return; const response = await courseApi.getCourses({ keyword: keyword.value || undefined, language: language.value || undefined, page: 0, size: 100 }); courses.value = response.data.data.content.map((course) => ({ ...mockCourses[0], id: course.courseId, ...course, tone: 'green' })) }
-async function toggle(course) { if (!useLiveApi) { course.status = course.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'; return }; const response = await courseApi.updateStatus(course.id, course.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'); Object.assign(course, response.data.data) }
+
+const courses = ref([])
+const loadError = ref('')
+const keyword = ref('')
+const language = ref('')
+const status = ref('')
+const stats = computed(() => [
+  { label: '조회 강의', value: `${courses.value.length}`, desc: '현재 필터 결과', icon: LibraryBig },
+  { label: '활성 강의', value: `${courses.value.filter((course) => course.status === 'ACTIVE').length}`, desc: '현재 결과 중 노출', icon: BadgeCheck },
+  { label: '비활성 강의', value: `${courses.value.filter((course) => course.status === 'INACTIVE').length}`, desc: '현재 결과 중 비노출', icon: BookX }
+])
+
+async function loadCourses() {
+  loadError.value = ''
+  try {
+    const response = await courseApi.getAdminCourses({ keyword: keyword.value || undefined, language: language.value || undefined, status: status.value || undefined, page: 0, size: 100 })
+    courses.value = response.data.data.content.map((course) => ({ id: course.courseId, ...course }))
+  } catch (error) {
+    courses.value = []
+    loadError.value = error.response?.data?.message || '강의 목록을 불러오지 못했습니다.'
+  }
+}
+
+async function toggle(course) {
+  await courseApi.updateStatus(course.id, course.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')
+  await loadCourses()
+}
+
 onMounted(loadCourses)
 </script>
-<style scoped>.summary{margin-bottom:14px}.course-panel{padding:0;overflow:hidden}.table-toolbar{display:flex;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line)}.table-search{width:270px;height:38px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--surface-2);border-radius:9px;color:var(--muted)}.table-search input{background:transparent;border:0;outline:0;font-size:10px}.table-toolbar .select{width:130px;min-height:38px;font-size:9px}.table-toolbar .button{margin-left:auto}.course-admin-list article{display:grid;grid-template-columns:120px 1fr 90px auto;align-items:center;gap:18px;padding:14px 16px;border-bottom:1px solid var(--line)}.course-admin-list article:last-child{border-bottom:0}.course-image{height:74px;display:grid;place-items:center;overflow:hidden;background:#dce9df;border-radius:10px}.course-image img{width:85%;height:85%;object-fit:contain;mix-blend-mode:multiply}.tone-blue{background:#dce7f3}.tone-amber{background:#f4e8d0}.tone-purple{background:#e8e1f0}.tone-red{background:#f1ddd8}.course-info>div{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:8px}.course-info h2{margin:7px 0 3px;font-size:13px}.course-info p{color:var(--muted);font-size:8px}.lesson-count{display:flex;align-items:center;gap:8px;color:var(--muted)}.lesson-count strong,.lesson-count span{display:block}.lesson-count strong{color:var(--ink);font-size:12px}.lesson-count span{font-size:8px}.course-actions{display:flex;gap:6px}.row-menu{color:var(--muted);background:transparent}@media(max-width:900px){.course-admin-list article{grid-template-columns:90px 1fr auto}.lesson-count{display:none}.course-actions .button{font-size:0}.course-actions .button svg{margin:0}}@media(max-width:620px){.table-toolbar{flex-wrap:wrap}.table-search{width:100%}.table-toolbar .button{margin-left:0}.course-admin-list article{grid-template-columns:72px 1fr}.course-actions{grid-column:2}.course-image{height:60px}}</style>
+
+<style scoped>
+.summary{margin-bottom:14px}.course-panel{padding:0;overflow:hidden}.table-toolbar{display:flex;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line)}.table-search{width:270px;height:38px;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--surface-2);border-radius:9px;color:var(--muted)}.table-search input{background:transparent;border:0;outline:0;font-size:10px}.table-toolbar .select{width:130px;min-height:38px;font-size:9px}.table-toolbar .button{margin-left:auto}.course-admin-list article{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid var(--line)}.course-info>div{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:8px}.course-info h2{margin:7px 0 3px;font-size:13px}.course-info p{color:var(--muted);font-size:8px}.course-actions{display:flex;gap:6px}.empty-message{padding:36px;color:var(--muted);text-align:center}@media(max-width:620px){.table-toolbar{flex-wrap:wrap}.table-search{width:100%}.table-toolbar .button{margin-left:0}.course-admin-list article{align-items:flex-start;flex-direction:column}.course-actions{width:100%}}
+</style>

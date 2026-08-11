@@ -4,6 +4,7 @@ import com.lecture.user.entity.Invitation;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,6 +12,22 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 public class InvitationDto {
+
+    @Getter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ValidateRequest {
+        @NotBlank(message = "초대코드는 필수입니다")
+        private String invitationCode;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class ValidationResponse {
+        private boolean valid;
+        private Long companyId;
+        private LocalDateTime expiresAt;
+    }
 
     @Getter
     @NoArgsConstructor

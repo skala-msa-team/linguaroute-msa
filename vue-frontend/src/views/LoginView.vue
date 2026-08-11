@@ -12,8 +12,7 @@
         <div><p class="eyebrow">Sign in</p><h2>LinguaRoute 로그인</h2><p class="muted">회사에서 사용하는 이메일로 로그인하세요.</p></div>
         <div v-if="reasonMessage" class="login-notice"><TriangleAlert :size="17" />{{ reasonMessage }}</div>
         <form class="form-stack" @submit.prevent="login">
-          <template v-if="!useLiveApi"><div class="field"><label for="email">이메일</label><div class="input-with-icon"><Mail :size="17" /><input id="email" v-model.trim="email" class="input" type="email" autocomplete="username" required /></div></div><div class="field"><div class="label-row"><label for="password">비밀번호</label><router-link to="/account/recovery">비밀번호를 잊으셨나요?</router-link></div><div class="input-with-icon"><LockKeyhole :size="17" /><input id="password" v-model="password" class="input" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" aria-label="비밀번호 표시" @click="showPassword=!showPassword"><Eye :size="17" /></button></div></div><label class="check-row"><input type="checkbox" checked /> 로그인 상태 유지</label></template>
-          <p v-else class="muted">계정 정보는 다음 Auth Server 로그인 화면에서 입력합니다.</p>
+          <p class="muted">계정 정보는 다음 Auth Server 로그인 화면에서 입력합니다.</p>
           <div v-if="loginError" class="login-notice"><TriangleAlert :size="17" />{{ loginError }}</div>
           <button class="button primary" type="submit" :disabled="isSubmitting">{{ isSubmitting ? '로그인 중...' : '로그인' }} <ArrowRight :size="17" /></button>
         </form>
@@ -26,20 +25,20 @@
 </template>
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth.js'
-import { Check, BookOpen, ArrowLeft, Mail, LockKeyhole, Eye, ArrowRight, Building2, TicketCheck, ChevronRight, TriangleAlert } from '@lucide/vue'
+import { Check, BookOpen, ArrowLeft, ArrowRight, Building2, TicketCheck, ChevronRight, TriangleAlert } from '@lucide/vue'
 import BrandLogo from '@/components/BrandLogo.vue'
-const showPassword=ref(false)
-const email=ref('employee@scalatech.co.kr'),password=ref('Password123!'),loginError=ref(''),isSubmitting=ref(false)
-const route=useRoute(),router=useRouter(),auth=useAuthStore(); const useLiveApi=import.meta.env.VITE_USE_LIVE_API==='true'
-const reasonMessage=computed(()=>route.query.reason==='session-expired'?'Access Token이 만료되었습니다. 다시 로그인해 주세요.':route.query.reason==='user-inactive'?'비활성 또는 탈퇴 계정은 서비스를 이용할 수 없습니다.':'')
-const homeByRole={PLATFORM_ADMIN:'/admin',COMPANY_ADMIN:'/company',EMPLOYEE:'/app'}
+const loginError=ref(''),isSubmitting=ref(false)
+const route=useRoute(),auth=useAuthStore()
+const reasonMessage=computed(()=>route.query.reason==='signup-complete'?'기업 계정이 생성되었습니다. 로그인하면 구독 결제를 계속할 수 있습니다.':route.query.reason==='session-expired'?'Access Token이 만료되었습니다. 다시 로그인해 주세요.':route.query.reason==='user-inactive'?'비활성 또는 탈퇴 계정은 서비스를 이용할 수 없습니다.':route.query.reason==='auth-required'?'로그인이 필요한 화면입니다. 로그인 후 다시 이용해 주세요.':'')
 async function login(){
   loginError.value=''
-  if(!useLiveApi){router.push('/app');return}
   isSubmitting.value=true
   try{
+    const nextPath=String(route.query.next||'')
+    if(nextPath.startsWith('/')&&!nextPath.startsWith('//')) sessionStorage.setItem('post_login_redirect',nextPath)
+    else sessionStorage.removeItem('post_login_redirect')
     auth.startOAuthLogin()
   }catch(error){
     loginError.value=error.response?.data?.message||'이메일 또는 비밀번호를 확인해 주세요.'

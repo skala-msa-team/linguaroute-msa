@@ -1,6 +1,6 @@
 # LinguaRoute MSA ERD
 
-> 문서 상태: MVP 논리 설계 초안
+> 문서 상태: 2026-08-11 현재 엔티티·초기 스키마·이벤트 구현 동기화
 
 ## 1. 설계 원칙
 
@@ -28,9 +28,8 @@ flowchart LR
     COURSE["Course<br/>course-service"] --> LESSON["Lesson<br/>course-service"]
     COURSE -. "논리 참조" .-> ENROLLMENT
     ENROLLMENT --> PROGRESS["Lesson Progress<br/>enrollment-service"]
-    USER -. "논리 참조" .-> RECOMMENDATION["Recommendation<br/>recommend-service"]
-    COURSE -. "ACTIVE 강의 조회" .-> RECOMMENDATION
-    RECOMMENDATION --> RECOMMENDATION_ITEM["Recommendation Item<br/>recommend-service"]
+    USER -. "권한·수강 이력 조회" .-> RECOMMEND_ENGINE["Recommendation Engine<br/>recommend-service"]
+    COURSE -. "ACTIVE 강의 조회" .-> RECOMMEND_ENGINE
 ```
 
 점선은 서로 다른 서비스 소유 영역 사이의 논리 참조이며 실제 데이터베이스 외래키를 생성하지 않습니다.
@@ -215,44 +214,20 @@ erDiagram
 
 ---
 
-## 6. recommend-service ERD
+## 6. recommend-service 데이터 처리
 
-```mermaid
-erDiagram
-    RECOMMENDATION ||--|{ RECOMMENDATION_ITEM : contains
+현재 연동 골격의 `recommend-service`는 물리 테이블을 만들지 않습니다. 추천 요청과 결과는 요청 처리 중 메모리에서 생성해 즉시 응답하며 `init-db/01_init.sql`에도 추천 테이블이 없습니다. 추천 시스템은 김지민 팀원이 연동할 예정이며, 영속화가 필요해질 경우 서비스 소유권과 보존 정책을 먼저 확정한 뒤 이 문서와 초기화 SQL을 함께 변경합니다.
 
-    RECOMMENDATION {
-        bigint id PK
-        bigint user_id
-        bigint company_id
-        varchar language
-        varchar level
-        varchar job
-        varchar situation
-        text goal
-        varchar source
-        varchar status
-        datetime created_at
-    }
-
-    RECOMMENDATION_ITEM {
-        bigint id PK
-        bigint recommendation_id FK
-        bigint course_id
-        int rank
-        text reason
-        datetime created_at
-    }
+```text
+직원 요청
+→ user-service 내부 API로 최신 역할·상태 확인
+→ enrollment-service 내부 API로 기존 수강 강의 ID 조회
+→ course-service 내부 API로 같은 언어의 ACTIVE 후보 조회
+→ 수준·상황 일치도로 정렬하고 추천 이유 생성
+→ RULE_BASED_FALLBACK 응답 반환
 ```
 
-### recommend-service 주요 제약조건
-
-| 테이블 | 제약조건 |
-| --- | --- |
-| `recommendation_item` | `(recommendation_id, course_id)` 유일 |
-| 추천 결과 | `ACTIVE` 강의와 요청 언어가 일치하는 강의만 저장 |
-
-`recommendation.user_id`와 `company_id`는 `user-service`, `recommendation_item.course_id`는 `course-service`에 대한 논리 참조입니다. `recommend-service`는 다른 서비스의 테이블을 직접 조회하지 않고 `course-service` API로 추천 후보와 상태를 검증합니다.
+추천 응답의 `recommendationId`는 응답 추적용 실행 시각 기반 값이며 데이터베이스 기본키가 아닙니다. 향후 추천 이력 저장이 요구될 때만 서비스 소유 테이블과 보존 정책을 별도 설계합니다.
 
 ---
 
@@ -552,7 +527,7 @@ erDiagram
 }
 ```
 
-현재 `recommend-service`는 이 이벤트를 추천 캐시 갱신을 위한 힌트로만 소비하며, 추천 결과의 기준 데이터는 `course-service`와 `enrollment-service` 내부 조회 API입니다. 추천 기능 담당자가 소비 로직을 확정할 때 이벤트 중복 처리와 영속화 필요 여부를 함께 결정합니다.
+현재 `recommend-service`는 이 이벤트를 수신해 로그로 기록하며 추천 캐시나 DB를 갱신하지 않습니다. 추천 요청 시점마다 `course-service`와 `enrollment-service` 내부 조회 API에서 최신 기준 데이터를 가져옵니다.
 
 ### 11.7 구독 이벤트 처리 흐름
 
@@ -592,3 +567,4 @@ MVP에서는 미발행 Outbox 이벤트를 5초 간격으로 재시도하고 성
 | 서비스 경계 | 다른 서비스 소유 테이블 직접 조회·조인과 서비스 사이 외래키가 없는지 확인 |
 | 논리 참조 | 서비스 밖의 ID가 논리 참조로만 저장되는지 확인 |
 | 이벤트 전달 보장 | Outbox를 5초 간격으로 재시도하고 `processed_event`는 프로젝트 기간 동안 보관 |
+| 추천 데이터 | 현재 물리 테이블 없이 요청 시 계산하며 `recommendationId`는 영속 ID가 아님 |

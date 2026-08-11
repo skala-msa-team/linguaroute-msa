@@ -107,6 +107,18 @@ class CourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("출장 중국어 실전"));
 
+        mockMvc.perform(post("/api/admin/courses/{courseId}", courseId)
+                        .param("action", "update-course")
+                        .with(jwt())
+                        .header("X-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"출장 중국어 브라우저","description":"브라우저 수정","language":"CHINESE",
+                                 "situation":"BUSINESS_TRIP","level":"INTERMEDIATE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("출장 중국어 브라우저"));
+
         mockMvc.perform(patch("/api/admin/courses/{courseId}/status", courseId)
                         .with(jwt())
                         .header("X-User-Id", 1L)
@@ -115,6 +127,23 @@ class CourseControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("INACTIVE"));
 
-        verify(userAuthorizationClient, times(3)).requirePlatformAdmin(1L);
+        mockMvc.perform(get("/api/admin/courses")
+                        .with(jwt())
+                        .header("X-User-Id", 1L)
+                        .param("status", "INACTIVE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].title").value("출장 중국어 브라우저"))
+                .andExpect(jsonPath("$.data.content[0].status").value("INACTIVE"));
+
+        mockMvc.perform(post("/api/admin/courses/{courseId}/status", courseId)
+                        .param("action", "update-status")
+                        .with(jwt())
+                        .header("X-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        verify(userAuthorizationClient, times(6)).requirePlatformAdmin(1L);
     }
 }

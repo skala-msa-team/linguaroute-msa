@@ -90,5 +90,9 @@ public class UserAuthorizationClient {
                     && "COMPANY_ADMIN".equals(businessRole)
                     && companyId != null;
         }
+
+        public boolean isActivePlatformAdmin() {
+            return "ACTIVE".equals(status) && "PLATFORM_ADMIN".equals(businessRole);
+        }
     }
 }

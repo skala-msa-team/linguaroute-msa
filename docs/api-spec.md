@@ -10,9 +10,9 @@
 | 데이터 형식 | `application/json` |
 | 인증 방식 | `Authorization: Bearer {accessToken}` |
 | 날짜 형식 | ISO 8601, 예: `2026-08-10T10:30:00+09:00` |
-| 문서 상태 | 인증·구독·직원·강의·수강 API는 구현·검증 기록 반영, AI 추천·플랫폼 운영 API는 설계·미구현 |
+| 문서 상태 | 추천 시스템은 팀원 연동 예정, 나머지 확정 MVP API의 2026-08-11 통합 검증 결과 반영 |
 
-인증·구독·직원·강의·수강 API의 구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. AI 추천과 플랫폼 운영 URL은 기능 설계를 위한 초안이므로 구현 후 Swagger UI와 실제 요청·응답을 대조해야 합니다.
+구현·검증 범위는 [MVP 통합 검증 기록](./mvp-verification.md)을 따릅니다. 외부·보호·내부 API와 OAuth2 흐름을 포함한 curl 79건, 역할별 Chrome 상황 38건을 2026-08-11 로컬 Docker Compose 환경에서 확인했습니다. 이 중 추천 요청은 팀원 연동 전 계약 골격 검증이며 추천 기능 완료 건수로 해석하지 않습니다.
 
 기존 API Gateway 서버는 유지하고 새 Gateway 서버를 추가하지 않습니다. 제공 Gateway 이미지는 수정하지 않으며, `docker-compose.yml` 환경변수로 가능한 라우팅만 보정합니다. 공개 허용 경로가 이미지에 고정된 경우에는 해당 경로를 MVP 외부 계약으로 사용합니다.
 
@@ -89,6 +89,7 @@
 | AUTH-07 | `POST` | `/api/users/register?action=request-id-find` | 공개 | 아이디 찾기 | 필수 |
 | AUTH-08 | `PUT` | `/api/users/me/password` | 로그인 | 비밀번호 변경 | 필수 |
 | AUTH-09 | `POST` | `/api/users/register?action=exchange-oauth-code` | 공개 | Authorization Code를 Access Token으로 교환 | 필수 |
+| AUTH-10 | `POST` | `/api/users/register?action=validate-invitation` | 공개 | 직원 가입 전 초대코드·만료·사용·구독·좌석 검증 | 필수 |
 
 수업 가이드의 JSON `POST /api/users/login` 예시는 현재 제공 Gateway/Auth 이미지와 다르며 실제 요청은 `401`을 반환합니다. 제공 Auth Server는 `authorization_code` grant를 지원하므로, 자체 이메일·비밀번호 로그인 후 `/oauth2/authorize`에서 Authorization Code를 받고 `/oauth2/token`에서 JWT를 발급받는 계약을 사용합니다. `AUTH-03`부터 `AUTH-08`의 보조 인증 기능은 `user-service`가 소유합니다. 제공 Gateway 이미지는 신규 공개 `/api/auth/**` 경로를 허용하지 않으므로 공개 보조 인증 API는 기존 공개 가입 경로 `POST /api/users/register`에 `action` 쿼리 파라미터를 사용합니다. `action`이 없으면 기존 기업 대표계정 가입으로 처리합니다.
 
@@ -123,6 +124,15 @@ Content-Type: application/json
 ```
 
 Auth Server가 사용하는 기존 `users.role`은 `EMPLOYEE`일 때 `STUDENT`, `COMPANY_ADMIN` 또는 `PLATFORM_ADMIN`일 때 `INSTRUCTOR`로 저장합니다. 실제 권한과 기업 소속은 `user-service`의 `business_role`, `company_id`, `status`를 기준으로 보호 API에서 확인합니다. Gateway가 전달한 기존 역할 값만으로 비즈니스 권한을 결정하지 않습니다.
+
+직원 가입 화면은 최종 가입 전에 다음 공개 요청으로 초대코드를 검사합니다. 제공 Gateway의 공개 경로가 고정되어 있으므로 신규 `/api/employees/**` 공개 경로를 만들지 않고 기존 공개 가입 경로의 `action` 계약을 사용합니다. 이 검사는 코드를 소비하지 않으며 최종 가입 트랜잭션이 같은 조건을 다시 검사합니다.
+
+```http
+POST /api/users/register?action=validate-invitation
+Content-Type: application/json
+
+{"invitationCode":"ABCD-EFGH"}
+```
 
 ### AUTH-03·04 비밀번호 재설정
 
@@ -261,9 +271,9 @@ Authorization: Bearer {accessToken}
 | --- | --- | --- | --- | --- | --- |
 | COMPANY-01 | `POST` | `/api/users/register` | 공개 | 기업 대표계정 회원가입 | 필수 |
 | COMPANY-02 | `GET` | `/api/companies/me` | 기업 관리자 | 기업 정보 조회 | 필수 |
-| COMPANY-03 | `PATCH` | `/api/companies/me` | 기업 관리자 | 기업 정보 수정 | 필수 |
+| COMPANY-03 | `POST` | `/api/companies/me?action=update-company` | 기업 관리자 | 기업 정보 수정 | 필수 |
 | USER-01 | `GET` | `/api/users/me` | 로그인 | 내 정보 조회 | 필수 |
-| USER-02 | `PATCH` | `/api/users/me` | 로그인 | 내 정보 수정 | 필수 |
+| USER-02 | `POST` | `/api/users/me?action=update-profile` | 로그인 | 내 정보 수정 | 필수 |
 | USER-03 | `PUT` | `/api/users/me/password` | 로그인 | 현재 비밀번호 확인 후 변경 | 필수 |
 | USER-04 | `DELETE` | `/api/users/me` | 로그인 | 회원 탈퇴 | 필수 |
 
@@ -369,9 +379,9 @@ Gateway는 회원가입 요청을 `user-service`로 전달합니다. `user-servi
 | INVITE-02 | `GET` | `/api/companies/me/invitations` | 기업 관리자 | 초대코드 목록·상태 조회 | 필수 |
 | INVITE-03 | `DELETE` | `/api/companies/me/invitations/{invitationId}` | 기업 관리자 | 초대코드 폐기 | 필수 |
 | INVITE-04 | `POST` | `/api/companies/me/invitations/{invitationId}/reissue` | 기업 관리자 | 초대코드 재발급 | 필수 |
-| EMPLOYEE-01 | `POST` | `/api/employees/signup` | 공개 | 초대코드 기반 직원 가입 | 필수 |
+| EMPLOYEE-01 | `POST` | `/api/users/register?action=employee-signup` | 공개 | 초대코드 기반 직원 가입 | 필수 |
 | EMPLOYEE-02 | `GET` | `/api/companies/me/employees` | 기업 관리자 | 소속 직원 목록 조회 | 필수 |
-| EMPLOYEE-03 | `PATCH` | `/api/companies/me/employees/{userId}/status` | 기업 관리자 | 직원 비활성화·소속 해제 | 필수 |
+| EMPLOYEE-03 | `POST` | `/api/companies/me/employees/{userId}/status?action=update-status` | 기업 관리자 | 직원 비활성화·소속 해제 | 필수 |
 | SEAT-01 | `GET` | `/api/companies/me/seats` | 기업 관리자 | 구매·사용·잔여 좌석 조회 | 필수 |
 
 ### INVITE-01 초대코드 생성
@@ -498,7 +508,7 @@ POST /api/companies/me/invitations/{invitationId}/reissue
 }
 ```
 
-`PATCH /api/companies/me/employees/{userId}/status` 요청은 아래 상태 중 하나를 사용합니다.
+`POST /api/companies/me/employees/{userId}/status?action=update-status` 요청은 아래 상태 중 하나를 사용합니다.
 
 ```json
 { "status": "INACTIVE" }
@@ -571,9 +581,10 @@ X-Internal-Api-Key: {internalApiKey}
 | COURSE-01 | `GET` | `/api/courses` | 직원 | 목록·검색·필터 | 필수 |
 | COURSE-02 | `GET` | `/api/courses/{courseId}` | 직원 | 강의 상세 조회 | 필수 |
 | COURSE-03 | `GET` | `/api/courses/{courseId}/lessons` | 직원 | 강의 차시 목록 조회 | 필수 |
+| ADMIN-COURSE-00 | `GET` | `/api/admin/courses` | 플랫폼 관리자 | 전체 강의·상태 검색 | 필수 |
 | ADMIN-COURSE-01 | `POST` | `/api/admin/courses` | 플랫폼 관리자 | 강의 등록 | 필수 |
-| ADMIN-COURSE-02 | `PATCH` | `/api/admin/courses/{courseId}` | 플랫폼 관리자 | 강의 수정 | 필수 |
-| ADMIN-COURSE-03 | `PATCH` | `/api/admin/courses/{courseId}/status` | 플랫폼 관리자 | 강의 활성·비활성 | 필수 |
+| ADMIN-COURSE-02 | `POST` | `/api/admin/courses/{courseId}?action=update-course` | 플랫폼 관리자 | 강의 수정 | 필수 |
+| ADMIN-COURSE-03 | `POST` | `/api/admin/courses/{courseId}/status?action=update-status` | 플랫폼 관리자 | 강의 활성·비활성 | 필수 |
 | ADMIN-LESSON-01 | `POST` | `/api/admin/courses/{courseId}/lessons` | 플랫폼 관리자 | 강의 차시 등록 | 필수 |
 
 ### COURSE-01 목록·검색·필터
@@ -668,6 +679,10 @@ GET /api/courses?keyword=미팅&language=ENGLISH&situation=CUSTOMER_MEETING&leve
 ```
 
 직원용 강의 상세 조회와 동일하게 `ACTIVE` 강의만 조회할 수 있습니다.
+
+### ADMIN-COURSE-00 관리자 강의 목록
+
+플랫폼 관리자는 `GET /api/admin/courses`에서 `keyword`, `language`, `situation`, `level`, `status`, `page`, `size`를 사용할 수 있습니다. 직원용 목록과 달리 `status`를 생략하면 `ACTIVE`와 `INACTIVE`를 모두 반환하므로 비활성 강의를 다시 활성화할 수 있습니다. API Gateway가 전달한 사용자 ID를 내부 권한 API로 재검증합니다.
 
 ### ADMIN-COURSE-01 강의 등록
 
@@ -1047,15 +1062,15 @@ Authorization: Bearer {accessToken}
 
 ---
 
-## 9. AI 강의 추천 API (설계·미구현)
+## 9. 강의 추천 API (팀원 연동 예정)
 
-> 이 절의 경로와 요청·응답은 확정 MVP 목표 계약이다. 현재 `recommend-service`의 외부 경로와 내부 호출이 이 계약에 맞지 않아 Gateway 통합 API로 사용할 수 없다. 구현·curl 검증 전에는 완료 API로 공유하지 않는다.
+추천 시스템의 최종 구현은 김지민 팀원이 연동할 예정입니다. 현재 `recommend-service`의 외부 Gateway 경로, 직원 권한 확인, 내부 강의·수강 이력 조회와 `RULE_BASED_FALLBACK` 응답 골격까지만 통합 검증했습니다. 아래 계약은 팀원 연동 시 유지해야 할 목표 계약이며, 현재 상태를 추천 기능 완료로 표시하지 않습니다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수 |
+| AI-01 | `POST` | `/api/courses/recommendations` | 직원 | AI 강의 추천 | 필수·팀원 연동 예정 |
 
-추천 요청과 결과 데이터는 `recommend-service`가 소유합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
+추천 요청 처리와 결과 생성 책임은 `recommend-service`가 소유합니다. 현재 결과는 영속화하지 않고 즉시 응답합니다. 외부 URL은 API Gateway 계약에 따라 `/api/courses/recommendations`를 유지하며, `recommend-service`는 `course-service` API로 실제 `ACTIVE` 상태 및 요청 언어와 일치하는 강의인지 조회·검증합니다.
 
 ### AI-01 추천 요청
 
@@ -1075,14 +1090,14 @@ Authorization: Bearer {accessToken}
 {
   "data": {
     "recommendationId": 3001,
-    "source": "AI",
+    "source": "RULE_BASED_FALLBACK",
     "courses": [
       {
         "courseId": 12,
         "title": "해외 고객 미팅 영어",
         "language": "ENGLISH",
         "level": "INTERMEDIATE",
-        "reason": "해외영업 직무와 고객 미팅 목표에 적합합니다."
+        "reason": "선택한 언어, 현재 수준, 업무 상황과 학습 목표에 적합한 활성 강의입니다."
       }
     ]
   },
@@ -1090,7 +1105,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-AI 장애 시 대체 응답:
+현재 연동 골격 응답:
 
 ```json
 {
@@ -1109,18 +1124,19 @@ AI 장애 시 대체 응답:
 }
 ```
 
-AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언어와 다시 대조합니다.
+현재 골격은 추천 후보를 실제 `ACTIVE` 강의 및 선택 언어와 대조하고, 이미 수강 중인 강의를 제외합니다. 수준과 상황 일치 여부를 이용한 정렬은 연동 전 동작 확인용이며 최종 추천 판단으로 간주하지 않습니다. 팀원 추천 시스템을 추가한 뒤에도 같은 최종 검증을 통과한 강의만 반환해야 합니다.
 
 ### recommend-service 내부 의존 API
 
 `recommend-service`는 추천 후보와 기존 수강 이력을 조회할 때 Gateway를 거치지 않고 대상 서비스를 직접 호출합니다. 모든 내부 호출에는 `X-Internal-Api-Key`가 필요합니다.
 
-| 대상 서비스 | 이전 경로 | 현재 경로 | 비고 |
-| --- | --- | --- | --- |
-| `course-service` | `/api/courses/internal/recommend` | `/internal/courses/recommend` | `language`, `excludeIds` 파라미터 사용 |
-| `enrollment-service` | `/api/enrollments/internal/history/{userId}` | `/internal/enrollments/history/{userId}` | 응답 필드명 `activeCourseIds` 유지 |
+| 대상 서비스 | 현재 경로 | 비고 |
+| --- | --- | --- |
+| `user-service` | `/internal/users/{userId}/authorization` | 최신 역할·소속·상태 확인 |
+| `course-service` | `/internal/courses/recommend` | `language`, `excludeIds` 파라미터 사용 |
+| `enrollment-service` | `/internal/enrollments/history/{userId}` | `activeCourseIds`로 기존 수강 강의 제외 |
 
-`course-service` 추천 후보 응답은 `id`, `title`, `description`, `language`, `situation`, `level`, `status`, `createdAt`, `updatedAt` 구조입니다. 추천 서비스가 과거 강의 도메인의 `category`, `price`, `instructorId`, `enrollmentCount` 필드를 전제로 파싱한다면 새 강의 도메인 구조에 맞춰 조정해야 합니다.
+`course-service` 추천 후보 응답은 `id`, `title`, `description`, `language`, `situation`, `level`, `status` 구조이며 `recommend-service`의 현재 Pydantic 모델과 일치합니다.
 
 ---
 
@@ -1128,12 +1144,14 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
-| TERM-01 | `GET` | `/api/terms/active` | 공개 | 현재 필수·선택 약관 조회 | 필수 |
+| TERM-01 | `GET` | `/api/users/register?action=active-terms` | 공개 | 현재 필수·선택 약관 조회 | 필수 |
 | TERM-02 | `POST` | `/api/users/me/agreements` | 로그인 | 가입 후 선택 약관 동의 변경 | 필수 |
 
 기업 관리자와 직원 회원가입 요청은 현재 필수 약관의 `agreementIds`를 포함해야 하며, 서버는 누락된 필수 약관이 있으면 가입을 거부합니다.
 
 ### TERM-01 활성 약관 조회
+
+제공 Gateway의 공개 허용 경로에 맞춰 외부 클라이언트는 위 경로를 사용한다. user-service 직접 호출 호환 경로인 `GET /api/terms/active`도 같은 응답을 반환한다.
 
 응답 `200 OK`:
 
@@ -1167,9 +1185,9 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 
 ---
 
-## 11. 플랫폼 운영 API (설계·미구현)
+## 11. 플랫폼 운영 API
 
-> 아래 운영 조회 API는 화면·클라이언트에서 호출하지 않는다. 현재 각 소유 서비스에 플랫폼 관리자용 집계 API가 구현되어 있지 않으므로, 구현 및 Gateway 검증 전에는 설계 계약으로만 관리한다.
+아래 운영 조회 API는 플랫폼 관리자만 호출할 수 있습니다. 사용자·기업은 `user-service`, 결제는 `payment-service`, 수강은 `enrollment-service`가 각각 소유하며 프론트 운영 화면이 Gateway를 통해 결과를 조합합니다. 플랫폼 관리자 계정은 네 API 모두 `200`, 직원 계정은 `403`으로 실제 검증했습니다.
 
 | ID | Method | URL | 권한 | 기능 | MVP |
 | --- | --- | --- | --- | --- | --- |
@@ -1179,7 +1197,85 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | OPS-04 | `GET` | `/api/admin/enrollments` | 플랫폼 관리자 | 수강 상태 조회 | 필수 |
 | OPS-05 | `GET` | `/api/admin/audit-logs` | 플랫폼 관리자 | 주요 감사 로그 조회 | 추후 확장 |
 
-운영 화면이 데이터를 한 번에 조회하더라도 각 데이터의 소유 서비스는 유지합니다. 별도 운영 DB를 추가하지 않고 API Gateway 또는 프론트엔드가 각 서비스의 관리자 조회 API를 조합합니다.
+### 11.1 OPS-01 사용자 상태 조회
+
+쿼리 파라미터:
+
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `keyword` | 아니오 | 사용자 이름, 이메일 또는 소속 기업명 부분 검색. 대소문자 구분 없음 |
+| `businessRole` | 아니오 | `PLATFORM_ADMIN`, `COMPANY_ADMIN`, `EMPLOYEE` |
+| `status` | 아니오 | `ACTIVE`, `INACTIVE`, `WITHDRAWN` |
+| `page` | 아니오 | 0부터 시작. 기본값 `0`, 음수는 `0`으로 보정 |
+| `size` | 아니오 | 기본값 `20`, 허용 범위 `1~100`으로 보정 |
+
+응답은 `createdAt`, `userId` 내림차순이다.
+
+```json
+{
+  "data": {
+    "content": [
+      {
+        "userId": 9102,
+        "email": "employee.lee@skala-tech.local",
+        "name": "이수강",
+        "businessRole": "EMPLOYEE",
+        "status": "ACTIVE",
+        "companyId": 9101,
+        "companyName": "스칼라테크",
+        "createdAt": "2026-08-10T09:12:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "timestamp": "2026-08-11T09:42:45+09:00"
+}
+```
+
+플랫폼 관리자는 기업 소속이 없으므로 `companyId`, `companyName`이 `null`일 수 있다.
+
+### 11.2 OPS-02 기업 상태 조회
+
+쿼리 파라미터:
+
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `keyword` | 아니오 | 기업명 또는 사업자번호 부분 검색. 사업자번호의 `-`는 제거해 비교 |
+| `status` | 아니오 | `ACTIVE`, `INACTIVE` |
+| `page` | 아니오 | 0부터 시작. 기본값 `0`, 음수는 `0`으로 보정 |
+| `size` | 아니오 | 기본값 `20`, 허용 범위 `1~100`으로 보정 |
+
+응답은 `createdAt`, `companyId` 내림차순이다. 결제·구독 상세는 payment-service 소유이므로 이 응답에 포함하지 않는다.
+
+```json
+{
+  "data": {
+    "content": [
+      {
+        "companyId": 9101,
+        "name": "스칼라테크",
+        "businessNumber": "9910000001",
+        "status": "ACTIVE",
+        "createdAt": "2026-08-10T09:00:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1
+  },
+  "timestamp": "2026-08-11T09:42:45+09:00"
+}
+```
+
+두 API는 Bearer Token의 사용자 ID로 user-service의 최신 `businessRole`, `status`를 다시 확인한다. 활성 `PLATFORM_ADMIN`이 아니면 `403 PLATFORM_ADMIN_REQUIRED` 또는 `403 USER_INACTIVE`를 반환한다. 알 수 없는 enum 필터는 `400 BAD_REQUEST`를 반환한다.
+
+- `OPS-01`, `OPS-02`, `OPS-03`은 배열을 `data`로 반환합니다.
+- `OPS-04`는 `page`, `size`, `totalElements`, `totalPages`, `content`를 포함한 페이지 응답을 `data`로 반환하며 기본값은 `page=0`, `size=100`입니다.
+- `OPS-03`, `OPS-04`는 Gateway의 payment/enrollment 라우트에 `/api/admin/**` 경로를 명시적으로 추가해 해당 소유 서비스로 전달합니다.
 
 ---
 
@@ -1208,6 +1304,7 @@ AI가 반환한 강의 ID는 응답 전에 실제 `ACTIVE` 강의 및 선택 언
 | `DUPLICATE_PAYMENT` | `409` | 중복 결제 요청 |
 | `INVALID_USER_CONTEXT` | `401` | Gateway가 전달한 인증 사용자 정보가 없거나 올바르지 않음 |
 | `COMPANY_ADMIN_REQUIRED` | `403` | 기업 관리자 권한 필요 |
+| `PLATFORM_ADMIN_REQUIRED` | `403` | 플랫폼 관리자 권한 필요 |
 | `USER_AUTHORIZATION_UNAVAILABLE` | `503` | 사용자 권한 정보를 확인할 수 없음 |
 | `PAYMENT_FAILED` | `422` | 결제 실패 |
 | `COURSE_NOT_FOUND` | `404` | 강의 없음 |

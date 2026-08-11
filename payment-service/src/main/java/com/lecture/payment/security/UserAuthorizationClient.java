@@ -44,6 +44,31 @@ public class UserAuthorizationClient {
         }
     }
 
+    public void requirePlatformAdmin(Long userId) {
+        AuthorizationData data = getAuthorizationData(userId);
+        if (!"ACTIVE".equals(data.status()) || !"PLATFORM_ADMIN".equals(data.businessRole())) {
+            throw new PaymentException(PaymentErrorCode.PLATFORM_ADMIN_REQUIRED);
+        }
+    }
+
+    private AuthorizationData getAuthorizationData(Long userId) {
+        try {
+            AuthorizationResponse response = restClient.get()
+                    .uri("/internal/users/{userId}/authorization-context", userId)
+                    .header("X-Internal-Api-Key", internalApiKey)
+                    .retrieve()
+                    .body(AuthorizationResponse.class);
+            if (response == null || response.data() == null) {
+                throw new PaymentException(PaymentErrorCode.USER_AUTHORIZATION_UNAVAILABLE);
+            }
+            return response.data();
+        } catch (PaymentException e) {
+            throw e;
+        } catch (RestClientException e) {
+            throw new PaymentException(PaymentErrorCode.USER_AUTHORIZATION_UNAVAILABLE);
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record AuthorizationResponse(AuthorizationData data) {
     }

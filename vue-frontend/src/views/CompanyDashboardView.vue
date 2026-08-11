@@ -1,19 +1,31 @@
-<template><AppShell><PageHeader eyebrow="Company overview" title="스칼라테크 학습 현황" description="구독, 좌석, 직원 학습을 한눈에 확인하세요."><router-link class="button accent" to="/company/employees"><UserPlus :size="16"/> 직원 초대</router-link></PageHeader><section class="subscription-strip"><div><span class="tag">ACTIVE</span><strong>Business 50 · 월간</strong><small>다음 결제일 2026.09.10</small></div><div class="seat-usage"><span><b>42</b> / 50석 사용 중</span><div class="progress"><span style="width:84%"></span></div></div><router-link to="/company/subscription">구독 관리 <ArrowRight :size="15"/></router-link></section><section class="metric-grid"><article v-for="item in metrics" :key="item.label" class="metric card"><div class="metric-head"><span>{{ item.label }}</span><span class="metric-icon"><component :is="item.icon" :size="17"/></span></div><div><strong class="metric-value">{{ item.value }}</strong><p class="trend">{{ item.trend }}</p></div></article></section><section class="company-grid"><article class="panel progress-panel"><div class="section-head"><div><h2>직원 학습 추이</h2><p>최근 6개월 평균 진도율</p></div><select><option>전체 부서</option><option>글로벌사업팀</option></select></div><div class="chart"><span v-for="(v,i) in [42,48,55,59,68,78]" :key="i" :style="`height:${v}%`"><i>{{ v }}%</i><small>{{ ['3월','4월','5월','6월','7월','8월'][i] }}</small></span></div></article><article class="panel activity-panel"><div class="section-head"><div><h2>최근 활동</h2><p>직원과 구독의 주요 변화</p></div><button><MoreHorizontal :size="18"/></button></div><div class="activity-list"><div v-for="item in activities" :key="item.text"><span :class="item.tone"><component :is="item.icon" :size="15"/></span><p><strong>{{ item.text }}</strong><small>{{ item.time }}</small></p></div></div></article></section><section class="panel employee-preview"><div class="section-head"><div><h2>학습이 필요한 직원</h2><p>최근 진도율이 낮거나 학습이 멈춘 직원입니다.</p></div><router-link to="/company/progress">전체 현황 보기 <ArrowRight :size="15"/></router-link></div><div class="table-wrap"><table class="data-table"><thead><tr><th>직원</th><th>부서</th><th>수강 강의</th><th>평균 진도</th><th>최근 학습</th><th>상태</th></tr></thead><tbody><tr v-for="employee in employees.slice(1,5)" :key="employee.email"><td><div class="person"><span class="avatar">{{ employee.name[0] }}</span><span><strong>{{ employee.name }}</strong><span>{{ employee.email }}</span></span></div></td><td>{{ employee.team }}</td><td>{{ employee.courses }}개</td><td><div class="table-progress"><div class="progress"><span :style="`width:${employee.progress}%`"></span></div><b>{{ employee.progress }}%</b></div></td><td>{{ employee.joined }}</td><td><span class="tag" :class="employee.progress<40?'amber':''">{{ employee.progress<40?'관심 필요':'학습 중' }}</span></td></tr></tbody></table></div></section></AppShell></template>
+<template>
+  <AppShell>
+    <PageHeader eyebrow="Company overview" title="기업 학습 현황" description="좌석과 직원 학습 현황을 실제 저장 데이터로 확인하세요.">
+      <router-link class="button accent" to="/company/employees"><UserPlus :size="16"/> 직원 초대</router-link>
+    </PageHeader>
+    <p v-if="loadError" class="panel load-error" role="alert">{{ loadError }}</p>
+    <section class="metric-grid">
+      <article v-for="item in metrics" :key="item.label" class="metric card"><div class="metric-head"><span>{{ item.label }}</span><span class="metric-icon"><component :is="item.icon" :size="17"/></span></div><div><strong class="metric-value">{{ item.value }}</strong><p class="trend">{{ item.trend }}</p></div></article>
+    </section>
+    <section class="panel employee-preview">
+      <div class="section-head"><div><h2>직원별 학습 현황</h2><p>서버에서 계산한 수강 수와 평균 진도율입니다.</p></div><router-link to="/company/progress">전체 현황 보기 <ArrowRight :size="15"/></router-link></div>
+      <div v-if="employees.length" class="table-wrap"><table class="data-table"><thead><tr><th>직원</th><th>수강 강의</th><th>평균 진도</th><th>최근 학습</th><th>상태</th></tr></thead><tbody><tr v-for="employee in employees.slice(0,5)" :key="employee.userId || employee.email"><td><div class="person"><span class="avatar">{{ employee.name[0] }}</span><span><strong>{{ employee.name }}</strong><span>{{ employee.email }}</span></span></div></td><td>{{ employee.courses }}개</td><td><div class="table-progress"><div class="progress"><span :style="`width:${employee.progress}%`"></span></div><b>{{ employee.progress }}%</b></div></td><td>{{ employee.joined || '-' }}</td><td><span class="tag" :class="employee.status==='ACTIVE'?'':'amber'">{{ employee.status }}</span></td></tr></tbody></table></div>
+      <p v-else-if="!loadError" class="empty-message">등록된 직원 또는 수강 데이터가 없습니다.</p>
+    </section>
+  </AppShell>
+</template>
 <script setup>
 import { onMounted, ref } from 'vue'
-import { UserPlus,ArrowRight,UsersRound,Armchair,GraduationCap,ChartNoAxesCombined,MoreHorizontal,CircleCheck,TicketCheck,CreditCard,BookOpen } from '@lucide/vue'
+import { UserPlus,ArrowRight,UsersRound,Armchair,GraduationCap,ChartNoAxesCombined } from '@lucide/vue'
 import AppShell from '@/components/AppShell.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import { employees as mockEmployees } from '@/data/mockData.js'
 import { companyApi } from '@/api/company.js'
 
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
-const employees = ref(mockEmployees)
-const metrics = ref([{label:'활성 직원',value:'42명',trend:'이번 달 +5명',icon:UsersRound},{label:'잔여 좌석',value:'8석',trend:'사용률 84%',icon:Armchair},{label:'수강 중 강의',value:'87건',trend:'전월 대비 +14%',icon:GraduationCap},{label:'평균 진도율',value:'78%',trend:'전월 대비 +12%',icon:ChartNoAxesCombined}])
-const activities = ref([{text:'김민지님이 강의를 완료했습니다.',time:'최근',icon:CircleCheck,tone:'green'},{text:'새 초대코드가 생성되었습니다.',time:'최근',icon:TicketCheck,tone:'blue'},{text:'구독 결제 이력을 확인하세요.',time:'최근',icon:CreditCard,tone:'amber'},{text:'직원 학습 현황을 확인하세요.',time:'최근',icon:BookOpen,tone:'purple'}])
+const employees = ref([])
+const metrics = ref([])
+const loadError = ref('')
 
 onMounted(async () => {
-  if (!useLiveApi) return
   try {
     const [employeeResponse, seatResponse, progressResponse] = await Promise.all([
       companyApi.getEmployees(), companyApi.getSeats(), companyApi.getEnrollmentProgress()
@@ -34,8 +46,10 @@ onMounted(async () => {
       { label: '수강 중 강의', value: `${enrollments.filter((item) => item.status !== 'COMPLETED').length}건`, trend: '서버 수강 상태 기준', icon: GraduationCap },
       { label: '평균 진도율', value: `${average}%`, trend: '서버 계산 진도율', icon: ChartNoAxesCombined }
     ]
-  } catch (_) {
-    // API 오류 시 데모 데이터를 유지한다.
+  } catch (error) {
+    employees.value = []
+    metrics.value = []
+    loadError.value = error.response?.data?.message || '기업 학습 현황을 불러오지 못했습니다.'
   }
 })
 </script>

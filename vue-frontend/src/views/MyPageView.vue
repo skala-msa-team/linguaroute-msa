@@ -45,9 +45,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import { authApi } from '@/api/auth.js'
 import { unwrapApiData } from '@/constants/domain.js'
 
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const tab = ref('profile')
-const profileName = ref('박건우')
+const profileName = ref('')
 const profileMessage = ref('')
 const passwordSaved = ref(false)
 const withdrawConfirmed = ref(false)
@@ -55,33 +54,35 @@ const withdrawn = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
 const newPasswordConfirm = ref('')
-const user = reactive({ id: 101, email: 'employee@scalatech.co.kr', name: '박건우', role: 'STUDENT', businessRole: 'EMPLOYEE', companyId: 10, status: 'ACTIVE', createdAt: '2026-07-12T09:00:00' })
-const terms = reactive([{ id: 1, type: 'SERVICE_TERMS', title: 'LinguaRoute 이용약관', version: '1.0', required: true, effectiveAt: '2026.08.10', agreed: true }, { id: 2, type: 'PRIVACY', title: '개인정보 수집 및 이용', version: '1.0', required: true, effectiveAt: '2026.08.10', agreed: true }, { id: 3, type: 'MARKETING', title: '교육 소식 및 혜택 수신', version: '1.0', required: false, effectiveAt: '2026.08.10', agreed: false }])
+const user = reactive({ id: null, email: '', name: '', role: '', businessRole: '', companyId: null, status: '', createdAt: '' })
+const terms = reactive([])
 const tabs = [{ id: 'profile', label: '기본 정보', icon: UserRound }, { id: 'security', label: '비밀번호 변경', icon: LockKeyhole }, { id: 'agreements', label: '약관 및 동의', icon: FileCheck2 }, { id: 'withdraw', label: '회원 탈퇴', icon: UserRoundX }]
 
 onMounted(async () => {
-  if (!useLiveApi) return
-  const userData = unwrapApiData(await authApi.getMe())
-  Object.assign(user, userData)
-  profileName.value = user.name
-  const activeTerms = unwrapApiData(await authApi.getActiveTerms())
-  terms.splice(0, terms.length, ...activeTerms.map((term) => ({ ...term, title: term.content, effectiveAt: term.effectiveAt?.slice(0, 10), agreed: term.required })))
+  try {
+    const userData = unwrapApiData(await authApi.getMe())
+    Object.assign(user, userData)
+    profileName.value = user.name
+    const activeTerms = unwrapApiData(await authApi.getActiveTerms())
+    terms.splice(0, terms.length, ...activeTerms.map((term) => ({ ...term, title: term.content, effectiveAt: term.effectiveAt?.slice(0, 10), agreed: term.required })))
+  } catch (error) {
+    profileMessage.value = error.response?.data?.message || '내 정보를 불러오지 못했습니다.'
+  }
 })
 
 async function saveProfile() {
-  if (useLiveApi) Object.assign(user, unwrapApiData(await authApi.updateMe(profileName.value)))
-  else user.name = profileName.value
+  Object.assign(user, unwrapApiData(await authApi.updateMe(profileName.value)))
   profileMessage.value = '이름이 저장되었습니다.'
 }
 
 async function savePassword() {
   if (newPassword.value !== newPasswordConfirm.value) return
-  if (useLiveApi) await authApi.changePassword(currentPassword.value, newPassword.value)
+  await authApi.changePassword(currentPassword.value, newPassword.value)
   passwordSaved.value = true
 }
 
 async function withdrawMe() {
-  if (useLiveApi) await authApi.withdrawMe()
+  await authApi.withdrawMe()
   withdrawn.value = true
 }
 </script>

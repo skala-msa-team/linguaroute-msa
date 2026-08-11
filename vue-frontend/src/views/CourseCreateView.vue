@@ -11,7 +11,7 @@
         <section class="panel editor-section"><div class="section-number">02</div><div class="section-content"><div class="section-head"><div><h2>강의 차시</h2><p>차시 등록은 강의 생성 후 별도 API로 순서대로 처리합니다.</p></div><button class="button small accent" @click="addLesson"><Plus :size="14" /> 차시 추가</button></div><div class="lesson-editor"><article v-for="(lesson,index) in lessons" :key="lesson.sequence"><GripVertical :size="17" /><span class="lesson-num">{{ String(lesson.sequence).padStart(2,'0') }}</span><span><input v-model="lesson.title" class="inline-input" /><small>{{ lesson.durationSeconds }}초 · {{ lesson.required ? '필수' : '선택' }} 차시</small></span><button aria-label="차시 삭제" @click="removeLesson(index)"><Trash2 :size="15" /></button></article></div></div></section>
       </main>
 
-      <aside><section class="panel status-card"><h3>강의 상태</h3><p>생성과 상태 변경은 서로 다른 API입니다.</p><div><span>노출 상태</span><button class="status-toggle" :class="{ active: status === 'ACTIVE' }" @click="status = status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'"><i></i>{{ status }}</button></div><small><code>PATCH /api/admin/courses/{id}/status</code></small></section><section class="panel contract-card"><ShieldCheck :size="19" /><h3>문서 계약 기준</h3><ul><li>언어 3종</li><li>난이도 4단계</li><li>상황 5종</li><li>ACTIVE / INACTIVE</li></ul></section></aside>
+      <aside><section class="panel status-card"><h3>강의 상태</h3><p>생성과 상태 변경은 서로 다른 API입니다.</p><div><span>노출 상태</span><button class="status-toggle" :class="{ active: status === 'ACTIVE' }" @click="status = status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'"><i></i>{{ status }}</button></div><small><code>POST /api/admin/courses/{id}/status?action=update-status</code></small></section><section class="panel contract-card"><ShieldCheck :size="19" /><h3>문서 계약 기준</h3><ul><li>언어 3종</li><li>난이도 4단계</li><li>상황 5종</li><li>ACTIVE / INACTIVE</li></ul></section></aside>
     </div>
   </AppShell>
 </template>
@@ -27,7 +27,6 @@ import { LANGUAGE_OPTIONS, LEVEL_OPTIONS, SITUATION_OPTIONS } from '@/constants/
 
 const route = useRoute()
 const isEdit = computed(() => Boolean(route.params.id))
-const useLiveApi = import.meta.env.VITE_USE_LIVE_API === 'true'
 const saved = ref(false)
 const saving = ref(false)
 const feedback = ref('')
@@ -38,7 +37,7 @@ const lessons = reactive([{ title: '미팅 전, 관계를 여는 스몰토크', 
 function addLesson() { lessons.push({ title: '새 차시', contentUrl: '', sequence: lessons.length + 1, required: true, durationSeconds: 600 }) }
 function removeLesson(index) { lessons.splice(index, 1); lessons.forEach((lesson, i) => { lesson.sequence = i + 1 }) }
 onMounted(async () => {
-  if (!useLiveApi || !isEdit.value) return
+  if (!isEdit.value) return
   try {
     const [courseResponse, lessonResponse] = await Promise.all([courseApi.getById(route.params.id), courseApi.getLessons(route.params.id)])
     const course = courseResponse.data.data
@@ -50,7 +49,6 @@ onMounted(async () => {
 
 async function saveCourse() {
   feedback.value = ''
-  if (!useLiveApi) { saved.value = true; return }
   saving.value = true
   try {
     const course = isEdit.value

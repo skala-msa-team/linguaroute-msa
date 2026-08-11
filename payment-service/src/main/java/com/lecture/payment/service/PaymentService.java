@@ -20,4 +20,8 @@ public class PaymentService {
                 paymentRepository.findByCompanyIdOrderByRequestedAtDesc(companyId)
         );
     }
+
+    public List<PaymentDto.PaymentResponse> getAllPayments() {
+        return PaymentDto.PaymentResponses.from(paymentRepository.findAll());
+    }
 }
